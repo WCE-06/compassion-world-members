@@ -1,49 +1,38 @@
-# FEBBRAIO セルフレジ連携 API v1
+# FEBBRAIO セルフレジ参照 API v1
 
 Base URL: `https://compassion-world-members-card.combetter27.chatgpt.site`
 
-すべてのリクエストに `Authorization: Bearer {POS_API_TOKEN}` を付ける。金額はすべて円の整数。APIは税抜・税額・税込を併記する。
+## 利用中情報の取得
 
-## 精算対象セッション取得
+`GET /api/v1/febbraio/active-usage?memberCode={会員証コード}`
 
-`GET /api/v1/pos/sessions?memberCode={会員証コード}`
+ヘッダー: `Authorization: Bearer {POS_API_TOKEN}`
 
-成功時は `sessionId`, `memberCode`, `studioId`, `reservationId`, `checkedInAt`, `scheduledEndsAt`, `status`, `paymentStatus`, `planType`, `productCode`, `unitPriceExcludingTax`, `taxRateBps`, `totalExcludingTax`, `taxAmount`, `totalIncludingTax`, `currency`, `version` を返す。
-
-## 決済成功通知
-
-`POST /api/v1/pos/sessions/{sessionId}/payments`
-
-追加ヘッダー: `Idempotency-Key: {16〜128文字のレジ側一意キー}`
+利用中の場合:
 
 ```json
 {
-  "result": "SUCCESS",
-  "source": "FEBBRAIO_SELF_REGISTER",
-  "paymentId": "POS-20260810-000123",
-  "paidAt": 1786305600000,
-  "totalExcludingTax": 5000,
-  "taxAmount": 500,
-  "totalIncludingTax": 5500
+  "found": true,
+  "memberCode": "会員証コード",
+  "checkedInAt": 1786302000000,
+  "memberRank": "STANDARD",
+  "usageMinutes": 73,
+  "billingHours": 2,
+  "productCode": "STN02"
 }
 ```
 
-成功時、セッションは `IN_USE / UNPAID` から `COMPLETED / PAID` へ更新される。同じ `Idempotency-Key` と `paymentId` の再送には成功応答と `idempotentReplay: true` を返す。別の決済で同じキーを再利用した場合は拒否する。
+利用していない場合:
 
-決済成功の通知元はセルフレジGASとし、セルフレジが実機の決済成功を確認した後だけ本APIを呼ぶ。失敗・キャンセル時は呼ばないため、セッションは `IN_USE / UNPAID` のまま維持される。
+```json
+{
+  "found": false,
+  "code": "NO_ACTIVE_USAGE"
+}
+```
 
-## エラーコード
+`usageMinutes` は利用開始から現在までの経過分を切り捨てた整数。`billingHours` は60分単位で切り上げ、最低1時間、最大10時間。通常会員は `STN01`〜`STN10`、住民会員は `STR01`〜`STR10` を返す。
 
-- `UNAUTHORIZED`: APIトークン不正
-- `INVALID_MEMBER_CODE`: 会員証コード形式不正
-- `SESSION_NOT_FOUND`: 精算対象なし
-- `MULTIPLE_ACTIVE_SESSIONS`: 利用中セッション重複
-- `PRICE_NOT_READY`: 料金未確定
-- `INVALID_IDEMPOTENCY_KEY`: 冪等性キー形式不正
-- `IDEMPOTENCY_KEY_REUSED`: 別決済でキー再利用
-- `INVALID_PAYMENT_NOTIFICATION`: 成功通知形式不正
-- `SESSION_NOT_PAYABLE`: 精算対象外状態
-- `AMOUNT_MISMATCH`: 金額不一致
-- `SESSION_CONFLICT`: 同時更新競合
+同じ会員に利用中ログが複数ある場合は HTTP 409 / `MULTIPLE_ACTIVE_USAGES`。ログの必須項目が欠けている場合は HTTP 409 / `ACTIVE_USAGE_INCOMPLETE`。認証失敗は HTTP 401 / `UNAUTHORIZED`、会員証コード形式不正は HTTP 400 / `INVALID_MEMBER_CODE`。
 
-HTTPステータスは入力不正 `400`、認証失敗 `401`、対象なし `404`、状態・金額・競合 `409` を使用する。
+このAPIは参照専用であり、利用終了、決済完了、退店処理、セッション更新を行わない。
