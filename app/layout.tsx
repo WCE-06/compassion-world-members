@@ -9,8 +9,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const base = new URL(`${protocol}://${host}`);
   return {
     metadataBase: base,
-    title: "LINE会員証 | COMPASSION WORLD",
-    description: "COMPASSION WORLDのデジタル会員証。会員番号の表示、スタジオ予約、モバイルオーダーへ。",
+    title: "FEBBRAIO 空き状況・予約 | COMPASSION WORLD",
+    description: "Music Studio FEBBRAIOの公開空き状況とLINE会員予約。",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: { title: "COMPASSION WORLD | LINE MEMBERS CARD", description: "つながる、ひろがる、会員証。", images: [{ url: new URL("/og.png", base).toString(), width: 1200, height: 630 }] },
     twitter: { card: "summary_large_image", title: "COMPASSION WORLD | LINE MEMBERS CARD", description: "つながる、ひろがる、会員証。", images: [new URL("/og.png", base).toString()] },

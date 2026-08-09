@@ -166,7 +166,7 @@ export default function Home() {
           )}
 
           <section className="actions" aria-label="会員メニュー">
-            <button className="action primary" onClick={() => openPlaceholder("スタジオ予約")}>
+            <button className="action primary" onClick={() => { window.location.href = "/availability"; }}>
               <span className="action-icon calendar" aria-hidden="true">□</span><span><small>STUDIO</small><strong>スタジオを予約する</strong></span><b>›</b>
             </button>
             <button className="action" onClick={() => openPlaceholder("モバイルオーダー")}>
