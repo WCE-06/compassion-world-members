@@ -4,6 +4,7 @@ export const members = sqliteTable("members", {
   id: text("id").primaryKey(),
   memberCode: text("member_code").notNull(),
   displayName: text("display_name").notNull(),
+  memberRank: text("member_rank", { enum: ["STANDARD", "RESIDENT"] }),
   status: text("status", { enum: ["ACTIVE", "INACTIVE"] }).notNull().default("ACTIVE"),
   sourceSystem: text("source_system").notNull().default("LEGACY"),
   sourceCustomerId: text("source_customer_id"),

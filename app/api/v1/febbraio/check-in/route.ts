@@ -18,9 +18,9 @@ export async function POST(request: NextRequest) {
   if (!await authorized(request)) return NextResponse.json({error:"UNAUTHORIZED"},{status:401});
   const body = await request.json().catch(()=>null) as {memberCode?:string;memberRank?:string;requestedHours?:number;reservationId?:string}|null;
   const memberCode = body?.memberCode?.trim() ?? "";
-  const memberRank = body?.memberRank === "RESIDENT" ? "RESIDENT" : body?.memberRank === "STANDARD" ? "STANDARD" : "";
+  const requestedMemberRank = body?.memberRank === "RESIDENT" ? "RESIDENT" : body?.memberRank === "STANDARD" ? "STANDARD" : "";
   const requestedHours = Number(body?.requestedHours ?? 1);
-  if (!/^[A-Za-z0-9_-]{4,64}$/.test(memberCode) || !memberRank || !Number.isInteger(requestedHours) || requestedHours<1 || requestedHours>10)
+  if (!/^[A-Za-z0-9_-]{4,64}$/.test(memberCode) || !requestedMemberRank || !Number.isInteger(requestedHours) || requestedHours<1 || requestedHours>10)
     return NextResponse.json({error:"INVALID_CHECK_IN"},{status:400});
   const active = await env.DB.prepare(
     `SELECT s.id FROM studio_sessions s JOIN members m ON m.id=s.member_id
@@ -33,8 +33,9 @@ export async function POST(request: NextRequest) {
      VALUES (?,?,?,'ACTIVE','RECEPTION',?, ?,?)
      ON CONFLICT(member_code) DO UPDATE SET status='ACTIVE',updated_at=excluded.updated_at`,
   ).bind(memberId,memberCode,"FEBBRAIO会員",memberCode,now,now).run();
-  const member=await env.DB.prepare("SELECT id FROM members WHERE member_code=? LIMIT 1").bind(memberCode).first<{id:string}>();
+  const member=await env.DB.prepare("SELECT id, member_rank FROM members WHERE member_code=? LIMIT 1").bind(memberCode).first<{id:string;member_rank:"STANDARD"|"RESIDENT"|null}>();
   if(!member) return NextResponse.json({error:"MEMBER_SAVE_FAILED"},{status:500});
+  const memberRank = member.member_rank ?? requestedMemberRank;
   await env.DB.prepare(
     `INSERT INTO studio_sessions (id,reservation_id,member_id,studio_id,checked_in_at,scheduled_ends_at,plan_type,status,payment_status,version,updated_at)
      VALUES (?,?,?,?,?,?,?,'IN_USE','UNPAID',1,?)`,
