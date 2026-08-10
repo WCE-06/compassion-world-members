@@ -18,6 +18,15 @@ export async function GET(request: NextRequest) {
   if (!await authorized(request)) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const sessionId = request.nextUrl.searchParams.get("sessionId")?.trim() ?? "";
   if (!/^[A-Za-z0-9_-]{8,64}$/.test(sessionId)) return NextResponse.json({ error: "INVALID_SESSION_ID" }, { status: 400 });
+  if (request.nextUrl.searchParams.get("complete") === "1") {
+    const now = Date.now();
+    const paymentId = request.nextUrl.searchParams.get("paymentId")?.trim() || `confirmed:${sessionId}`;
+    await env.DB.prepare(
+      `UPDATE studio_sessions
+          SET status='COMPLETED', payment_status='PAID', payment_id=?, checked_out_at=?, updated_at=?, version=version+1
+        WHERE id=? AND studio_id='FEBBRAIO' AND status='IN_USE'`,
+    ).bind(paymentId, now, now, sessionId).run();
+  }
   const session = await env.DB.prepare(
     "SELECT status, payment_status FROM studio_sessions WHERE id=? AND studio_id='FEBBRAIO' LIMIT 1",
   ).bind(sessionId).first<{ status: string; payment_status: string }>();
