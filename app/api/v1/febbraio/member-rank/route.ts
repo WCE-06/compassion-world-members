@@ -14,6 +14,26 @@ async function authorized(request: NextRequest) {
   return difference === 0;
 }
 
+export async function GET(request: NextRequest) {
+  if (!await authorized(request)) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  const memberCode = request.nextUrl.searchParams.get("memberCode")?.trim() ?? "";
+  if (!/^[A-Za-z0-9_-]{4,64}$/.test(memberCode)) {
+    return NextResponse.json({ error: "INVALID_MEMBER_CODE" }, { status: 400 });
+  }
+  const member = await env.DB.prepare(
+    "SELECT id, display_name, member_rank FROM members WHERE member_code=? AND status='ACTIVE' LIMIT 1",
+  ).bind(memberCode).first<{ id: string; display_name: string; member_rank: "STANDARD" | "RESIDENT" | null }>();
+  if (!member) return NextResponse.json({ error: "MEMBER_NOT_FOUND" }, { status: 404 });
+  if (!member.member_rank) return NextResponse.json({ error: "MEMBER_RANK_NOT_SYNCED" }, { status: 409 });
+  return NextResponse.json({
+    memberId: member.id,
+    name: member.display_name || "会員",
+    memberRank: member.member_rank,
+    planCode: member.member_rank,
+    planName: member.member_rank === "RESIDENT" ? "住民限定プラン" : "通常プラン",
+  }, { headers: { "Cache-Control": "no-store" } });
+}
+
 export async function POST(request: NextRequest) {
   if (!await authorized(request)) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const body = await request.json().catch(() => null) as { memberCode?: string; memberRank?: string } | null;
