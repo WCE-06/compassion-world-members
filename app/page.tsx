@@ -195,7 +195,7 @@ export default function Home() {
 
           <section className="majica-actions" aria-label="よく使うサービス">
             <button onClick={() => { window.location.href = "/availability"; }}><span><CalendarDays aria-hidden="true" size={19} strokeWidth={1.7} /></span><strong>予約</strong></button>
-            <button onClick={() => openFutureFeature("Aozora Kitchen モバイルオーダー")}><span className="food-drink-icon"><UtensilsCrossed aria-hidden="true" size={17} strokeWidth={1.7} /><Coffee aria-hidden="true" size={15} strokeWidth={1.7} /></span><strong>フード・ドリンク</strong><small>Aozora Kitchen</small></button>
+            <button onClick={() => { window.location.href = "/mobile-order"; }}><span className="food-drink-icon"><UtensilsCrossed aria-hidden="true" size={17} strokeWidth={1.7} /><Coffee aria-hidden="true" size={15} strokeWidth={1.7} /></span><strong>フード・ドリンク</strong><small>Aozora Kitchen</small></button>
             <button onClick={() => openFutureFeature("クーポン")}><span><TicketPercent aria-hidden="true" size={20} strokeWidth={1.7} /></span><strong>クーポン</strong></button>
             <button onClick={() => openFutureFeature("利用履歴")}><span><History aria-hidden="true" size={20} strokeWidth={1.7} /></span><strong>履歴</strong></button>
           </section>
@@ -210,6 +210,10 @@ export default function Home() {
           {(member.session || member.nextReservation || member.activeOrder) && (
             <section className="activity-card">
               <div className="section-heading"><div><p className="eyebrow">YOUR ACTIVITY</p><h2>予約・Aozora Kitchen注文</h2></div><button onClick={() => openFutureFeature("利用履歴")}>履歴を見る</button></div>
+              <div className="activity-create-actions">
+                <button onClick={() => { window.location.href = "/availability"; }}><CalendarDays size={17} strokeWidth={1.7} /><span><small>STUDIO</small><strong>新しく予約する</strong></span><b>›</b></button>
+                <button onClick={() => { window.location.href = "/mobile-order"; }}><UtensilsCrossed size={17} strokeWidth={1.7} /><span><small>AOZORA KITCHEN</small><strong>商品を注文する</strong></span><b>›</b></button>
+              </div>
               {member.session && (
                 <article className="activity-row active-session"><span className="status-dot" /><div><small>現在利用中</small><strong>{member.session.facilityName}</strong><p>{member.session.startedAt && `開始 ${dateLabel(member.session.startedAt)}`} {member.session.scheduledEndsAt && `／終了予定 ${dateLabel(member.session.scheduledEndsAt)}`}</p></div><b>{paymentLabel(member.session.paymentStatus)}</b></article>
               )}

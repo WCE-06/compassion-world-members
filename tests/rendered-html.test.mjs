@@ -34,6 +34,9 @@ test("LIFF・移行・共通セッションの接続点を保持する", async (
   assert.match(page, /wallet-balances/);
   assert.match(page, /Aozora Kitchen/);
   assert.match(page, /product-request/);
+  assert.match(page, /mobile-order/);
+  assert.match(page, /新しく予約する/);
+  assert.match(page, /商品を注文する/);
   assert.match(membershipApi, /api\.line\.me\/v2\/profile/);
   assert.match(linkApi, /VERIFICATION_REQUIRED/);
   assert.match(schema, /identityLinks/);
