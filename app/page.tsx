@@ -139,7 +139,11 @@ export default function Home() {
 
       if (!liffId) {
         setDemo(true);
-        setView(requested === "unlinked" ? "unlinked" : requested === "new" ? "new" : "member");
+        if (requested === "unlinked") return setView("unlinked");
+        if (requested === "new") return setView("new");
+        const response = await fetch("/api/v1/me/membership", { headers: { "X-Compass-Preview": "representative" } });
+        if (response.ok) setMember(await response.json());
+        setView("member");
         return;
       }
 

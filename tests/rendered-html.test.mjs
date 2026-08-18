@@ -16,9 +16,10 @@ test("会員証アプリを正常に配信する", async () => {
 });
 
 test("LIFF・移行・共通セッションの接続点を保持する", async () => {
-  const [page, membershipApi, linkApi, schema, hosting] = await Promise.all([
+  const [page, membershipApi, memberAuth, linkApi, schema, hosting] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
+    readFile(new URL("lib/member-auth.ts", root), "utf8"),
     readFile(new URL("app/api/v1/membership-links/route.ts", root), "utf8"),
     readFile(new URL("db/schema.ts", root), "utf8"),
     readFile(new URL(".openai/hosting.json", root), "utf8"),
@@ -37,7 +38,8 @@ test("LIFF・移行・共通セッションの接続点を保持する", async (
   assert.match(page, /mobile-order/);
   assert.match(page, /新しく予約する/);
   assert.match(page, /商品を注文する/);
-  assert.match(membershipApi, /api\.line\.me\/v2\/profile/);
+  assert.match(memberAuth, /api\.line\.me\/v2\/profile/);
+  assert.match(membershipApi, /authenticatedMember/);
   assert.match(linkApi, /VERIFICATION_REQUIRED/);
   assert.match(schema, /identityLinks/);
   assert.match(schema, /studioSessions/);
