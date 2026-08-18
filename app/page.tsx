@@ -1,19 +1,35 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type View = "loading" | "member" | "unlinked" | "new" | "error";
+
+type MemberNotice = {
+  id: string;
+  category: "PAYMENT" | "POINT" | "RESERVATION" | "ORDER" | "NEWS";
+  title: string;
+  body: string;
+  createdAt: string;
+  unread: boolean;
+};
 
 type Member = {
   memberId: string;
   memberCode: string;
   displayName: string;
+  points: number;
+  rank: string;
+  nextReservation?: { facilityName: string; startsAt: string; endsAt: string } | null;
   session?: {
-    status: "RESERVED" | "IN_USE" | "COMPLETED";
-    paymentStatus: "UNPAID" | "PAID";
-    reservedStart?: string;
-    reservedEnd?: string;
+    facilityName: string;
+    status: "RESERVED" | "IN_USE" | "EXTENDING" | "COMPLETED";
+    paymentStatus: "UNCONFIRMED" | "UNPAID" | "PROCESSING" | "PAID" | "FAILED";
+    startedAt?: string;
+    scheduledEndsAt?: string;
+    unpaidAmount?: number;
   } | null;
+  activeOrder?: { orderNumber: string; status: "WAITING_PAYMENT" | "ACCEPTED" | "COOKING" | "READY" } | null;
+  notices: MemberNotice[];
 };
 
 declare global {
@@ -23,70 +39,98 @@ declare global {
       isLoggedIn: () => boolean;
       login: (config?: { redirectUri?: string }) => void;
       getAccessToken: () => string | null;
-      getProfile: () => Promise<{ userId: string; displayName: string }>;
-      isInClient: () => boolean;
-      closeWindow: () => void;
+    };
+    QRCode?: {
+      toCanvas: (canvas: HTMLCanvasElement, value: string, options: Record<string, unknown>) => Promise<void>;
     };
   }
 }
 
 const DEMO_MEMBER: Member = {
   memberId: "mem_01JCOMPASSION",
-  memberCode: "00001234",
+  memberCode: "A7K4P9X2M6",
   displayName: "山田 花子",
+  points: 480,
+  rank: "STANDARD",
+  nextReservation: {
+    facilityName: "Music Studio FEBBRAIO",
+    startsAt: "2026-08-22T14:00:00+09:00",
+    endsAt: "2026-08-22T16:00:00+09:00",
+  },
   session: null,
+  activeOrder: null,
+  notices: [
+    { id: "n1", category: "POINT", title: "120ポイント付与されました", body: "おもひで商店のご利用ありがとうございました。", createdAt: "今日 12:42", unread: true },
+    { id: "n2", category: "PAYMENT", title: "お支払いが完了しました", body: "ご利用明細を確認できます。", createdAt: "今日 12:41", unread: true },
+    { id: "n3", category: "NEWS", title: "今週のお知らせ", body: "COMPASSION WORLDからのお知らせです。", createdAt: "8月17日", unread: false },
+  ],
 };
 
-const CODE128: Record<string, string> = {
-  "0":"212222","1":"222122","2":"222221","3":"121223","4":"121322","5":"131222","6":"122213","7":"122312","8":"132212","9":"221213",
-  "10":"221312","11":"231212","12":"112232","13":"122132","14":"122231","15":"113222","16":"123122","17":"123221","18":"223211","19":"221132",
-  "20":"221231","21":"213212","22":"223112","23":"312131","24":"311222","25":"321122","26":"321221","27":"312212","28":"322112","29":"322211",
-  "30":"212123","31":"212321","32":"232121","33":"111323","34":"131123","35":"131321","36":"112313","37":"132113","38":"132311","39":"211313",
-  "40":"231113","41":"231311","42":"112133","43":"112331","44":"132131","45":"113123","46":"113321","47":"133121","48":"313121","49":"211331",
-  "50":"231131","51":"213113","52":"213311","53":"213131","54":"311123","55":"311321","56":"331121","57":"312113","58":"312311","59":"332111",
-  "60":"314111","61":"221411","62":"431111","63":"111224","64":"111422","65":"121124","66":"121421","67":"141122","68":"141221","69":"112214",
-  "70":"112412","71":"122114","72":"122411","73":"142112","74":"142211","75":"241211","76":"221114","77":"413111","78":"241112","79":"134111",
-  "80":"111242","81":"121142","82":"121241","83":"114212","84":"124112","85":"124211","86":"411212","87":"421112","88":"421211","89":"212141",
-  "90":"214121","91":"412121","92":"111143","93":"111341","94":"131141","95":"114113","96":"114311","97":"411113","98":"411311","99":"113141",
-  "100":"114131","101":"311141","102":"411131","103":"211412","104":"211214","105":"211232","106":"2331112"
-};
-
-function barcodeBits(value: string) {
-  const values = [...value].map((char) => char.charCodeAt(0) - 32);
-  const checksum = (104 + values.reduce((sum, n, index) => sum + n * (index + 1), 0)) % 103;
-  return [104, ...values, checksum, 106]
-    .flatMap((code) => [...CODE128[String(code)]].flatMap((width, index) => Array(Number(width)).fill(index % 2 === 0 ? "1" : "0")))
-    .join("");
+function normalizeMemberCode(value: string) {
+  return value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
 }
 
-function Barcode({ value }: { value: string }) {
-  const bits = useMemo(() => barcodeBits(value), [value]);
+function loadScript(src: string, ready: () => boolean) {
+  return new Promise<void>((resolve, reject) => {
+    if (ready()) return resolve();
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("必要な機能を読み込めませんでした")), { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = src;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("必要な機能を読み込めませんでした"));
+    document.head.appendChild(script);
+  });
+}
+
+function MemberQr({ value }: { value: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    loadScript("https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js", () => Boolean(window.QRCode))
+      .then(async () => {
+        if (!active || !canvasRef.current || !window.QRCode) return;
+        await window.QRCode.toCanvas(canvasRef.current, value, {
+          width: 196,
+          margin: 1,
+          errorCorrectionLevel: "M",
+          color: { dark: "#142d26", light: "#ffffff" },
+        });
+      })
+      .catch(() => active && setFailed(true));
+    return () => { active = false; };
+  }, [value]);
+
   return (
-    <div className="barcode-wrap" aria-label={`会員番号 ${value} のバーコード`}>
-      <div className="barcode" style={{ gridTemplateColumns: `repeat(${bits.length}, 1fr)` }}>
-        {[...bits].map((bit, index) => <i key={index} className={bit === "1" ? "bar" : "space"} />)}
-      </div>
-      <div className="barcode-number">{value}</div>
+    <div className="qr-panel" aria-label={`会員番号 ${value} のQRコード`}>
+      {failed ? <div className="qr-fallback">QR<br />読み込み中</div> : <canvas ref={canvasRef} width="196" height="196" />}
+      <div><small>MEMBER No.</small><strong>{value}</strong></div>
     </div>
   );
 }
 
-function loadLiffScript() {
-  return new Promise<void>((resolve, reject) => {
-    if (window.liff) return resolve();
-    const script = document.createElement("script");
-    script.src = "https://static.line-scdn.net/liff/edge/2/sdk.js";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("LIFF SDKを読み込めませんでした"));
-    document.head.appendChild(script);
-  });
+function dateLabel(value: string) {
+  const date = new Date(value);
+  return new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
+function paymentLabel(status: NonNullable<Member["session"]>["paymentStatus"]) {
+  return { UNCONFIRMED: "料金未確定", UNPAID: "未精算", PROCESSING: "決済処理中", PAID: "精算済み", FAILED: "決済を確認してください" }[status];
 }
 
 export default function Home() {
   const [view, setView] = useState<View>("loading");
   const [member, setMember] = useState<Member>(DEMO_MEMBER);
-  const [notice, setNotice] = useState<string>("");
+  const [notice, setNotice] = useState("");
   const [demo, setDemo] = useState(false);
+  const [memberCode, setMemberCode] = useState("");
+  const [showAllNotices, setShowAllNotices] = useState(false);
 
   useEffect(() => {
     async function start() {
@@ -101,24 +145,16 @@ export default function Home() {
       }
 
       try {
-        await loadLiffScript();
+        await loadScript("https://static.line-scdn.net/liff/edge/2/sdk.js", () => Boolean(window.liff));
         await window.liff!.init({ liffId });
         if (!window.liff!.isLoggedIn()) {
           window.liff!.login({ redirectUri: window.location.href });
           return;
         }
         const token = window.liff!.getAccessToken();
-        const response = await fetch("/api/v1/me/membership", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (response.status === 404) {
-          setView("unlinked");
-          return;
-        }
-        if (response.status === 422) {
-          setView("new");
-          return;
-        }
+        const response = await fetch("/api/v1/me/membership", { headers: { Authorization: `Bearer ${token}` } });
+        if (response.status === 404) return setView("unlinked");
+        if (response.status === 422) return setView("new");
         if (!response.ok) throw new Error("会員情報を取得できませんでした");
         setMember(await response.json());
         setView("member");
@@ -130,88 +166,96 @@ export default function Home() {
     start();
   }, []);
 
-  const openPlaceholder = (label: string) => setNotice(`${label}は次の開発段階で接続します`);
+  const unreadCount = member.notices.filter((item) => item.unread).length;
+  const visibleNotices = showAllNotices ? member.notices : member.notices.slice(0, 2);
+  const openFutureFeature = (label: string) => setNotice(`${label}は共通システムとの接続準備中です`);
 
   return (
     <main className="app-shell">
       <header className="brand-header">
         <div className="brand-mark" aria-hidden="true"><span>C</span><span>W</span></div>
-        <div>
-          <p className="eyebrow">COMPASSION WORLD</p>
-          <h1>MEMBERS CARD</h1>
-        </div>
-        <button className="help-button" aria-label="ヘルプ" onClick={() => setNotice("受付スタッフへこの画面をお見せください")}>?</button>
+        <div><p className="eyebrow">COMPASSION WORLD</p><h1>POINT CARD</h1></div>
+        <button className="notice-button" aria-label={`お知らせ 未読${unreadCount}件`} onClick={() => document.getElementById("notices")?.scrollIntoView({ behavior: "smooth" })}>
+          <span aria-hidden="true">●</span>{unreadCount > 0 && <b>{unreadCount}</b>}
+        </button>
       </header>
 
-      {demo && <div className="demo-strip"><span>DEMO</span> 開発用プレビュー</div>}
-
-      {view === "loading" && <section className="loading-state"><div className="loader" /><p>会員情報を確認しています</p></section>}
+      {demo && <div className="demo-strip"><span>DEMO</span> 開発用URLで表示しています</div>}
+      {view === "loading" && <section className="loading-state"><div className="loader" /><p>ポイントカードを準備しています</p></section>}
 
       {view === "member" && (
         <>
-          <section className="member-card">
-            <div className="card-glow" />
-            <div className="card-top"><span>MEMBER</span><span className="valid-dot">● ACTIVE</span></div>
-            <div className="member-name"><span>MEMBER NAME</span><strong>{member.displayName || "お名前未登録"}</strong></div>
-            <Barcode value={member.memberCode} />
-            <div className="member-meta"><span>MEMBER No.</span><strong>{member.memberCode}</strong></div>
+          <section className="point-hero">
+            <div className="point-copy"><p>保有ポイント</p><strong>{member.points.toLocaleString("ja-JP")}<small> pt</small></strong><span>{member.displayName} 様</span></div>
+            <button onClick={() => openFutureFeature("ポイント履歴")}><span>ポイント履歴</span><b>›</b></button>
           </section>
 
-          {member.session?.status === "IN_USE" && (
-            <section className="session-card">
-              <span className="pulse" />
-              <div><small>STUDIO SESSION</small><strong>現在スタジオをご利用中です</strong></div>
-              <b className={member.session.paymentStatus === "PAID" ? "paid" : "unpaid"}>{member.session.paymentStatus === "PAID" ? "精算済" : "未精算"}</b>
+          <MemberQr value={member.memberCode} />
+
+          <section className="quick-grid" aria-label="よく使うサービス">
+            <button onClick={() => { window.location.href = "/availability"; }}><span className="quick-icon">予</span><strong>スタジオ予約</strong><small>空き状況を見る</small></button>
+            <button onClick={() => openFutureFeature("モバイルオーダー")}><span className="quick-icon">注</span><strong>モバイルオーダー</strong><small>商品を注文する</small></button>
+          </section>
+
+          {(member.session || member.nextReservation || member.activeOrder) && (
+            <section className="activity-card">
+              <div className="section-heading"><div><p className="eyebrow">YOUR ACTIVITY</p><h2>予約・注文</h2></div><button onClick={() => openFutureFeature("利用履歴")}>履歴を見る</button></div>
+              {member.session && (
+                <article className="activity-row active-session"><span className="status-dot" /><div><small>現在利用中</small><strong>{member.session.facilityName}</strong><p>{member.session.startedAt && `開始 ${dateLabel(member.session.startedAt)}`} {member.session.scheduledEndsAt && `／終了予定 ${dateLabel(member.session.scheduledEndsAt)}`}</p></div><b>{paymentLabel(member.session.paymentStatus)}</b></article>
+              )}
+              {!member.session && member.nextReservation && (
+                <article className="activity-row"><span className="date-chip">NEXT</span><div><small>次回予約</small><strong>{member.nextReservation.facilityName}</strong><p>{dateLabel(member.nextReservation.startsAt)}〜</p></div><button onClick={() => openFutureFeature("予約の変更・キャンセル")}>詳細</button></article>
+              )}
+              {member.activeOrder && (
+                <article className="activity-row"><span className="date-chip">ORDER</span><div><small>注文番号 {member.activeOrder.orderNumber}</small><strong>{{ WAITING_PAYMENT: "お支払い待ち", ACCEPTED: "注文受付済み", COOKING: "ただいま調理中", READY: "商品ができあがりました" }[member.activeOrder.status]}</strong></div><button onClick={() => openFutureFeature("注文状況")}>詳細</button></article>
+              )}
             </section>
           )}
 
-          <section className="actions" aria-label="会員メニュー">
-            <button className="action primary" onClick={() => { window.location.href = "/availability"; }}>
-              <span className="action-icon calendar" aria-hidden="true">□</span><span><small>STUDIO</small><strong>スタジオを予約する</strong></span><b>›</b>
-            </button>
-            <button className="action" onClick={() => openPlaceholder("モバイルオーダー")}>
-              <span className="action-icon bag" aria-hidden="true">♢</span><span><small>AOZORA KITCHEN</small><strong>モバイルオーダー</strong></span><b>›</b>
-            </button>
+          <section className="benefit-grid">
+            <button onClick={() => openFutureFeature("クーポン")}><span>COUPON</span><strong>クーポン</strong><small>保有特典を確認</small></button>
+            <button onClick={() => openFutureFeature("会員特典")}><span>MEMBER</span><strong>{member.rank}</strong><small>会員限定価格・特典</small></button>
+          </section>
+
+          <section className="notice-list" id="notices">
+            <div className="section-heading"><div><p className="eyebrow">INFORMATION</p><h2>お知らせ</h2></div>{unreadCount > 0 && <span className="unread-label">未読 {unreadCount}</span>}</div>
+            {visibleNotices.map((item) => (
+              <button className="notice-row" key={item.id} onClick={() => setNotice(item.body)}>
+                <span className={`notice-category ${item.category.toLowerCase()}`}>{item.category === "PAYMENT" ? "決済" : item.category === "POINT" ? "ポイント" : item.category === "ORDER" ? "注文" : item.category === "RESERVATION" ? "予約" : "お知らせ"}</span>
+                <div><strong>{item.title}</strong><small>{item.createdAt}</small></div>{item.unread && <i aria-label="未読" />}<b>›</b>
+              </button>
+            ))}
+            {member.notices.length > 2 && <button className="all-notices" onClick={() => setShowAllNotices((value) => !value)}>{showAllNotices ? "閉じる" : "すべてのお知らせを見る"}</button>}
           </section>
         </>
       )}
 
       {view === "unlinked" && (
         <section className="flow-card">
-          <div className="flow-icon">↗</div><p className="eyebrow">MEMBER TRANSFER</p>
-          <h2>以前の会員番号を<br />引き継ぎましょう</h2>
-          <p>お持ちの会員番号を、このLINEアカウントに紐付けます。会員番号が分からない場合も確認できます。</p>
-          <label>既存の会員番号<input inputMode="numeric" placeholder="例）00001234" maxLength={12} /></label>
-          <button className="flow-button" onClick={() => { setMember(DEMO_MEMBER); setView("member"); setNotice("会員番号を紐付けました"); }}>会員番号を引き継ぐ</button>
-          <button className="text-button" onClick={() => setNotice("受付スタッフが会員情報を確認します")}>会員番号が分からない方</button>
+          <div className="flow-icon">↗</div><p className="eyebrow">MEMBER TRANSFER</p><h2>これまでのポイントを<br />引き継ぎましょう</h2>
+          <p>LINEに登録済みの会員情報を、新しいポイントカードへ紐付けます。</p>
+          <label>10文字の会員番号<input value={memberCode} onChange={(event) => setMemberCode(normalizeMemberCode(event.target.value))} inputMode="text" autoCapitalize="characters" placeholder="例）A7K4P9X2M6" maxLength={10} /></label>
+          <button className="flow-button" disabled={memberCode.length !== 10} onClick={() => { setMember({ ...DEMO_MEMBER, memberCode }); setView("member"); setNotice("会員情報を引き継ぎました"); }}>会員情報を引き継ぐ</button>
+          <button className="text-button" onClick={() => setNotice("スタッフ確認用の案内を表示します")}>会員番号が分からない方</button>
+          <button className="text-button secondary" onClick={() => setView("new")}>初めてご利用の方</button>
         </section>
       )}
 
       {view === "new" && (
         <section className="flow-card">
-          <div className="flow-icon">＋</div><p className="eyebrow">NEW MEMBER</p>
-          <h2>COMPASSION WORLDへ<br />ようこそ</h2>
-          <p>会員登録をすると、デジタル会員証・スタジオ予約・モバイルオーダーをご利用いただけます。</p>
-          <button className="flow-button" onClick={() => setNotice("会員登録フォームは次の開発段階で接続します")}>新規会員登録へ</button>
+          <div className="flow-icon">＋</div><p className="eyebrow">NEW MEMBER</p><h2>COMPASSION WORLDを<br />もっと身近に</h2>
+          <p>ポイントカードを作ると、おもひで商店への入店、ポイント、予約、モバイルオーダーをご利用いただけます。</p>
+          <ul className="registration-list"><li>入力項目は必要最小限</li><li>SMS認証は現在使用しません</li><li>登録後すぐに会員QRを表示</li></ul>
+          <button className="flow-button" onClick={() => openFutureFeature("新規会員登録フォーム")}>新しいポイントカードを作る</button>
           <button className="text-button" onClick={() => setView("unlinked")}>以前の会員番号をお持ちの方</button>
         </section>
       )}
 
-      {view === "error" && (
-        <section className="flow-card"><div className="flow-icon">!</div><h2>接続を確認してください</h2><p>{notice}</p><button className="flow-button" onClick={() => window.location.reload()}>もう一度読み込む</button></section>
-      )}
-
+      {view === "error" && <section className="flow-card"><div className="flow-icon">!</div><h2>接続を確認してください</h2><p>{notice}</p><button className="flow-button" onClick={() => window.location.reload()}>もう一度読み込む</button></section>}
       {notice && view !== "error" && <div className="toast" role="status" onClick={() => setNotice("")}>{notice}<button aria-label="閉じる">×</button></div>}
 
-      {demo && view !== "loading" && (
-        <nav className="demo-nav" aria-label="開発用画面切り替え">
-          <button className={view === "member" ? "active" : ""} onClick={() => setView("member")}>会員証</button>
-          <button className={view === "unlinked" ? "active" : ""} onClick={() => setView("unlinked")}>移行</button>
-          <button className={view === "new" ? "active" : ""} onClick={() => setView("new")}>新規</button>
-        </nav>
-      )}
-
-      <footer><span>COMPASSION</span><i /> <span>CREATIVITY</span><i /> <span>COMMUNITY</span></footer>
+      {demo && view !== "loading" && <nav className="demo-nav" aria-label="開発用画面切り替え"><button className={view === "member" ? "active" : ""} onClick={() => setView("member")}>カード</button><button className={view === "unlinked" ? "active" : ""} onClick={() => setView("unlinked")}>移行</button><button className={view === "new" ? "active" : ""} onClick={() => setView("new")}>新規</button></nav>}
+      <footer><span>COMPASSION</span><i /><span>CREATIVITY</span><i /><span>COMMUNITY</span></footer>
     </main>
   );
 }

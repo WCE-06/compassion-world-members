@@ -9,11 +9,11 @@ export async function generateMetadata(): Promise<Metadata> {
   const base = new URL(`${protocol}://${host}`);
   return {
     metadataBase: base,
-    title: "FEBBRAIO 空き状況・予約 | COMPASSION WORLD",
-    description: "Music Studio FEBBRAIOの公開空き状況とLINE会員予約。",
+    title: "COMPASSION WORLD POINT CARD",
+    description: "ポイント、会員QR、予約、注文をひとつにまとめたCOMPASSION WORLDのポイントカード。",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
-    openGraph: { title: "COMPASSION WORLD | LINE MEMBERS CARD", description: "つながる、ひろがる、会員証。", images: [{ url: new URL("/og.png", base).toString(), width: 1200, height: 630 }] },
-    twitter: { card: "summary_large_image", title: "COMPASSION WORLD | LINE MEMBERS CARD", description: "つながる、ひろがる、会員証。", images: [new URL("/og.png", base).toString()] },
+    openGraph: { title: "COMPASSION WORLD POINT CARD", description: "ポイント、予約、注文をひとつに。", images: [{ url: new URL("/og.png", base).toString(), width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title: "COMPASSION WORLD POINT CARD", description: "ポイント、予約、注文をひとつに。", images: [new URL("/og.png", base).toString()] },
   };
 }
 
