@@ -72,3 +72,30 @@ export const posPaymentEvents = sqliteTable("pos_payment_events", {
   uniqueIndex("pos_payment_events_payment_id_unique").on(table.paymentId),
   index("pos_payment_events_session_idx").on(table.sessionId),
 ]);
+
+export const orders = sqliteTable("orders", {
+  id: text("id").primaryKey(),
+  orderNumber: text("order_number").notNull(),
+  memberId: text("member_id").notNull().references(() => members.id),
+  status: text("status", { enum: ["WAITING_STORE_PAYMENT", "PAID", "ACCEPTED", "COOKING", "READY", "PICKED_UP", "EXPIRED", "CANCELLED"] }).notNull(),
+  paymentMethod: text("payment_method", { enum: ["STORE", "STRIPE"] }).notNull(),
+  totalIncludingTax: integer("total_including_tax").notNull(),
+  pickupAt: integer("pickup_at", { mode: "timestamp_ms" }),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [
+  uniqueIndex("orders_order_number_unique").on(table.orderNumber),
+  index("orders_member_created_idx").on(table.memberId, table.createdAt),
+]);
+
+export const orderItems = sqliteTable("order_items", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id").notNull().references(() => orders.id),
+  productId: text("product_id").notNull(),
+  productCode: text("product_code").notNull(),
+  productName: text("product_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPriceIncludingTax: integer("unit_price_including_tax").notNull(),
+  lineTotalIncludingTax: integer("line_total_including_tax").notNull(),
+}, (table) => [index("order_items_order_idx").on(table.orderId)]);
