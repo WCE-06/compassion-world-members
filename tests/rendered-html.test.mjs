@@ -9,7 +9,7 @@ test("会員証アプリを正常に配信する", async () => {
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("app/page.tsx", root), "utf8"),
   ]);
-  assert.match(layout, /COMPASSION WORLD POINT CARD/);
+  assert.match(layout, /COMPASSION WORLD Members/);
   assert.match(layout, /og\.png/);
   assert.match(page, /POINT CARD/);
   assert.doesNotMatch(`${layout}\n${page}`, /Your site is taking shape|codex-preview/);
