@@ -2,7 +2,7 @@
 
 import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
-import { Bell, CalendarDays, History, House, IdCard, ShoppingBag, TicketPercent } from "lucide-react";
+import { Bell, CalendarDays, Coffee, History, House, IdCard, MessageSquarePlus, TicketPercent, UtensilsCrossed } from "lucide-react";
 
 type View = "loading" | "member" | "unlinked" | "new" | "error";
 
@@ -195,16 +195,21 @@ export default function Home() {
 
           <section className="majica-actions" aria-label="よく使うサービス">
             <button onClick={() => { window.location.href = "/availability"; }}><span><CalendarDays aria-hidden="true" size={19} strokeWidth={1.7} /></span><strong>予約</strong></button>
-            <button onClick={() => openFutureFeature("モバイルオーダー")}><span><ShoppingBag aria-hidden="true" size={19} strokeWidth={1.7} /></span><strong>注文</strong></button>
+            <button onClick={() => openFutureFeature("Aozora Kitchen モバイルオーダー")}><span className="food-drink-icon"><UtensilsCrossed aria-hidden="true" size={17} strokeWidth={1.7} /><Coffee aria-hidden="true" size={15} strokeWidth={1.7} /></span><strong>フード・ドリンク</strong><small>Aozora Kitchen</small></button>
             <button onClick={() => openFutureFeature("クーポン")}><span><TicketPercent aria-hidden="true" size={20} strokeWidth={1.7} /></span><strong>クーポン</strong></button>
             <button onClick={() => openFutureFeature("利用履歴")}><span><History aria-hidden="true" size={20} strokeWidth={1.7} /></span><strong>履歴</strong></button>
           </section>
 
           <button className="service-banner" onClick={() => openFutureFeature("おもひで商店のご案内")}><span>OMOHIDE SHOTEN</span><strong>おもひで商店を、もっと便利に。</strong><small>会員限定のお知らせ・特典を見る　›</small></button>
 
+          <button className="request-banner" onClick={() => { window.location.href = "/product-request"; }}>
+            <span><MessageSquarePlus aria-hidden="true" size={22} strokeWidth={1.6} /></span>
+            <div><small>OMOHIDE SHOTEN REQUEST</small><strong>取り寄せ希望・置いてほしい商品</strong><p>「こんな商品があったらいいな」をお聞かせください</p></div><b>›</b>
+          </button>
+
           {(member.session || member.nextReservation || member.activeOrder) && (
             <section className="activity-card">
-              <div className="section-heading"><div><p className="eyebrow">YOUR ACTIVITY</p><h2>予約・注文</h2></div><button onClick={() => openFutureFeature("利用履歴")}>履歴を見る</button></div>
+              <div className="section-heading"><div><p className="eyebrow">YOUR ACTIVITY</p><h2>予約・Aozora Kitchen注文</h2></div><button onClick={() => openFutureFeature("利用履歴")}>履歴を見る</button></div>
               {member.session && (
                 <article className="activity-row active-session"><span className="status-dot" /><div><small>現在利用中</small><strong>{member.session.facilityName}</strong><p>{member.session.startedAt && `開始 ${dateLabel(member.session.startedAt)}`} {member.session.scheduledEndsAt && `／終了予定 ${dateLabel(member.session.scheduledEndsAt)}`}</p></div><b>{paymentLabel(member.session.paymentStatus)}</b></article>
               )}
