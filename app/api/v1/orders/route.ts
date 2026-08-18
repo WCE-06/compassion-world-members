@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
 import { authenticatedMember } from "@/lib/member-auth";
-import { ORDER_PRODUCTS } from "@/lib/order-catalog";
+import { getOrderProducts } from "@/lib/order-catalog";
 
 export async function GET(request: NextRequest) {
   const member = await authenticatedMember(request);
@@ -18,8 +18,9 @@ export async function POST(request: NextRequest) {
   if (!member) return NextResponse.json({ error: "MEMBER_LOGIN_REQUIRED" }, { status: 401 });
   const body = await request.json().catch(() => null) as { items?: { productId?: string; quantity?: number }[]; pickupAt?: number; requestId?: string } | null;
   const requested = body?.items ?? [];
+  const {products}=await getOrderProducts();
   const items = requested.map(item => {
-    const product = ORDER_PRODUCTS.find(candidate => candidate.id === item.productId);
+    const product = products.find(candidate => candidate.id === item.productId&&!candidate.soldOut);
     const quantity = Number(item.quantity);
     return product && Number.isInteger(quantity) && quantity > 0 && quantity <= 20 ? { product, quantity } : null;
   }).filter((item): item is NonNullable<typeof item> => Boolean(item));
