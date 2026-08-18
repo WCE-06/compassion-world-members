@@ -2,6 +2,7 @@
 
 import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
+import { Bell, CalendarDays, History, House, IdCard, ShoppingBag, TicketPercent } from "lucide-react";
 
 type View = "loading" | "member" | "unlinked" | "new" | "error";
 
@@ -174,7 +175,7 @@ export default function Home() {
         <div className="brand-mark" aria-hidden="true"><span>C</span><span>W</span></div>
         <div><p className="eyebrow">COMPASSION WORLD</p><h1>POINT CARD</h1></div>
         <button className="notice-button" aria-label={`お知らせ 未読${unreadCount}件`} onClick={() => document.getElementById("notices")?.scrollIntoView({ behavior: "smooth" })}>
-          <span aria-hidden="true">●</span>{unreadCount > 0 && <b>{unreadCount}</b>}
+          <Bell aria-hidden="true" size={17} strokeWidth={1.7} />{unreadCount > 0 && <b>{unreadCount}</b>}
         </button>
       </header>
 
@@ -193,10 +194,10 @@ export default function Home() {
           </section>
 
           <section className="majica-actions" aria-label="よく使うサービス">
-            <button onClick={() => { window.location.href = "/availability"; }}><span>予</span><strong>予約</strong></button>
-            <button onClick={() => openFutureFeature("モバイルオーダー")}><span>注</span><strong>注文</strong></button>
-            <button onClick={() => openFutureFeature("クーポン")}><span>券</span><strong>クーポン</strong></button>
-            <button onClick={() => openFutureFeature("利用履歴")}><span>歴</span><strong>履歴</strong></button>
+            <button onClick={() => { window.location.href = "/availability"; }}><span><CalendarDays aria-hidden="true" size={19} strokeWidth={1.7} /></span><strong>予約</strong></button>
+            <button onClick={() => openFutureFeature("モバイルオーダー")}><span><ShoppingBag aria-hidden="true" size={19} strokeWidth={1.7} /></span><strong>注文</strong></button>
+            <button onClick={() => openFutureFeature("クーポン")}><span><TicketPercent aria-hidden="true" size={20} strokeWidth={1.7} /></span><strong>クーポン</strong></button>
+            <button onClick={() => openFutureFeature("利用履歴")}><span><History aria-hidden="true" size={20} strokeWidth={1.7} /></span><strong>履歴</strong></button>
           </section>
 
           <button className="service-banner" onClick={() => openFutureFeature("おもひで商店のご案内")}><span>OMOHIDE SHOTEN</span><strong>おもひで商店を、もっと便利に。</strong><small>会員限定のお知らせ・特典を見る　›</small></button>
@@ -233,11 +234,11 @@ export default function Home() {
           </section>
 
           <nav className="bottom-tabs" aria-label="メインメニュー">
-            <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><span>⌂</span><strong>ホーム</strong></button>
-            <button onClick={() => openFutureFeature("クーポン")}><span>券</span><strong>クーポン</strong></button>
-            <button className="card-tab" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><span>▦</span><strong>会員証</strong></button>
-            <button onClick={() => { window.location.href = "/availability"; }}><span>予</span><strong>予約</strong></button>
-            <button onClick={() => document.getElementById("notices")?.scrollIntoView({ behavior: "smooth" })}><span>●</span><strong>お知らせ</strong>{unreadCount > 0 && <i>{unreadCount}</i>}</button>
+            <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><span><House aria-hidden="true" size={17} strokeWidth={1.7} /></span><strong>ホーム</strong></button>
+            <button onClick={() => openFutureFeature("クーポン")}><span><TicketPercent aria-hidden="true" size={18} strokeWidth={1.7} /></span><strong>クーポン</strong></button>
+            <button className="card-tab" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><span><IdCard aria-hidden="true" size={23} strokeWidth={1.6} /></span><strong>会員証</strong></button>
+            <button onClick={() => { window.location.href = "/availability"; }}><span><CalendarDays aria-hidden="true" size={18} strokeWidth={1.7} /></span><strong>予約</strong></button>
+            <button onClick={() => document.getElementById("notices")?.scrollIntoView({ behavior: "smooth" })}><span><Bell aria-hidden="true" size={17} strokeWidth={1.7} /></span><strong>お知らせ</strong>{unreadCount > 0 && <i>{unreadCount}</i>}</button>
           </nav>
         </>
       )}
