@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 type Slot = { hour: number; startsAt: number; available: boolean };
 type Reservation = { id:string; studioId:string; startsAt:number; endsAt:number; status:"CONFIRMED"|"CANCELLED"|"COMPLETED" };
 declare global { interface Window { liff?: { init(c:{liffId:string}):Promise<void>; isLoggedIn():boolean; login(c?:{redirectUri?:string}):void; getAccessToken():string|null } } }
-function dateText(date:string){return new Intl.DateTimeFormat("ja-JP",{month:"long",day:"numeric",weekday:"short"}).format(new Date(`${date}T00:00:00+09:00`))}
+function dateText(date:string){return new Intl.DateTimeFormat("ja-JP",{month:"long",day:"numeric",weekday:"short",timeZone:"Asia/Tokyo"}).format(new Date(`${date}T12:00:00+09:00`))}
 function hourText(hour:number){return hour < 24 ? `${hour}:00` : `翌${hour-24}:00`}
 const ITEM_HEIGHT=72;
 

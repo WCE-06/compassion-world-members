@@ -7,9 +7,7 @@ const JST = "+09:00";
 
 function bounds(date: string) {
   const start = Date.parse(`${date}T08:00:00${JST}`);
-  const next = new Date(`${date}T00:00:00${JST}`); next.setUTCDate(next.getUTCDate() + 1);
-  const nextDate = next.toISOString().slice(0, 10);
-  return { start, end: Date.parse(`${nextDate}T02:00:00${JST}`) };
+  return { start, end: start + 18 * 3_600_000 };
 }
 
 export async function GET(request: NextRequest) {
