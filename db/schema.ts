@@ -99,3 +99,16 @@ export const orderItems = sqliteTable("order_items", {
   unitPriceIncludingTax: integer("unit_price_including_tax").notNull(),
   lineTotalIncludingTax: integer("line_total_including_tax").notNull(),
 }, (table) => [index("order_items_order_idx").on(table.orderId)]);
+
+export const catalogOverrides = sqliteTable("catalog_overrides", {
+  productCode: text("product_code").primaryKey(),
+  description: text("description").notNull().default(""),
+  imageUrl: text("image_url").notNull().default(""),
+  menuCategory: text("menu_category").notNull(),
+  displaySequence: integer("display_sequence").notNull().default(9999),
+  showOnSelfRegister: integer("show_on_self_register", { mode: "boolean" }).notNull().default(true),
+  showOnMobileOrder: integer("show_on_mobile_order", { mode: "boolean" }).notNull().default(true),
+  soldOut: integer("sold_out", { mode: "boolean" }).notNull().default(false),
+  updatedBy: text("updated_by").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("catalog_overrides_category_sequence_idx").on(table.menuCategory, table.displaySequence)]);
