@@ -25,11 +25,13 @@ test("LIFF・移行・共通セッションの接続点を保持する", async (
   ]);
   assert.match(page, /NEXT_PUBLIC_LIFF_ID/);
   assert.match(page, /api\/v1\/me\/membership/);
-  assert.match(page, /スタジオ予約/);
+  assert.match(page, /window\.location\.href = "\/availability"/);
   assert.match(page, /モバイルオーダー/);
   assert.match(page, /A7K4P9X2M6/);
   assert.match(page, /ポイント履歴/);
   assert.match(page, /お知らせ/);
+  assert.match(page, /bottom-tabs/);
+  assert.match(page, /wallet-balances/);
   assert.match(membershipApi, /api\.line\.me\/v2\/profile/);
   assert.match(linkApi, /VERIFICATION_REQUIRED/);
   assert.match(schema, /identityLinks/);

@@ -1,5 +1,6 @@
 "use client";
 
+import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
 
 type View = "loading" | "member" | "unlinked" | "new" | "error";
@@ -39,9 +40,6 @@ declare global {
       isLoggedIn: () => boolean;
       login: (config?: { redirectUri?: string }) => void;
       getAccessToken: () => string | null;
-    };
-    QRCode?: {
-      toCanvas: (canvas: HTMLCanvasElement, value: string, options: Record<string, unknown>) => Promise<void>;
     };
   }
 }
@@ -93,10 +91,10 @@ function MemberQr({ value }: { value: string }) {
 
   useEffect(() => {
     let active = true;
-    loadScript("https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js", () => Boolean(window.QRCode))
+    Promise.resolve()
       .then(async () => {
-        if (!active || !canvasRef.current || !window.QRCode) return;
-        await window.QRCode.toCanvas(canvasRef.current, value, {
+        if (!active || !canvasRef.current) return;
+        await QRCode.toCanvas(canvasRef.current, value, {
           width: 196,
           margin: 1,
           errorCorrectionLevel: "M",
@@ -185,17 +183,23 @@ export default function Home() {
 
       {view === "member" && (
         <>
-          <section className="point-hero">
-            <div className="point-copy"><p>保有ポイント</p><strong>{member.points.toLocaleString("ja-JP")}<small> pt</small></strong><span>{member.displayName} 様</span></div>
-            <button onClick={() => openFutureFeature("ポイント履歴")}><span>ポイント履歴</span><b>›</b></button>
+          <section className="wallet-card">
+            <div className="wallet-card-head"><div><span>会員証</span><strong>{member.displayName} 様</strong></div><button onClick={() => setNotice("会員番号を受付端末へ提示してください")}>拡大</button></div>
+            <MemberQr value={member.memberCode} />
+            <div className="wallet-balances">
+              <button onClick={() => openFutureFeature("ポイント履歴")}><small>保有ポイント</small><strong>{member.points.toLocaleString("ja-JP")}<span> P</span></strong><em>履歴を見る ›</em></button>
+              <button onClick={() => openFutureFeature("会員特典")}><small>会員ランク</small><strong className="rank-value">{member.rank}</strong><em>特典を見る ›</em></button>
+            </div>
           </section>
 
-          <MemberQr value={member.memberCode} />
-
-          <section className="quick-grid" aria-label="よく使うサービス">
-            <button onClick={() => { window.location.href = "/availability"; }}><span className="quick-icon">予</span><strong>スタジオ予約</strong><small>空き状況を見る</small></button>
-            <button onClick={() => openFutureFeature("モバイルオーダー")}><span className="quick-icon">注</span><strong>モバイルオーダー</strong><small>商品を注文する</small></button>
+          <section className="majica-actions" aria-label="よく使うサービス">
+            <button onClick={() => { window.location.href = "/availability"; }}><span>予</span><strong>予約</strong></button>
+            <button onClick={() => openFutureFeature("モバイルオーダー")}><span>注</span><strong>注文</strong></button>
+            <button onClick={() => openFutureFeature("クーポン")}><span>券</span><strong>クーポン</strong></button>
+            <button onClick={() => openFutureFeature("利用履歴")}><span>歴</span><strong>履歴</strong></button>
           </section>
+
+          <button className="service-banner" onClick={() => openFutureFeature("おもひで商店のご案内")}><span>OMOHIDE SHOTEN</span><strong>おもひで商店を、もっと便利に。</strong><small>会員限定のお知らせ・特典を見る　›</small></button>
 
           {(member.session || member.nextReservation || member.activeOrder) && (
             <section className="activity-card">
@@ -227,6 +231,14 @@ export default function Home() {
             ))}
             {member.notices.length > 2 && <button className="all-notices" onClick={() => setShowAllNotices((value) => !value)}>{showAllNotices ? "閉じる" : "すべてのお知らせを見る"}</button>}
           </section>
+
+          <nav className="bottom-tabs" aria-label="メインメニュー">
+            <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><span>⌂</span><strong>ホーム</strong></button>
+            <button onClick={() => openFutureFeature("クーポン")}><span>券</span><strong>クーポン</strong></button>
+            <button className="card-tab" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><span>▦</span><strong>会員証</strong></button>
+            <button onClick={() => { window.location.href = "/availability"; }}><span>予</span><strong>予約</strong></button>
+            <button onClick={() => document.getElementById("notices")?.scrollIntoView({ behavior: "smooth" })}><span>●</span><strong>お知らせ</strong>{unreadCount > 0 && <i>{unreadCount}</i>}</button>
+          </nav>
         </>
       )}
 
