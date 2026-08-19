@@ -34,6 +34,8 @@ jobs:
 
       - name: Build screen preview
         if: github.event.action != 'closed'
+        env:
+          PREVIEW_CATALOG_SNAPSHOT_ONLY: "1"
         run: |
           pnpm install --frozen-lockfile
           pnpm preview:build
