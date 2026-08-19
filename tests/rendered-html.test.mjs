@@ -169,3 +169,10 @@ test("任意の日をイベントと無関係に通し営業へ変更できる",
   assert.match(catalog, /exception\?\.status==="CONTINUOUS"/);
   assert.match(schema, /continuousLastOrder/);
 });
+
+test("月別営業カレンダーを日曜始まりで表示する", async () => {
+  const page = await readFile(new URL("app/menu-admin/page.tsx", root), "utf8");
+  assert.match(page, /lead=first\.getDay\(\)/);
+  assert.match(page, /className="calendar-week"><span>日<\/span><span>月<\/span>/);
+  assert.doesNotMatch(page, /lead=\(first\.getDay\(\)\+6\)%7/);
+});
