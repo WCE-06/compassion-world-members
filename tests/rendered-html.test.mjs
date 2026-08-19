@@ -74,3 +74,22 @@ test("モクテルをベースと割材の掛け算で注文できる", async ()
   assert.match(pairing, /ウーロン茶/);
   assert.match(sync, /inferMocktailPair/);
 });
+
+test("セルフレジの商品税情報とオプション構造をモバイル表示へ引き継ぐ", async () => {
+  const [page, catalog, sync, css] = await Promise.all([
+    readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
+    readFile(new URL("lib/order-catalog.ts", root), "utf8"),
+    readFile(new URL("scripts/sync-preview-catalog.mjs", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+  ]);
+  assert.match(catalog, /basePrice/);
+  assert.match(catalog, /taxDivision/);
+  assert.match(catalog, /optionGroups/);
+  assert.match(sync, /basePrice: Number\(product\.basePrice/);
+  assert.match(sync, /optionGroups: Array\.isArray/);
+  assert.match(page, /税込 ¥/);
+  assert.match(page, /税抜 ¥/);
+  assert.match(page, /Math\.ceil\(product\.price\*100\/\(100\+Number\(product\.taxRate\?\?10\)\)\)/);
+  assert.match(page, /オプションあり/);
+  assert.match(css, /\.dual-price/);
+});
