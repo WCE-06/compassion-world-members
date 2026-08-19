@@ -23,6 +23,13 @@ export async function PUT(request: NextRequest) {
   const email = adminEmail(request);
   if (!email) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
   const body = await request.json().catch(() => null) as null | Record<string, unknown>;
+  if (Array.isArray(body?.order)) {
+    const order = body.order.filter((code): code is string => typeof code === "string").slice(0, 500);
+    const now = new Date();
+    const catalog=(await getOrderProducts({includeOverrides:true})).products;
+    await getDb().batch(order.map((code, index) => {const product=catalog.find(item=>item.code===code);return getDb().insert(catalogOverrides).values({productCode:code,description:product?.description??"",imageUrl:product?.imageUrl??"",menuCategory:product?.menuCategory??"food-side",displaySequence:(index+1)*10,showOnSelfRegister:product?.showOnSelfRegister??true,showOnMobileOrder:product?.showOnMobileOrder??true,soldOut:product?.soldOut??false,scheduleEnabled:product?.scheduleEnabled??false,scheduleStart:product?.scheduleStart??"11:00",scheduleEnd:product?.scheduleEnd??"20:00",scheduleDays:(product?.scheduleDays??[1,2,3,4,5,6,7]).join(","),updatedBy:email,updatedAt:now}).onConflictDoUpdate({target:catalogOverrides.productCode,set:{displaySequence:(index+1)*10,updatedBy:email,updatedAt:now}})}));
+    return NextResponse.json({saved:true,count:order.length});
+  }
   const productCode = typeof body?.productCode === "string" ? body.productCode.trim() : "";
   const menuCategory = typeof body?.menuCategory === "string" ? body.menuCategory.trim() : "";
   const imageUrl = typeof body?.imageUrl === "string" ? body.imageUrl.trim() : "";

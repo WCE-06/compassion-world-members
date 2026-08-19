@@ -119,12 +119,39 @@ test("管理画面で店舗営業時間と時間帯限定メニューを設定�
     readFile(new URL("db/schema.ts", root), "utf8"),
     readFile(new URL("drizzle/0005_many_supernaut.sql", root), "utf8"),
   ]);
-  assert.match(page, /店舗営業時間・注文受付/);
-  assert.match(page, /時間帯限定メニュー/);
+  assert.match(page, /基本営業時間/);
+  assert.match(page, /個別販売時間で上書き/);
   assert.match(page, /ラストオーダー/);
   assert.match(hoursApi, /Asia\/Tokyo/);
   assert.match(catalogApi, /scheduleEnabled/);
   assert.match(catalog, /product\.scheduleDays\.includes\(today\)/);
   assert.match(schema, /storeHours/);
   assert.match(migration, /CREATE TABLE `store_hours`/);
+});
+
+test("商品カード並び替え、二部営業、月別例外、ジャンル時間を共通管理する", async () => {
+  const [page, catalogApi, hoursApi, categoryApi, calendarApi, catalog, migration] = await Promise.all([
+    readFile(new URL("app/menu-admin/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/v1/admin/catalog/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/admin/store-hours/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/admin/category-schedules/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/business-calendar/route.ts", root), "utf8"),
+    readFile(new URL("lib/order-catalog.ts", root), "utf8"),
+    readFile(new URL("drizzle/0006_powerful_betty_brant.sql", root), "utf8"),
+  ]);
+  assert.match(page, /draggable/);
+  assert.match(page, /onDrop=\{\(\)=>reorder/);
+  assert.match(page, /ランチ/);
+  assert.match(page, /ディナー/);
+  assert.match(page, /月別営業カレンダー/);
+  assert.match(page, /お米使用メニューは土日限定/);
+  assert.match(catalogApi, /Array\.isArray\(body\?\.order\)/);
+  assert.match(hoursApi, /lunchStart:"11:30"/);
+  assert.match(hoursApi, /dinnerStart:"17:30"/);
+  assert.match(categoryApi, /categorySchedules/);
+  assert.match(calendarApi, /businessCalendar/);
+  assert.match(catalog, /exception\?\.status==="CLOSED"/);
+  assert.match(catalog, /categoryRules\[product\.menuCategory\]/);
+  assert.match(migration, /CREATE TABLE `business_calendar`/);
+  assert.match(migration, /CREATE TABLE `category_schedules`/);
 });

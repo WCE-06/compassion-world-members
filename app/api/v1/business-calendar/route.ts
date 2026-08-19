@@ -1,0 +1,4 @@
+import { NextResponse } from "next/server";
+import { getDb } from "@/db";
+import { businessCalendar, storeHours } from "@/db/schema";
+export async function GET(){try{const [hours]=await getDb().select().from(storeHours).limit(1);const exceptions=await getDb().select().from(businessCalendar);return NextResponse.json({timezone:"Asia/Tokyo",weekly:hours?{lunch:{enabled:hours.lunchEnabled,start:hours.lunchStart,end:hours.lunchEnd,lastOrder:hours.lunchLastOrder,days:hours.lunchDays.split(",").map(Number)},dinner:{enabled:hours.dinnerEnabled,start:hours.dinnerStart,end:hours.dinnerEnd,lastOrder:hours.dinnerLastOrder,days:hours.dinnerDays.split(",").map(Number)},eventDinnerEnabled:hours.eventDinnerEnabled}:null,exceptions},{headers:{"Cache-Control":"public, max-age=300"}})}catch{return NextResponse.json({timezone:"Asia/Tokyo",weekly:null,exceptions:[]})}}

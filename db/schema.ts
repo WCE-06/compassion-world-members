@@ -126,6 +126,42 @@ export const storeHours = sqliteTable("store_hours", {
   orderStart: text("order_start").notNull().default("11:00"),
   lastOrder: text("last_order").notNull().default("19:30"),
   businessDays: text("business_days").notNull().default("1,2,3,4,5,6,7"),
+  lunchEnabled: integer("lunch_enabled", { mode: "boolean" }).notNull().default(true),
+  lunchStart: text("lunch_start").notNull().default("11:30"),
+  lunchEnd: text("lunch_end").notNull().default("14:00"),
+  lunchLastOrder: text("lunch_last_order").notNull().default("13:30"),
+  lunchDays: text("lunch_days").notNull().default("2,3,4,5,6,7"),
+  dinnerEnabled: integer("dinner_enabled", { mode: "boolean" }).notNull().default(true),
+  dinnerStart: text("dinner_start").notNull().default("17:30"),
+  dinnerEnd: text("dinner_end").notNull().default("22:00"),
+  dinnerLastOrder: text("dinner_last_order").notNull().default("21:30"),
+  dinnerDays: text("dinner_days").notNull().default("6"),
+  eventDinnerEnabled: integer("event_dinner_enabled", { mode: "boolean" }).notNull().default(true),
+  updatedBy: text("updated_by").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const businessCalendar = sqliteTable("business_calendar", {
+  date: text("date").primaryKey(),
+  status: text("status", { enum: ["DEFAULT", "CLOSED", "CUSTOM", "EVENT"] }).notNull().default("DEFAULT"),
+  lunchEnabled: integer("lunch_enabled", { mode: "boolean" }).notNull().default(true),
+  dinnerEnabled: integer("dinner_enabled", { mode: "boolean" }).notNull().default(false),
+  lunchStart: text("lunch_start").notNull().default("11:30"),
+  lunchEnd: text("lunch_end").notNull().default("14:00"),
+  dinnerStart: text("dinner_start").notNull().default("17:30"),
+  dinnerEnd: text("dinner_end").notNull().default("22:00"),
+  note: text("note").notNull().default(""),
+  updatedBy: text("updated_by").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("business_calendar_status_idx").on(table.status)]);
+
+export const categorySchedules = sqliteTable("category_schedules", {
+  category: text("category").primaryKey(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
+  startTime: text("start_time").notNull().default("11:30"),
+  endTime: text("end_time").notNull().default("14:00"),
+  days: text("days").notNull().default("1,2,3,4,5,6,7"),
+  note: text("note").notNull().default(""),
   updatedBy: text("updated_by").notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
