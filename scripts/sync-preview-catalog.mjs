@@ -1,15 +1,29 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 const endpoint = process.env.SELF_REGISTER_CATALOG_URL ??
   "https://script.google.com/macros/s/AKfycbx-NlcSg-7MoAKRdySnfs05LY2Ttd3RVYEjWjcDx0MfLTE49EYazxUrV8e2CD-dAB8P/exec?api=catalog";
 
-const response = await fetch(`${endpoint}${endpoint.includes("?") ? "&" : "?"}sync=${Date.now()}`, {
-  redirect: "follow",
-  signal: AbortSignal.timeout(30_000),
-});
-if (!response.ok) throw new Error(`Catalog fetch failed: ${response.status}`);
-const body = await response.json();
-if (!body?.ok || !Array.isArray(body?.result?.products)) throw new Error("Catalog response is invalid");
+const snapshotUrl = new URL("../preview/generated/catalog.json", import.meta.url);
+let body;
+for (let attempt = 1; attempt <= 3; attempt++) {
+  try {
+    const response = await fetch(`${endpoint}${endpoint.includes("?") ? "&" : "?"}sync=${Date.now()}`, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(90_000),
+    });
+    if (!response.ok) throw new Error(`Catalog fetch failed: ${response.status}`);
+    body = await response.json();
+    if (!body?.ok || !Array.isArray(body?.result?.products)) throw new Error("Catalog response is invalid");
+    break;
+  } catch (error) {
+    if (attempt === 3) {
+      const snapshot = JSON.parse(await readFile(snapshotUrl, "utf8"));
+      console.warn(`Live catalog unavailable; using ${snapshot.products.length} saved products`);
+      process.exit(0);
+    }
+    console.warn(`Catalog attempt ${attempt} failed; retrying`);
+  }
+}
 
 const products = body.result.products
   .filter(product => product.section === "kitchen" && product.code && product.name && product.menuCategory)
@@ -35,7 +49,7 @@ const products = body.result.products
 
 if (!products.length) throw new Error("Current self-register kitchen catalog is empty");
 await mkdir(new URL("../preview/generated/", import.meta.url), { recursive: true });
-await writeFile(new URL("../preview/generated/catalog.json", import.meta.url), JSON.stringify({
+await writeFile(snapshotUrl, JSON.stringify({
   products,
   sync: body.result.sync ?? {},
 }, null, 2));
