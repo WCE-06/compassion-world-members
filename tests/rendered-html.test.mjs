@@ -60,3 +60,17 @@ test("モバイル注文の商品画像を切り抜かず、飲料を段階選�
   assert.match(css, /span\.product-image\{[^}]*aspect-ratio:4\/3/);
   assert.match(css, /span\.product-image img\{[^}]*width:auto[^}]*height:auto[^}]*max-width:100%[^}]*max-height:100%[^}]*object-fit:contain/);
 });
+
+test("モクテルをベースと割材の掛け算で注文できる", async () => {
+  const [page, pairing, sync] = await Promise.all([
+    readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
+    readFile(new URL("lib/drink-pairing.ts", root), "utf8"),
+    readFile(new URL("scripts/sync-preview-catalog.mjs", root), "utf8"),
+  ]);
+  assert.match(page, /category==="soft-mocktail"/);
+  assert.match(page, /ベースと割材から\{category==="soft-mocktail"\?"モクテル":"カクテル"\}/);
+  assert.match(page, /bucket\(p\)===category&&p\.cocktailBase&&p\.cocktailMixer/);
+  assert.match(pairing, /ファジーネーブル\|レゲエパンチ/);
+  assert.match(pairing, /ウーロン茶/);
+  assert.match(sync, /inferMocktailPair/);
+});
