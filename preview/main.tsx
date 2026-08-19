@@ -26,6 +26,8 @@ window.fetch = async (input, init) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   if (url.endsWith("/api/v1/catalog")) return new Response(JSON.stringify({ products }), { status:200, headers:{"Content-Type":"application/json"} });
   if (url.endsWith("/api/v1/admin/catalog") && init?.method === "PUT") return new Response(JSON.stringify({saved:true}), {status:200,headers:{"Content-Type":"application/json"}});
+  if (url.endsWith("/api/v1/admin/store-hours") && init?.method === "PUT") return new Response(JSON.stringify({saved:true}), {status:200,headers:{"Content-Type":"application/json"}});
+  if (url.endsWith("/api/v1/admin/store-hours")) return new Response(JSON.stringify({hours:{enabled:true,openTime:"11:00",closeTime:"20:00",orderStart:"11:00",lastOrder:"19:30",businessDays:[1,2,3,4,5,6,7]}}), {status:200,headers:{"Content-Type":"application/json"}});
   if (url.endsWith("/api/v1/admin/catalog")) return new Response(JSON.stringify({ products, sync:currentCatalog.sync }), { status:200, headers:{"Content-Type":"application/json"} });
   if (url.endsWith("/api/v1/orders") && init?.method === "POST") return new Response(JSON.stringify({ orderNumber:"PREVIEW-001",status:"WAITING_STORE_PAYMENT",totalIncludingTax:980,expiresAt:Date.now()+900000 }), { status:200, headers:{"Content-Type":"application/json"} });
   return originalFetch(input, init);

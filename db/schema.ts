@@ -109,6 +109,23 @@ export const catalogOverrides = sqliteTable("catalog_overrides", {
   showOnSelfRegister: integer("show_on_self_register", { mode: "boolean" }).notNull().default(true),
   showOnMobileOrder: integer("show_on_mobile_order", { mode: "boolean" }).notNull().default(true),
   soldOut: integer("sold_out", { mode: "boolean" }).notNull().default(false),
+  scheduleEnabled: integer("schedule_enabled", { mode: "boolean" }).notNull().default(false),
+  scheduleStart: text("schedule_start").notNull().default("11:00"),
+  scheduleEnd: text("schedule_end").notNull().default("20:00"),
+  scheduleDays: text("schedule_days").notNull().default("1,2,3,4,5,6,7"),
   updatedBy: text("updated_by").notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 }, (table) => [index("catalog_overrides_category_sequence_idx").on(table.menuCategory, table.displaySequence)]);
+
+export const storeHours = sqliteTable("store_hours", {
+  id: text("id").primaryKey().default("AOZORA_KITCHEN"),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  timezone: text("timezone").notNull().default("Asia/Tokyo"),
+  openTime: text("open_time").notNull().default("11:00"),
+  closeTime: text("close_time").notNull().default("20:00"),
+  orderStart: text("order_start").notNull().default("11:00"),
+  lastOrder: text("last_order").notNull().default("19:30"),
+  businessDays: text("business_days").notNull().default("1,2,3,4,5,6,7"),
+  updatedBy: text("updated_by").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});

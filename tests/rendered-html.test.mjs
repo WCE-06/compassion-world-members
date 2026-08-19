@@ -109,3 +109,22 @@ test("PRプレビューが古い画面をキャッシュし続けない", async 
   assert.match(preview, /searchParams\.set\("cache", Date\.now\(\)\.toString\(\)\)/);
   assert.match(workflow, /VITE_PREVIEW_REVISION: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
 });
+
+test("管理画面で店舗営業時間と時間帯限定メニューを設定できる", async () => {
+  const [page, hoursApi, catalogApi, catalog, schema, migration] = await Promise.all([
+    readFile(new URL("app/menu-admin/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/v1/admin/store-hours/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/admin/catalog/route.ts", root), "utf8"),
+    readFile(new URL("lib/order-catalog.ts", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("drizzle/0005_many_supernaut.sql", root), "utf8"),
+  ]);
+  assert.match(page, /店舗営業時間・注文受付/);
+  assert.match(page, /時間帯限定メニュー/);
+  assert.match(page, /ラストオーダー/);
+  assert.match(hoursApi, /Asia\/Tokyo/);
+  assert.match(catalogApi, /scheduleEnabled/);
+  assert.match(catalog, /product\.scheduleDays\.includes\(today\)/);
+  assert.match(schema, /storeHours/);
+  assert.match(migration, /CREATE TABLE `store_hours`/);
+});
