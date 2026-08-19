@@ -6,6 +6,20 @@ import "../app/globals.css";
 import currentCatalog from "./generated/catalog.json";
 
 const products = currentCatalog.products;
+const previewRevision = import.meta.env.VITE_PREVIEW_REVISION || "local";
+
+// Keep the visible URL tied to the exact preview build so copied links do not
+// silently reopen an older cached document after a later deployment.
+if (previewRevision !== "local") {
+  const previewUrl = new URL(window.location.href);
+  const requestedRevision = previewUrl.searchParams.get("revision");
+  if (!requestedRevision || !previewRevision.startsWith(requestedRevision)) {
+    previewUrl.searchParams.set("revision", previewRevision.slice(0, 7));
+    previewUrl.searchParams.set("cache", Date.now().toString());
+    history.replaceState(null, "", previewUrl);
+  }
+  document.documentElement.dataset.previewRevision = previewRevision;
+}
 
 const originalFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {

@@ -93,3 +93,15 @@ test("セルフレジの商品税情報とオプション構造をモバイル�
   assert.match(page, /オプションあり/);
   assert.match(css, /\.dual-price/);
 });
+
+test("PRプレビューが古い画面をキャッシュし続けない", async () => {
+  const [html, preview, workflow] = await Promise.all([
+    readFile(new URL("preview/index.html", root), "utf8"),
+    readFile(new URL("preview/main.tsx", root), "utf8"),
+    readFile(new URL(".github/workflows/pr-preview.yml", root), "utf8"),
+  ]);
+  assert.match(html, /no-cache, no-store, must-revalidate/);
+  assert.match(preview, /VITE_PREVIEW_REVISION/);
+  assert.match(preview, /searchParams\.set\("cache", Date\.now\(\)\.toString\(\)\)/);
+  assert.match(workflow, /VITE_PREVIEW_REVISION: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+});

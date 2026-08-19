@@ -36,6 +36,7 @@ jobs:
         if: github.event.action != 'closed'
         env:
           PREVIEW_CATALOG_SNAPSHOT_ONLY: "1"
+          VITE_PREVIEW_REVISION: ${{ github.event.pull_request.head.sha }}
         run: |
           pnpm install --frozen-lockfile
           pnpm preview:build
