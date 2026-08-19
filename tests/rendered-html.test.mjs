@@ -89,6 +89,10 @@ test("セルフレジの商品税情報とオプション構造をモバイル�
   assert.match(sync, /optionGroups: Array\.isArray/);
   assert.match(page, /税込 ¥/);
   assert.match(page, /税抜 ¥/);
+  assert.match(page, /<b>税抜 ¥\{taxExcludedPrice\(product\)/);
+  assert.match(page, /<small>税込 ¥\{product\.price/);
+  assert.match(page, /税抜小計/);
+  assert.match(page, /税込合計 ¥\{total/);
   assert.match(page, /Math\.ceil\(product\.price\*100\/\(100\+Number\(product\.taxRate\?\?10\)\)\)/);
   assert.match(page, /オプションあり/);
   assert.match(css, /\.dual-price/);
