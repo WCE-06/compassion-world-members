@@ -155,3 +155,17 @@ test("商品カード並び替え、二部営業、月別例外、ジャンル�
   assert.match(migration, /CREATE TABLE `business_calendar`/);
   assert.match(migration, /CREATE TABLE `category_schedules`/);
 });
+
+test("任意の日をイベントと無関係に通し営業へ変更できる", async () => {
+  const [page, hoursApi, catalog, schema] = await Promise.all([
+    readFile(new URL("app/menu-admin/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/v1/admin/store-hours/route.ts", root), "utf8"),
+    readFile(new URL("lib/order-catalog.ts", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+  ]);
+  assert.match(page, /\["CONTINUOUS","通し営業"\]/);
+  assert.match(page, /continuousLastOrder/);
+  assert.match(hoursApi, /"CONTINUOUS"/);
+  assert.match(catalog, /exception\?\.status==="CONTINUOUS"/);
+  assert.match(schema, /continuousLastOrder/);
+});

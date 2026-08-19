@@ -143,13 +143,16 @@ export const storeHours = sqliteTable("store_hours", {
 
 export const businessCalendar = sqliteTable("business_calendar", {
   date: text("date").primaryKey(),
-  status: text("status", { enum: ["DEFAULT", "CLOSED", "CUSTOM", "EVENT"] }).notNull().default("DEFAULT"),
+  status: text("status", { enum: ["DEFAULT", "CLOSED", "CUSTOM", "EVENT", "CONTINUOUS"] }).notNull().default("DEFAULT"),
   lunchEnabled: integer("lunch_enabled", { mode: "boolean" }).notNull().default(true),
   dinnerEnabled: integer("dinner_enabled", { mode: "boolean" }).notNull().default(false),
   lunchStart: text("lunch_start").notNull().default("11:30"),
   lunchEnd: text("lunch_end").notNull().default("14:00"),
   dinnerStart: text("dinner_start").notNull().default("17:30"),
   dinnerEnd: text("dinner_end").notNull().default("22:00"),
+  continuousStart: text("continuous_start").notNull().default("11:30"),
+  continuousEnd: text("continuous_end").notNull().default("22:00"),
+  continuousLastOrder: text("continuous_last_order").notNull().default("21:30"),
   note: text("note").notNull().default(""),
   updatedBy: text("updated_by").notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
