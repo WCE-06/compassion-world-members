@@ -47,14 +47,16 @@ test("LIFF・移行・共通セッションの接続点を保持する", async (
   assert.match(hosting, /"d1": "DB"/);
 });
 
-test("モバイル注文の商品画像を切り抜かず、飲料分類を分離する", async () => {
+test("モバイル注文の商品画像を切り抜かず、飲料を段階選択する", async () => {
   const [page, css] = await Promise.all([
     readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
     readFile(new URL("app/globals.css", root), "utf8"),
   ]);
-  assert.match(page, /\['soft','ソフトドリンク'\]/);
-  assert.match(page, /\['alcohol','アルコール'\]/);
-  assert.doesNotMatch(page, /\['drink','ドリンク'\]/);
+  assert.match(page, /\['drink','ドリンク'\]/);
+  assert.match(page, /category==="drink"&&<section className="drink-family-choices"/);
+  assert.match(page, /chooseCategory\("soft-simple"\)/);
+  assert.match(page, /chooseCategory\("alcohol-main"\)/);
+  assert.match(css, /drink-family-choices\+\.order-workspace\{display:none\}/);
   assert.match(css, /span\.product-image\{[^}]*aspect-ratio:4\/3/);
   assert.match(css, /span\.product-image img\{[^}]*width:auto[^}]*height:auto[^}]*max-width:100%[^}]*max-height:100%[^}]*object-fit:contain/);
 });
