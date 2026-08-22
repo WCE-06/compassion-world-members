@@ -61,6 +61,20 @@ test("モバイル注文の商品画像を切り抜かず、飲料を段階選�
   assert.match(css, /span\.product-image img\{[^}]*width:auto[^}]*height:auto[^}]*max-width:100%[^}]*max-height:100%[^}]*object-fit:contain/);
 });
 
+test("モバイル注文は直前メニューを即表示し商品取得を背後で更新する", async () => {
+  const [page, route, catalog] = await Promise.all([
+    readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/v1/catalog/route.ts", root), "utf8"),
+    readFile(new URL("lib/order-catalog.ts", root), "utf8"),
+  ]);
+  assert.match(page, /compassion-mobile-order-catalog-v1/);
+  assert.match(page, /localStorage\.getItem\(catalogCacheKey\)/);
+  assert.match(page, /setLoading\(false\);cached=true/);
+  assert.match(route, /s-maxage=300, stale-while-revalidate=900/);
+  assert.match(catalog, /cacheEverything:true,cacheTtl:300/);
+  assert.match(catalog, /Promise\.all/);
+});
+
 test("モクテルをベースと割材の掛け算で注文できる", async () => {
   const [page, pairing, sync] = await Promise.all([
     readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
