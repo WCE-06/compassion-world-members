@@ -555,3 +555,17 @@ test("スマレジの直近365日集計を正本として会員証とセルフ�
   assert.match(handoff, /二重計上しない/);
   assert.match(handoff, /月額住民登録料はポイント対象外/);
 });
+
+test("新規登録完了後に発行済み会員証へ遷移する", async () => {
+  const [page,members] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/v1/members/route.ts", root), "utf8"),
+  ]);
+  assert.match(page, /COMPASSION WORLDへの入館/);
+  assert.doesNotMatch(page, /SMS認証は現在使用しません/);
+  assert.match(page, /setMember\(await membership\.json\(\)\);setView\("member"\)/);
+  assert.match(page, /新しいポイントカードを発行しました/);
+  assert.match(members, /randomMemberCode/);
+  assert.match(members, /INSERT INTO identity_links/);
+  assert.match(members, /status:201/);
+});
