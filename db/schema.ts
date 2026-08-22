@@ -82,6 +82,11 @@ export const studioSessions = sqliteTable("studio_sessions", {
   status: text("status", { enum: ["RESERVED", "IN_USE", "COMPLETED", "CANCELLED"] }).notNull(),
   paymentStatus: text("payment_status", { enum: ["UNPAID", "PAID", "REFUNDED"] }).notNull().default("UNPAID"),
   paymentId: text("payment_id"),
+  paymentMethod: text("payment_method", { enum: ["STORE", "STRIPE"] }),
+  pointEligible: integer("point_eligible", { mode: "boolean" }).notNull().default(true),
+  pointStatus: text("point_status", { enum: ["PENDING", "POSTING", "AWARDED", "REVERSED", "NOT_ELIGIBLE", "FAILED"] }).notNull().default("PENDING"),
+  pointsEarned: integer("points_earned").notNull().default(0),
+  smaregiTransactionId: text("smaregi_transaction_id"),
   version: integer("version").notNull().default(1),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 }, (table) => [index("sessions_member_status_idx").on(table.memberId, table.status)]);
@@ -107,9 +112,14 @@ export const orders = sqliteTable("orders", {
   id: text("id").primaryKey(),
   orderNumber: text("order_number").notNull(),
   memberId: text("member_id").notNull().references(() => members.id),
-  status: text("status", { enum: ["WAITING_STORE_PAYMENT", "PAID", "ACCEPTED", "COOKING", "READY", "PICKED_UP", "EXPIRED", "CANCELLED"] }).notNull(),
+  status: text("status", { enum: ["PENDING_PAYMENT", "WAITING_STORE_PAYMENT", "PAYMENT_PROCESSING", "PAID", "ACCEPTED", "COOKING", "READY", "PICKED_UP", "PAYMENT_FAILED", "EXPIRED", "CANCELLED", "REFUNDED"] }).notNull(),
   paymentMethod: text("payment_method", { enum: ["STORE", "STRIPE"] }).notNull(),
   totalIncludingTax: integer("total_including_tax").notNull(),
+  pointEligible: integer("point_eligible", { mode: "boolean" }).notNull().default(true),
+  pointStatus: text("point_status", { enum: ["PENDING", "POSTING", "AWARDED", "REVERSED", "FAILED"] }).notNull().default("PENDING"),
+  pointsEarned: integer("points_earned").notNull().default(0),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  smaregiTransactionId: text("smaregi_transaction_id"),
   pickupAt: integer("pickup_at", { mode: "timestamp_ms" }),
   expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
@@ -170,6 +180,26 @@ export const storeHours = sqliteTable("store_hours", {
   updatedBy: text("updated_by").notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
+
+export const paymentPointEvents = sqliteTable("payment_point_events", {
+  id: text("id").primaryKey(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  memberId: text("member_id").notNull().references(() => members.id),
+  purpose: text("purpose", { enum: ["MOBILE_ORDER", "STUDIO_USAGE", "RESIDENT_SUBSCRIPTION"] }).notNull(),
+  sourceId: text("source_id").notNull(),
+  stripeEventId: text("stripe_event_id"),
+  stripePaymentId: text("stripe_payment_id"),
+  smaregiTransactionId: text("smaregi_transaction_id"),
+  eligible: integer("eligible", { mode: "boolean" }).notNull(),
+  status: text("status", { enum: ["RECEIVED", "POSTING", "AWARDED", "REVERSED", "NOT_ELIGIBLE", "FAILED"] }).notNull(),
+  points: integer("points").notNull().default(0),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [
+  uniqueIndex("payment_point_events_idempotency_unique").on(table.idempotencyKey),
+  uniqueIndex("payment_point_events_stripe_event_unique").on(table.stripeEventId),
+  index("payment_point_events_source_idx").on(table.purpose, table.sourceId),
+]);
 
 export const businessCalendar = sqliteTable("business_calendar", {
   date: text("date").primaryKey(),

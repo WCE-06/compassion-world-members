@@ -232,3 +232,25 @@ test("LINE登録に必要なプライバシーポリシーと利用規約を公�
   assert.match(terms, /ポイント・特典/);
   assert.match(terms, /利用停止/);
 });
+
+test("スマート決済の名称と用途別ポイント規則を共通化する", async () => {
+  const [policy, schema, orders, mobileOrder, migration, readme] = await Promise.all([
+    readFile(new URL("lib/point-policy.ts", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/route.ts", root), "utf8"),
+    readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
+    readFile(new URL("drizzle/0009_rainy_rogue.sql", root), "utf8"),
+    readFile(new URL("README.md", root), "utf8"),
+  ]);
+  assert.match(policy, /MOBILE_ORDER/);
+  assert.match(policy, /STUDIO_USAGE/);
+  assert.match(policy, /purpose === "MOBILE_ORDER" \|\| purpose === "STUDIO_USAGE"/);
+  assert.match(policy, /スマート決済/);
+  assert.match(schema, /paymentPointEvents/);
+  assert.match(schema, /RESIDENT_SUBSCRIPTION/);
+  assert.match(orders, /pointRuleFor\("MOBILE_ORDER"\)/);
+  assert.match(mobileOrder, /スマート決済/);
+  assert.match(mobileOrder, /どちらのお支払いでもポイントが貯まります/);
+  assert.match(migration, /payment_point_events/);
+  assert.match(readme, /月額料金はポイント対象外/);
+});

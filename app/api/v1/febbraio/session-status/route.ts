@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const paymentId = request.nextUrl.searchParams.get("paymentId")?.trim() || `confirmed:${sessionId}`;
     await env.DB.prepare(
       `UPDATE studio_sessions
-          SET status='COMPLETED', payment_status='PAID', payment_id=?, checked_out_at=?, updated_at=?, version=version+1
+          SET status='COMPLETED', payment_status='PAID', payment_id=?, payment_method='STORE', point_eligible=1, point_status='PENDING', checked_out_at=?, updated_at=?, version=version+1
         WHERE id=? AND studio_id='FEBBRAIO' AND status='IN_USE'`,
     ).bind(paymentId, now, now, sessionId).run();
   }
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   const now = Date.now();
   const result = await env.DB.prepare(
     `UPDATE studio_sessions
-        SET status='COMPLETED', payment_status='PAID', payment_id=?, checked_out_at=?, updated_at=?, version=version+1
+        SET status='COMPLETED', payment_status='PAID', payment_id=?, payment_method='STORE', point_eligible=1, point_status='PENDING', checked_out_at=?, updated_at=?, version=version+1
       WHERE id=? AND studio_id='FEBBRAIO' AND status='IN_USE'`,
   ).bind(paymentId, now, now, sessionId).run();
   if ((result.meta.changes ?? 0) === 0) {
@@ -59,5 +59,5 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "SESSION_NOT_ACTIVE" }, { status: 409 });
     }
   }
-  return NextResponse.json({ sessionId, status: "PAID", sessionStatus: "COMPLETED", paymentStatus: "PAID" });
+  return NextResponse.json({ sessionId, status: "PAID", sessionStatus: "COMPLETED", paymentStatus: "PAID", paymentLabel:"現地決済", pointEligible:true, pointStatus:"PENDING" });
 }
