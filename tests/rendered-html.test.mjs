@@ -76,6 +76,20 @@ test("予約ページは代表会員へフォールバックせずLINE本人の�
   assert.match(cancellationApi, /LINE_AUTH_REQUIRED/);
 });
 
+test("読み込み中の仮通知を表示せず無料会員を住民登録へ案内する", async () => {
+  const [page, residentPage, upgradeApi] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/resident/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/v1/resident-upgrade/route.ts", root), "utf8"),
+  ]);
+  assert.match(page, /view === "member" \? member\.notices/);
+  assert.match(page, /member\.membershipType!=="RESIDENT"/);
+  assert.match(page, /住民登録へアップグレード/);
+  assert.match(residentPage, /ゴールドランク以上を保証/);
+  assert.match(upgradeApi, /RESIDENT_SUBSCRIPTION_CHECKOUT_URL/);
+  assert.match(upgradeApi, /client_reference_id/);
+});
+
 test("モバイル注文の商品画像を切り抜かず、飲料を段階選択する", async () => {
   const [page, css] = await Promise.all([
     readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),

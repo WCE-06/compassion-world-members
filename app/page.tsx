@@ -211,7 +211,7 @@ export default function Home() {
     start();
   }, []);
 
-  const unreadCount = member.notices.filter((item) => item.unread).length;
+  const unreadCount = view === "member" ? member.notices.filter((item) => item.unread).length : 0;
   const visibleNotices = showAllNotices ? member.notices : member.notices.slice(0, 2);
   const activeReservations=member.reservations??(member.nextReservation?[{...member.nextReservation,reservationId:"next",status:"CONFIRMED"}]:[]);
   const activeOrders=member.orders??(member.activeOrder?[member.activeOrder]:[]);
@@ -246,6 +246,8 @@ export default function Home() {
             {member.smaregiSyncStatus&&member.smaregiSyncStatus!=="SYNCED"&&<p className={`sync-status sync-${member.smaregiSyncStatus.toLowerCase()}`}>{member.smaregiSyncStatus==="FAILED"?"会員情報の連携を再確認しています":"スマレジ会員情報を連携しています"}</p>}
             {member.qualifyingSpendSource!=="SMAREGI"&&<p className="sync-status">過去1年のお買い上げ金額をスマレジと同期しています</p>}
           </section>
+
+          {member.membershipType!=="RESIDENT"&&<button className="resident-upgrade-banner" onClick={()=>{window.location.href="/resident"}}><span>RESIDENT MEMBERSHIP</span><strong>住民登録へアップグレード</strong><small>住民限定特典とゴールドランク保証を確認する　›</small></button>}
 
           <section className="majica-actions" aria-label="よく使うサービス">
             <button onClick={() => { window.location.href = "/availability"; }}><span><CalendarDays aria-hidden="true" size={19} strokeWidth={1.7} /></span><strong>予約</strong></button>
