@@ -175,6 +175,7 @@ export default function Home() {
     async function start() {
       const params = new URLSearchParams(window.location.search);
       const requested = params.get("state");
+      const entry = params.get("entry");
       const liffId = await fetch("/api/v1/client-config").then(response=>response.ok?response.json():{liffId:""}).then(config=>String(config.liffId??"")).catch(()=>"");
 
       if (!liffId) {
@@ -197,7 +198,7 @@ export default function Home() {
         const token = window.liff!.getAccessToken();
         setLineToken(token??"");
         const response = await fetch("/api/v1/me/membership", { headers: { Authorization: `Bearer ${token}` } });
-        if (response.status === 404) return setView("unlinked");
+        if (response.status === 404) return setView(entry === "join" ? "new" : "unlinked");
         if (response.status === 422) {const staged=await fetch("/api/v1/me/registration",{headers:{Authorization:`Bearer ${token}`}}).then(result=>result.ok?result.json():null).catch(()=>null);if(staged?.registration)setRegistration(current=>({...current,...Object.fromEntries(Object.entries(staged.registration).filter(([,value])=>Boolean(value)))}));return setView("new")}
         if (!response.ok) throw new Error("会員情報を取得できませんでした");
         setMember(await response.json());

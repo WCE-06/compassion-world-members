@@ -231,6 +231,8 @@ test("既存LINE会員を安全に移行し空欄会員を新規登録へ分け�
   assert.match(registration, /randomMemberCode/);
   assert.match(registration, /acceptedTerms/);
   assert.match(page, /登録しています…/);
+  assert.match(page, /entry === "join" \? "new" : "unlinked"/);
+  assert.match(page, /params\.get\("entry"\)/);
   assert.match(lineAuth, /oauth2\/v2\.1\/verify/);
   assert.match(lineAuth, /LINE_LOGIN_CHANNEL_ID/);
   assert.match(migration, /CREATE TABLE `legacy_member_imports`/);
