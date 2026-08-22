@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bookingDateRange, isBookableDate } from "@/lib/booking-window";
-import { facilityPost } from "@/lib/facility-api";
+import { facilityPost, filterOwnedFacilityRows, isOwnedFacilityRow } from "@/lib/facility-api";
 import { authenticatedMember } from "@/lib/member-auth";
 
-type FacilityReservation={reservationId:string;facilityId:string;startAt:string;endAt:string;status:"CONFIRMED"|"CANCELLED"|"COMPLETED"};
+type FacilityReservation={reservationId:string;memberCode:string;facilityId:string;startAt:string;endAt:string;status:"CONFIRMED"|"CANCELLED"|"COMPLETED"};
 
 export async function GET(request: NextRequest) {
   const member = await authenticatedMember(request);
   if (!member) return NextResponse.json({ error: "MEMBER_LOGIN_REQUIRED" }, { status: 401 });
   try {
     const rows = await facilityPost<FacilityReservation[]>("reservation.get", { facilityId: "FEBBRAIO", memberCode: member.memberCode });
-    return NextResponse.json({ reservations: rows.map(row => ({ id: row.reservationId, studioId: row.facilityId, startsAt: Date.parse(row.startAt), endsAt: Date.parse(row.endAt), status: row.status })) });
+    const ownedRows = filterOwnedFacilityRows(rows, member.memberCode);
+    return NextResponse.json({ reservations: ownedRows.map(row => ({ id: row.reservationId, studioId: row.facilityId, startsAt: Date.parse(row.startAt), endsAt: Date.parse(row.endAt), status: row.status })) });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "FACILITY_API_ERROR" }, { status: 502 }); }
 }
 
@@ -23,6 +24,7 @@ export async function POST(request: NextRequest) {
   const base=new Date(`${date}T12:00:00+09:00`);if(startHour>=24)base.setDate(base.getDate()+1);const localDate=new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Tokyo"}).format(base);const actualHour=startHour>=24?startHour-24:startHour;const startAt=`${localDate}T${String(actualHour).padStart(2,"0")}:00:00+09:00`;
   try {
     const row=await facilityPost<FacilityReservation>("reservation.create",{facilityId:"FEBBRAIO",memberCode:member.memberCode,startAt,hours:duration},body?.requestId||crypto.randomUUID());
+    if(!isOwnedFacilityRow(row,member.memberCode))throw new Error("RESERVATION_OWNERSHIP_MISMATCH");
     return NextResponse.json({reservationId:row.reservationId,startsAt:Date.parse(row.startAt),endsAt:Date.parse(row.endAt),status:row.status},{status:201});
   } catch(error){const code=error instanceof Error?error.message:"FACILITY_API_ERROR";return NextResponse.json({error:code},{status:code==="TIME_NOT_AVAILABLE"?409:502});}
 }

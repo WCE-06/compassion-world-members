@@ -10,6 +10,20 @@ export function facilityApiEnabled() {
   return Boolean(runtimeValue("COMMON_FACILITY_GAS_URL"));
 }
 
+export function normalizeFacilityMemberCode(value: unknown) {
+  return String(value ?? "").trim().toUpperCase();
+}
+
+export function filterOwnedFacilityRows<T extends { memberCode?: unknown }>(rows: T[], memberCode: string) {
+  const expected = normalizeFacilityMemberCode(memberCode);
+  if (!expected) return [];
+  return rows.filter((row) => normalizeFacilityMemberCode(row.memberCode) === expected);
+}
+
+export function isOwnedFacilityRow(row: { memberCode?: unknown } | null | undefined, memberCode: string) {
+  return Boolean(row) && normalizeFacilityMemberCode(row?.memberCode) === normalizeFacilityMemberCode(memberCode);
+}
+
 export async function facilityPublicGet<T>(action: string, data: Record<string, string>) {
   const url = new URL(runtimeValue("COMMON_FACILITY_GAS_URL"));
   url.searchParams.set("action", action);

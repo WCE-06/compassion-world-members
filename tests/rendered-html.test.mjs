@@ -47,6 +47,21 @@ test("LIFF・移行・共通セッションの接続点を保持する", async (
   assert.match(hosting, /"d1": "DB"/);
 });
 
+test("予約・利用情報は認証会員本人の会員番号で再検証する", async () => {
+  const [facilityApi, membershipApi, reservationsApi, cancellationApi] = await Promise.all([
+    readFile(new URL("lib/facility-api.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/reservations/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/reservations/[id]/route.ts", root), "utf8"),
+  ]);
+  assert.match(facilityApi, /filterOwnedFacilityRows/);
+  assert.match(facilityApi, /normalizeFacilityMemberCode\(row\.memberCode\) === expected/);
+  assert.match(membershipApi, /filterOwnedFacilityRows\(reservationRows,member\.memberCode\)/);
+  assert.match(membershipApi, /isOwnedFacilityRow\(sessionResult\.session,member\.memberCode\)/);
+  assert.match(reservationsApi, /filterOwnedFacilityRows\(rows, member\.memberCode\)/);
+  assert.match(cancellationApi, /memberCode:member\.memberCode/);
+});
+
 test("モバイル注文の商品画像を切り抜かず、飲料を段階選択する", async () => {
   const [page, css] = await Promise.all([
     readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
