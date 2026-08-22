@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authenticatedMember } from "@/lib/member-auth";
 import { getOrderProducts } from "@/lib/order-catalog";
 import { pointRuleFor } from "@/lib/point-policy";
+import { expireStaleLocks,expireStaleOrder } from "@/lib/order-pos";
 
 type Department="FOOD"|"DRINK";
 const departmentLabel:Record<Department,string>={FOOD:"フード",DRINK:"ドリンク"};
@@ -23,6 +24,7 @@ async function allocateCallNumber(callDate:string,department:Department,now:numb
 export async function GET(request: NextRequest) {
   const member = await authenticatedMember(request);
   if (!member) return NextResponse.json({ error: "MEMBER_LOGIN_REQUIRED" }, { status: 401 });
+  await expireStaleLocks();await expireStaleOrder();
   const orderId=request.nextUrl.searchParams.get("orderId")?.trim();
   if(orderId){
     const order=await env.DB.prepare(`SELECT id AS orderId,order_number AS orderNumber,status,payment_method AS paymentMethod,total_including_tax AS totalIncludingTax,point_eligible AS pointEligible,point_status AS pointStatus,expires_at AS expiresAt FROM orders WHERE id=? AND member_id=?`).bind(orderId,member.id).first<{orderId:string;orderNumber:string;status:string;paymentMethod:"STORE"|"STRIPE";totalIncludingTax:number;pointEligible:number;pointStatus:string;expiresAt:number}>();

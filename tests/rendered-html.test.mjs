@@ -405,8 +405,24 @@ test("現地決済は商品同期遅延で固まらず同じ注文を安全に�
   assert.match(mobile, /注文は重複しません/);
   assert.match(mobile, /商品情報と金額を確認しています/);
   assert.match(mobile, /現地決済の受付番号を発行しています/);
-  assert.match(mobile, /セルフレジでお支払いが完了するまでは、注文は確定しません/);
+  assert.match(mobile, /15分以内にセルフレジでお支払いください/);
   assert.doesNotMatch(mobile, /キッチンへ注文は送信されません/);
+});
+
+test("現地決済は15分後に注文と呼出情報を自動取消する", async () => {
+  const [mobile, orders, membership, pos] = await Promise.all([
+    readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
+    readFile(new URL("lib/order-pos.ts", root), "utf8"),
+  ]);
+  assert.match(orders, /15 \* 60_000/);
+  assert.match(orders, /expireStaleOrder\(\)/);
+  assert.match(membership, /expireStaleOrder\(\)/);
+  assert.match(pos, /status='EXPIRED'/);
+  assert.match(pos, /status='CANCELLED'/);
+  assert.match(mobile, /remaining\+250/);
+  assert.match(mobile, /お支払い期限を過ぎました/);
 });
 
 test("モバイル注文のカテゴリタブが商品追加ボタンと重ならない", async () => {
