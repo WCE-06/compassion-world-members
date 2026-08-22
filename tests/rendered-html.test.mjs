@@ -176,3 +176,20 @@ test("月別営業カレンダーを日曜始まりで表示する", async () =>
   assert.match(page, /className="calendar-week"><span>日<\/span><span>月<\/span>/);
   assert.doesNotMatch(page, /lead=\(first\.getDay\(\)\+6\)%7/);
 });
+
+test("基本営業時間の保存状態をその場で表示しプレビューでも保持する", async () => {
+  const [page, preview, css] = await Promise.all([
+    readFile(new URL("app/menu-admin/page.tsx", root), "utf8"),
+    readFile(new URL("preview/main.tsx", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+  ]);
+  assert.match(page, /hoursSaveState/);
+  assert.match(page, /保存しています…/);
+  assert.match(page, /再読み込み後も設定が反映されます/);
+  assert.match(page, /disabled=\{hoursSaveState==="SAVING"\}/);
+  assert.match(page, /aria-live="polite"/);
+  assert.match(preview, /localStorage\.setItem\(previewAdminKey/);
+  assert.match(preview, /previewAdminState=\{\.\.\.previewAdminState,hours:body\}/);
+  assert.match(css, /\.inline-save-status\.saved/);
+  assert.match(css, /@keyframes save-spin/);
+});
