@@ -220,8 +220,8 @@ export default function Home() {
 
       {view === "member" && (
         <>
-          <section className="wallet-card">
-            <div className="wallet-card-head"><div><span>会員証 {member.membershipLabel&&<b className="resident-badge">{member.membershipLabel}</b>}</span><strong>{member.displayName} 様</strong></div><button onClick={() => setNotice("会員番号を受付端末へ提示してください")}>拡大</button></div>
+          <section className={`wallet-card rank-card rank-card-${member.rank.toLowerCase()}`}>
+            <div className="wallet-card-head"><div><span>会員証 {member.membershipLabel&&<b className="resident-badge">{member.membershipLabel}</b>}</span><strong>{member.displayName} 様</strong></div><div className="rank-emblem"><small>{member.rankLabel??member.rank}</small><b>{member.pointRatePercent??1}%</b><span>POINT</span></div><button onClick={() => setNotice("会員番号を受付端末へ提示してください")}>拡大</button></div>
             <MemberQr value={member.memberCode} />
             <div className="wallet-balances">
               <button onClick={() => openFutureFeature("ポイント履歴")}><small>保有ポイント</small><strong>{member.points.toLocaleString("ja-JP")}<span> P</span></strong><em>履歴を見る ›</em></button>

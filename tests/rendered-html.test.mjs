@@ -513,6 +513,8 @@ test("会員ランクを利用実績で6段階化し住民のゴールド保証�
   for(const rate of [1,2,3,5,7,10])assert.match(ranks,new RegExp(`pointRatePercent:${rate}`));
   assert.match(page, /次の\{member.nextRankLabel\}まで/);
   assert.match(page, /基本ポイント還元率/);
+  assert.match(page, /rank-card-\$\{member\.rank\.toLowerCase\(\)\}/);
+  assert.match(page, /rank-emblem/);
   assert.match(membership, /memberPresentation/);
   assert.match(membership, /365\*24\*60\*60\*1000/);
   assert.match(membership, /unit_price_excluding_tax\*i.quantity/);
@@ -531,4 +533,5 @@ test("会員ランクを利用実績で6段階化し住民のゴールド保証�
   assert.match(membership, /LEGACY_RESIDENT_MEMBER_CODES/);
   assert.match(migration, /resident_status/);
   assert.match(css, /rank-diamond/);
+  for(const rank of ["standard","bronze","silver","gold","platinum","diamond"])assert.match(css,new RegExp(`rank-card-${rank}`));
 });
