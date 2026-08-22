@@ -401,8 +401,12 @@ test("現地決済は商品同期遅延で固まらず同じ注文を安全に�
   assert.match(orders, /timeoutMs:3_000,allowSnapshotFallback:true/);
   assert.match(mobile, /AbortSignal\.timeout\(10_000\)/);
   assert.match(mobile, /compassion-pending-order-request/);
-  assert.match(mobile, /finally\{setSending\(false\)\}/);
+  assert.match(mobile, /finally\{progressTimers\.forEach\(clearTimeout\);setSending\(false\)\}/);
   assert.match(mobile, /注文は重複しません/);
+  assert.match(mobile, /商品情報と金額を確認しています/);
+  assert.match(mobile, /現地決済の受付番号を発行しています/);
+  assert.match(mobile, /セルフレジでお支払いが完了するまでは、注文は確定しません/);
+  assert.doesNotMatch(mobile, /キッチンへ注文は送信されません/);
 });
 
 test("モバイル注文のカテゴリタブが商品追加ボタンと重ならない", async () => {
