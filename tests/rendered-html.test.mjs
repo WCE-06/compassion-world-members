@@ -251,6 +251,10 @@ test("スマート決済の名称と用途別ポイント規則を共通化す�
   assert.match(orders, /pointRuleFor\("MOBILE_ORDER"\)/);
   assert.match(mobileOrder, /スマート決済/);
   assert.match(mobileOrder, /どちらのお支払いでもポイントが貯まります/);
+  assert.match(mobileOrder, /choosingPayment/);
+  assert.match(mobileOrder, /お支払い方法を選択/);
+  assert.match(mobileOrder, /order\("STORE"\)/);
+  assert.match(mobileOrder, /order\("STRIPE"\)/);
   assert.match(migration, /payment_point_events/);
   assert.match(readme, /月額料金はポイント対象外/);
 });
