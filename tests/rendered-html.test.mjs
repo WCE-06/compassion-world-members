@@ -577,8 +577,24 @@ test("受渡済みの部門注文を会員証へ残さず注文全体も自動�
     readFile(new URL("lib/order-pos.ts", root), "utf8"),
   ]);
   assert.match(membership,/reconcileCompletedOrders\(member\.id\)/);
-  assert.match(membership,/f\.status NOT IN \('PICKED_UP','CANCELLED'\)/);
+  assert.match(membership,/filter\(Boolean\)\.every\(status=>status==="PICKED_UP"\|\|status==="CANCELLED"\)/);
   assert.match(pos,/UPDATE orders SET status='PICKED_UP'/);
   assert.doesNotMatch(kitchen,/existing\.status!==rule\.to[^}]+return NextResponse\.json\(\{id:fulfillmentId/s);
   assert.match(kitchen,/values\.every\(status=>status==="PICKED_UP"\)\?"PICKED_UP"/);
+});
+
+test("未完了の予約と注文をすべて表示し完了分を履歴へ分離する", async () => {
+  const [page,membership]=await Promise.all([
+    readFile(new URL("app/page.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/me/membership/route.ts",root),"utf8"),
+  ]);
+  assert.match(page,/ご利用予定・受付状況/);
+  assert.match(page,/activeReservations\.map/);
+  assert.match(page,/activeOrders\.map/);
+  assert.match(page,/activity-create-actions-bottom/);
+  assert.doesNotMatch(page,/予約・Aozora Kitchen注文/);
+  assert.match(membership,/reservationHistory/);
+  assert.match(membership,/orderHistory/);
+  assert.match(membership,/新しいポイントカードのご利用ありがとうございます/);
+  assert.match(membership,/cardStartedAt/);
 });
