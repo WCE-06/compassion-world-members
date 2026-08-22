@@ -119,6 +119,7 @@ export const orders = sqliteTable("orders", {
   pointStatus: text("point_status", { enum: ["PENDING", "POSTING", "AWARDED", "REVERSED", "FAILED"] }).notNull().default("PENDING"),
   pointsEarned: integer("points_earned").notNull().default(0),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripeCheckoutSessionId: text("stripe_checkout_session_id"),
   smaregiTransactionId: text("smaregi_transaction_id"),
   pickupAt: integer("pickup_at", { mode: "timestamp_ms" }),
   expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
@@ -127,9 +128,31 @@ export const orders = sqliteTable("orders", {
 }, (table) => [
   uniqueIndex("orders_order_number_unique").on(table.orderNumber),
   uniqueIndex("orders_stripe_payment_intent_unique").on(table.stripePaymentIntentId),
+  uniqueIndex("orders_stripe_checkout_session_unique").on(table.stripeCheckoutSessionId),
   uniqueIndex("orders_smaregi_transaction_unique").on(table.smaregiTransactionId),
   index("orders_member_created_idx").on(table.memberId, table.createdAt),
 ]);
+
+export const stripeCustomers = sqliteTable("stripe_customers", {
+  memberId: text("member_id").primaryKey().references(() => members.id),
+  stripeCustomerId: text("stripe_customer_id").notNull(),
+  defaultPaymentMethodId: text("default_payment_method_id"),
+  cardBrand: text("card_brand"),
+  cardLast4: text("card_last4"),
+  cardExpMonth: integer("card_exp_month"),
+  cardExpYear: integer("card_exp_year"),
+  reusableConsentAt: integer("reusable_consent_at", { mode: "timestamp_ms" }),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [uniqueIndex("stripe_customers_customer_unique").on(table.stripeCustomerId)]);
+
+export const stripeWebhookEvents = sqliteTable("stripe_webhook_events", {
+  eventId: text("event_id").primaryKey(),
+  eventType: text("event_type").notNull(),
+  status: text("status", { enum: ["RECEIVED", "PROCESSED", "IGNORED", "FAILED"] }).notNull(),
+  errorMessage: text("error_message"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  processedAt: integer("processed_at", { mode: "timestamp_ms" }),
+});
 
 export const orderItems = sqliteTable("order_items", {
   id: text("id").primaryKey(),

@@ -290,3 +290,19 @@ test("レシート番号を使わずフードとドリンクを別々に呼び�
   assert.match(indexes, /orders_smaregi_transaction_unique/);
   assert.match(guide, /レシート番号は顧客呼出しに使用しません/);
 });
+
+test("Stripe Checkoutを署名検証・同意・冪等処理付きで接続する", async () => {
+  const [checkout, webhook, stripe, mobile] = await Promise.all([
+    readFile(new URL("app/api/v1/orders/[id]/smart-payment/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/stripe/webhook/route.ts", root), "utf8"),
+    readFile(new URL("lib/stripe.ts", root), "utf8"),
+    readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
+  ]);
+  assert.match(checkout, /setup_future_usage/);
+  assert.match(checkout, /saveCardConsent/);
+  assert.match(webhook, /stripe_webhook_events/);
+  assert.match(webhook, /payment_point_events/);
+  assert.match(stripe, /HMAC/);
+  assert.match(stripe, /STRIPE_WEBHOOK_SECRET/);
+  assert.match(mobile, /カード番号はCOMPASSION WORLDでは保持しません/);
+});
