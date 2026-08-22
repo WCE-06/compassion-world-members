@@ -162,9 +162,44 @@ export const orderItems = sqliteTable("order_items", {
   productName: text("product_name").notNull(),
   department: text("department", { enum: ["FOOD", "DRINK"] }).notNull().default("FOOD"),
   quantity: integer("quantity").notNull(),
+  unitPriceExcludingTax: integer("unit_price_excluding_tax").notNull().default(0),
   unitPriceIncludingTax: integer("unit_price_including_tax").notNull(),
+  taxRate: integer("tax_rate").notNull().default(10),
+  taxDivision: text("tax_division").notNull().default("INCLUDED"),
+  taxRounding: text("tax_rounding").notNull().default("FLOOR"),
+  selectedOptionsJson: text("selected_options_json").notNull().default("[]"),
   lineTotalIncludingTax: integer("line_total_including_tax").notNull(),
 }, (table) => [index("order_items_order_idx").on(table.orderId)]);
+
+export const orderPaymentLocks = sqliteTable("order_payment_locks", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id").notNull().references(() => orders.id),
+  requestId: text("request_id").notNull(),
+  deviceId: text("device_id").notNull(),
+  status: text("status", { enum: ["ACTIVE", "RELEASED", "CONSUMED", "EXPIRED"] }).notNull(),
+  lockedAt: integer("locked_at", { mode: "timestamp_ms" }).notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  releasedAt: integer("released_at", { mode: "timestamp_ms" }),
+  releaseReason: text("release_reason"),
+}, (table) => [
+  uniqueIndex("order_payment_locks_request_unique").on(table.requestId),
+  index("order_payment_locks_order_status_idx").on(table.orderId, table.status, table.expiresAt),
+]);
+
+export const orderPaymentEvents = sqliteTable("order_payment_events", {
+  id: text("id").primaryKey(),
+  requestId: text("request_id").notNull(),
+  orderId: text("order_id").notNull().references(() => orders.id),
+  paymentId: text("payment_id").notNull(),
+  lockId: text("lock_id"),
+  deviceId: text("device_id"),
+  paidAt: integer("paid_at", { mode: "timestamp_ms" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [
+  uniqueIndex("order_payment_events_request_unique").on(table.requestId),
+  uniqueIndex("order_payment_events_payment_unique").on(table.paymentId),
+  index("order_payment_events_order_idx").on(table.orderId),
+]);
 
 export const orderCallCounters = sqliteTable("order_call_counters", {
   callDate: text("call_date").notNull(),

@@ -309,3 +309,24 @@ test("Stripe Checkoutを署名検証・任意保存・冪等処理付きで接�
   assert.doesNotMatch(mobile, /saveCardConsent/);
   assert.match(webhook, /savedForReuse/);
 });
+
+test("セルフレジ現地決済を未決済一覧・5分ロック・冪等通知で接続する", async () => {
+  const [unpaid, lock, release, confirmation, schema, migration, guide] = await Promise.all([
+    readFile(new URL("app/api/v1/orders/unpaid/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/[id]/payment-lock/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/[id]/payment-lock/release/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/payment-confirmation/route.ts", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("drizzle/0013_steady_hedge_knight.sql", root), "utf8"),
+    readFile(new URL("docs/SELF_REGISTER_ORDER_PAYMENT_API.md", root), "utf8"),
+  ]);
+  assert.match(unpaid, /WAITING_STORE_PAYMENT.*PAYMENT_PROCESSING/);
+  assert.match(lock, /PAYMENT_LOCK_TTL_MS/);
+  assert.match(lock, /PRICE_CHANGED/);
+  assert.match(release, /LOCK_NOT_OWNED/);
+  assert.match(confirmation, /DUPLICATE_PAYMENT_ID/);
+  assert.match(confirmation, /idempotentReplay/);
+  assert.match(schema, /orderPaymentLocks/);
+  assert.match(migration, /order_payment_events/);
+  assert.match(guide, /5分/);
+});
