@@ -433,3 +433,23 @@ test("モバイル注文のカテゴリタブが商品追加ボタンと重な�
   assert.match(layout, /mobile-order-fixes\.css/);
   assert.match(fix, /\.product-list article\s*\{[^}]*position:\s*relative/s);
 });
+
+test("提供予定をキッチン正本へ統一し固定30分を使用しない", async () => {
+  const [mobile,orders,estimate,payment,stripe,membership,schedule] = await Promise.all([
+    readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/estimate/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/payment-confirmation/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/stripe/webhook/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
+    readFile(new URL("lib/kitchen-schedule.ts", root), "utf8"),
+  ]);
+  assert.doesNotMatch(mobile, /30\s*\*\s*60_000/);
+  assert.match(mobile, /\/api\/v1\/orders\/estimate/);
+  assert.match(orders, /estimateOrderSchedule/);
+  assert.match(estimate, /estimateOrderSchedule/);
+  assert.match(payment, /confirmOrderSchedule/);
+  assert.match(stripe, /confirmOrderSchedule/);
+  assert.match(membership, /scheduleLabel/);
+  assert.match(schedule, /getOrderSchedule/);
+});
