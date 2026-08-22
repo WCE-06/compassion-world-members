@@ -330,3 +330,12 @@ test("セルフレジ現地決済を未決済一覧・5分ロック・冪等通�
   assert.match(migration, /order_payment_events/);
   assert.match(guide, /5分/);
 });
+
+test("モバイル注文のカテゴリタブが商品追加ボタンと重ならない", async () => {
+  const [layout, fix] = await Promise.all([
+    readFile(new URL("app/layout.tsx", root), "utf8"),
+    readFile(new URL("app/mobile-order-fixes.css", root), "utf8"),
+  ]);
+  assert.match(layout, /mobile-order-fixes\.css/);
+  assert.match(fix, /\.product-list article\s*\{[^}]*position:\s*relative/s);
+});

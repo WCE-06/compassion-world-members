@@ -1,0 +1,4 @@
+/* Keep the full-card add target inside its own product card. */
+.product-list article {
+  position: relative;
+}
