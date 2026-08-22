@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bell, CalendarDays, Coffee, History, House, IdCard, MessageSquarePlus, TicketPercent, UtensilsCrossed } from "lucide-react";
 
 type View = "loading" | "member" | "unlinked" | "new" | "error";
+type ServicePanel="ポイント履歴"|"会員特典"|"クーポン"|"利用履歴"|"おもひで商店のご案内"|"予約の変更・キャンセル"|"注文状況"|null;
 
 type MemberNotice = {
   id: string;
@@ -126,6 +127,9 @@ function paymentLabel(status: NonNullable<Member["session"]>["paymentStatus"]) {
 function fulfillmentLabel(status?:string|null){return{WAITING_PAYMENT:"決済待ち",ACCEPTED:"受付済み",COOKING:"調理中",READY:"完成",CALLED:"お呼び出し中",PICKED_UP:"受渡済み"}[status??""]??""}
 function scheduleText(schedule:NonNullable<Member["activeOrder"]>["schedule"],fallback?:string|null){const readyAt=schedule?.food?.readyAt??schedule?.drink?.readyAt;if(!readyAt)return fallback??"提供予定：できあがり次第";return `提供予定 ${new Intl.DateTimeFormat("ja-JP",{hour:"2-digit",minute:"2-digit"}).format(new Date(readyAt))}ごろ`}
 
+function Empty({text}:{text:string}){return <div className="member-empty"><span>STATUS</span><p>{text}</p></div>}
+function ServiceSheet({panel,member,onClose}:{panel:Exclude<ServicePanel,null>;member:Member;onClose:()=>void}){const pointNotices=member.notices.filter(item=>item.category==="POINT"),history=member.notices.filter(item=>item.category!=="NEWS");return <div className="member-sheet-backdrop" onClick={onClose}><section className="member-sheet" role="dialog" aria-modal="true" aria-label={panel} onClick={event=>event.stopPropagation()}><button className="member-sheet-close" onClick={onClose}>×</button><p className="eyebrow">MEMBER SERVICE</p><h2>{panel}</h2>{panel==="注文状況"&&(member.activeOrder?<div className="member-sheet-content"><strong>{member.activeOrder.status==="WAITING_PAYMENT"?"お支払い待ち":member.activeOrder.status==="COOKING"?"ただいま調理中":member.activeOrder.status==="READY"?"商品ができあがりました":"注文受付済み"}</strong><p>{[member.activeOrder.foodCallNumber&&`フード ${String(member.activeOrder.foodCallNumber).padStart(3,"0")} ${fulfillmentLabel(member.activeOrder.foodStatus)}`,member.activeOrder.drinkCallNumber&&`ドリンク ${String(member.activeOrder.drinkCallNumber).padStart(3,"0")} ${fulfillmentLabel(member.activeOrder.drinkStatus)}`].filter(Boolean).join(" ／ ")}</p><p>{scheduleText(member.activeOrder.schedule,member.activeOrder.scheduleLabel)}</p></div>:<Empty text="進行中の注文はありません"/>)}{panel==="ポイント履歴"&&<div className="member-sheet-content"><strong>保有ポイント {member.points.toLocaleString("ja-JP")} P</strong>{pointNotices.length?pointNotices.map(item=><p key={item.id}>{item.createdAt}　{item.title}</p>):<Empty text="表示できるポイント履歴はまだありません"/>}</div>}{panel==="会員特典"&&<div className="member-sheet-content"><strong>現在のランク：{member.rank}</strong><p>会員限定価格や対象特典は、利用可能になったものからこちらに表示されます。</p></div>}{panel==="クーポン"&&<Empty text="現在利用できるクーポンはありません"/>}{panel==="利用履歴"&&<div className="member-sheet-content">{history.length?history.map(item=><p key={item.id}>{item.createdAt}　{item.title}</p>):<Empty text="表示できる利用履歴はまだありません"/>}</div>}{panel==="予約の変更・キャンセル"&&(member.nextReservation?<div className="member-sheet-content"><strong>{member.nextReservation.facilityName}</strong><p>{dateLabel(member.nextReservation.startsAt)}〜</p><a href="/availability">予約ページを開く</a></div>:<Empty text="変更できる予約はありません"/>)}{panel==="おもひで商店のご案内"&&<div className="member-sheet-content"><strong>おもひで商店</strong><p>会員限定のお知らせや入荷情報は、このポイントカードのお知らせ欄でご案内します。</p><a href="/product-request">取り寄せ・商品リクエスト</a></div>}<button className="flow-button" onClick={onClose}>閉じる</button></section></div>}
+
 export default function Home() {
   const [view, setView] = useState<View>("loading");
   const [member, setMember] = useState<Member>(DEMO_MEMBER);
@@ -135,6 +139,7 @@ export default function Home() {
   const [showAllNotices, setShowAllNotices] = useState(false);
   const [lineToken,setLineToken]=useState("");
   const [registering,setRegistering]=useState(false);
+  const [linking,setLinking]=useState(false),[linkVerification,setLinkVerification]=useState({phone:"",birthDate:""}),[servicePanel,setServicePanel]=useState<ServicePanel>(null);
   const [registration,setRegistration]=useState({displayName:"",phone:"",birthDate:"",postalCode:"",address:"",email:"",acceptedTerms:false});
 
   useEffect(() => {
@@ -164,7 +169,7 @@ export default function Home() {
         setLineToken(token??"");
         const response = await fetch("/api/v1/me/membership", { headers: { Authorization: `Bearer ${token}` } });
         if (response.status === 404) return setView("unlinked");
-        if (response.status === 422) return setView("new");
+        if (response.status === 422) {const staged=await fetch("/api/v1/me/registration",{headers:{Authorization:`Bearer ${token}`}}).then(result=>result.ok?result.json():null).catch(()=>null);if(staged?.registration)setRegistration(current=>({...current,...Object.fromEntries(Object.entries(staged.registration).filter(([,value])=>Boolean(value)))}));return setView("new")}
         if (!response.ok) throw new Error("会員情報を取得できませんでした");
         setMember(await response.json());
         setView("member");
@@ -178,7 +183,8 @@ export default function Home() {
 
   const unreadCount = member.notices.filter((item) => item.unread).length;
   const visibleNotices = showAllNotices ? member.notices : member.notices.slice(0, 2);
-  const openFutureFeature = (label: string) => setNotice(`${label}は共通システムとの接続準備中です`);
+  const openFutureFeature = (label: string) => setServicePanel(label as ServicePanel);
+  const linkMembership=async()=>{if(linking)return;setLinking(true);setNotice("");try{if(demo){setMember({...DEMO_MEMBER,memberCode});setView("member");setNotice("会員情報を引き継ぎました");return}const response=await fetch("/api/v1/membership-links",{method:"POST",headers:{Authorization:`Bearer ${lineToken}`,"Content-Type":"application/json"},body:JSON.stringify({memberCode,...linkVerification})});const result=await response.json();if(!response.ok)throw new Error(result.message??"入力内容を確認してください");const membership=await fetch("/api/v1/me/membership",{headers:{Authorization:`Bearer ${lineToken}`}});if(!membership.ok)throw new Error("会員証を取得できませんでした");setMember(await membership.json());setView("member");setNotice("会員情報を引き継ぎました")}catch(error){setNotice(error instanceof Error?error.message:"引き継ぎできませんでした")}finally{setLinking(false)}};
   const register=async()=>{if(registering)return;setRegistering(true);setNotice("");try{if(demo){setMember(DEMO_MEMBER);setView("member");setNotice("開発用の新規登録が完了しました");return}const response=await fetch("/api/v1/members",{method:"POST",headers:{Authorization:`Bearer ${lineToken}`,"Content-Type":"application/json"},body:JSON.stringify(registration)});if(!response.ok)throw new Error("登録内容を確認してください");const membership=await fetch("/api/v1/me/membership",{headers:{Authorization:`Bearer ${lineToken}`}});if(!membership.ok)throw new Error("会員証を取得できませんでした");setMember(await membership.json());setView("member");setNotice("新しいポイントカードを発行しました")}catch(error){setNotice(error instanceof Error?error.message:"登録できませんでした")}finally{setRegistering(false)}};
 
   return (
@@ -269,7 +275,9 @@ export default function Home() {
           <div className="flow-icon">↗</div><p className="eyebrow">MEMBER TRANSFER</p><h2>これまでのポイントを<br />引き継ぎましょう</h2>
           <p>LINEに登録済みの会員情報を、新しいポイントカードへ紐付けます。</p>
           <label>10文字の会員番号<input value={memberCode} onChange={(event) => setMemberCode(normalizeMemberCode(event.target.value))} inputMode="text" autoCapitalize="characters" placeholder="例）A7K4P9X2M6" maxLength={10} /></label>
-          <button className="flow-button" disabled={memberCode.length !== 10} onClick={() => { setMember({ ...DEMO_MEMBER, memberCode }); setView("member"); setNotice("会員情報を引き継ぎました"); }}>会員情報を引き継ぐ</button>
+          <label>登録した電話番号<input value={linkVerification.phone} onChange={event=>setLinkVerification({...linkVerification,phone:event.target.value})} inputMode="tel" autoComplete="tel" placeholder="例）09012345678"/></label>
+          <label>生年月日<input type="date" value={linkVerification.birthDate} onChange={event=>setLinkVerification({...linkVerification,birthDate:event.target.value})}/></label>
+          <button className="flow-button" disabled={linking||memberCode.length!==10||linkVerification.phone.replace(/\D/g,"").length<8||!linkVerification.birthDate} onClick={linkMembership}>{linking?"確認しています…":"会員情報を引き継ぐ"}</button>
           <button className="text-button" onClick={() => setNotice("スタッフ確認用の案内を表示します")}>会員番号が分からない方</button>
           <button className="text-button secondary" onClick={() => setView("new")}>初めてご利用の方</button>
         </section>
@@ -280,7 +288,7 @@ export default function Home() {
           <div className="flow-icon">＋</div><p className="eyebrow">NEW MEMBER</p><h2>COMPASSION WORLDを<br />もっと身近に</h2>
           <p>ポイントカードを作ると、おもひで商店への入店、ポイント、予約、モバイルオーダーをご利用いただけます。</p>
           <ul className="registration-list"><li>SMS認証は現在使用しません</li><li>登録後すぐに会員QRを表示</li><li>空欄の既存LINE会員もこちらから登録</li></ul>
-          <div className="registration-form"><label>氏名（必須）<input autoComplete="name" value={registration.displayName} onChange={event=>setRegistration({...registration,displayName:event.target.value})}/></label><label>電話番号（必須）<input inputMode="tel" autoComplete="tel" value={registration.phone} onChange={event=>setRegistration({...registration,phone:event.target.value})}/></label><label>生年月日（必須）<input type="date" value={registration.birthDate} onChange={event=>setRegistration({...registration,birthDate:event.target.value})}/></label><label>郵便番号（必須）<input inputMode="numeric" autoComplete="postal-code" value={registration.postalCode} onChange={event=>setRegistration({...registration,postalCode:event.target.value})}/></label><label>住所（必須）<input autoComplete="street-address" value={registration.address} onChange={event=>setRegistration({...registration,address:event.target.value})}/></label><label>メールアドレス（任意）<input type="email" autoComplete="email" value={registration.email} onChange={event=>setRegistration({...registration,email:event.target.value})}/></label><label className="terms-check"><input type="checkbox" checked={registration.acceptedTerms} onChange={event=>setRegistration({...registration,acceptedTerms:event.target.checked})}/><span>利用規約・プライバシーポリシーに同意します</span></label></div>
+          <div className="registration-form"><label>氏名（必須）<input autoComplete="name" value={registration.displayName} onChange={event=>setRegistration({...registration,displayName:event.target.value})}/></label><label>電話番号（必須）<input inputMode="tel" autoComplete="tel" value={registration.phone} onChange={event=>setRegistration({...registration,phone:event.target.value})}/></label><label>生年月日（必須）<input type="date" value={registration.birthDate} onChange={event=>setRegistration({...registration,birthDate:event.target.value})}/></label><label>郵便番号（必須）<input inputMode="numeric" autoComplete="postal-code" value={registration.postalCode} onChange={event=>setRegistration({...registration,postalCode:event.target.value})}/></label><label>住所（必須）<input autoComplete="street-address" value={registration.address} onChange={event=>setRegistration({...registration,address:event.target.value})}/></label><label>メールアドレス（任意）<input type="email" autoComplete="email" value={registration.email} onChange={event=>setRegistration({...registration,email:event.target.value})}/></label><label className="terms-check"><input type="checkbox" checked={registration.acceptedTerms} onChange={event=>setRegistration({...registration,acceptedTerms:event.target.checked})}/><span><a href="/terms" target="_blank">利用規約</a>・<a href="/privacy" target="_blank">プライバシーポリシー</a>に同意します</span></label></div>
           <button className="flow-button" disabled={registering||!registration.displayName||!registration.phone||!registration.birthDate||!registration.postalCode||!registration.address||!registration.acceptedTerms} onClick={register}>{registering?"登録しています…":"新しいポイントカードを作る"}</button>
           <button className="text-button" onClick={() => setView("unlinked")}>以前の会員番号をお持ちの方</button>
         </section>
@@ -288,6 +296,7 @@ export default function Home() {
 
       {view === "error" && <section className="flow-card"><div className="flow-icon">!</div><h2>接続を確認してください</h2><p>{notice}</p><button className="flow-button" onClick={() => window.location.reload()}>もう一度読み込む</button></section>}
       {notice && view !== "error" && <div className="toast" role="status" onClick={() => setNotice("")}>{notice}<button aria-label="閉じる">×</button></div>}
+      {servicePanel&&<ServiceSheet panel={servicePanel} member={member} onClose={()=>setServicePanel(null)}/>}
 
       {demo && view !== "loading" && <nav className="demo-nav" aria-label="開発用画面切り替え"><button className={view === "member" ? "active" : ""} onClick={() => setView("member")}>カード</button><button className={view === "unlinked" ? "active" : ""} onClick={() => setView("unlinked")}>移行</button><button className={view === "new" ? "active" : ""} onClick={() => setView("new")}>新規</button></nav>}
       <footer><span>COMPASSION</span><i /><span>CREATIVITY</span><i /><span>COMMUNITY</span></footer>

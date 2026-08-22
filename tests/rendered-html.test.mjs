@@ -473,3 +473,23 @@ test("提供予定をキッチン正本へ統一し固定30分を使用しない
   assert.match(membership, /scheduleLabel/);
   assert.match(schedule, /getOrderSchedule/);
 });
+
+test("初回登録・既存会員移行・会員サービス詳細を実画面として提供する", async () => {
+  const [page,links,registration,members,css] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/v1/membership-links/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/me/registration/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/members/route.ts", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+  ]);
+  assert.doesNotMatch(page, /共通システムとの接続準備中です/);
+  assert.match(page, /ServiceSheet/);
+  assert.match(page, /現在利用できるクーポンはありません/);
+  assert.match(page, /\/api\/v1\/me\/registration/);
+  assert.match(page, /\/api\/v1\/membership-links/);
+  assert.match(links, /authenticatedLineUserId/);
+  assert.match(links, /MEMBER_VERIFICATION_FAILED/);
+  assert.match(registration, /legacy_member_imports/);
+  assert.match(members, /randomMemberCode/);
+  assert.match(css, /member-sheet-backdrop/);
+});
