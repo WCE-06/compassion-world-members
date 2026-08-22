@@ -22,6 +22,9 @@ type Member = {
   displayName: string;
   points: number;
   rank: string;
+  rankLabel?: string;
+  membershipType?: "GENERAL"|"RESIDENT";
+  membershipLabel?: string|null;
   nextReservation?: { facilityName: string; startsAt: string; endsAt: string } | null;
   session?: {
     facilityName: string;
@@ -52,6 +55,9 @@ const DEMO_MEMBER: Member = {
   displayName: "山田 花子",
   points: 480,
   rank: "STANDARD",
+  rankLabel: "スタンダード",
+  membershipType: "GENERAL",
+  membershipLabel: null,
   nextReservation: {
     facilityName: "Music Studio FEBBRAIO",
     startsAt: "2026-08-22T14:00:00+09:00",
@@ -128,7 +134,7 @@ function fulfillmentLabel(status?:string|null){return{WAITING_PAYMENT:"決済待
 function scheduleText(schedule:NonNullable<Member["activeOrder"]>["schedule"],fallback?:string|null){const readyAt=schedule?.food?.readyAt??schedule?.drink?.readyAt;if(!readyAt)return fallback??"提供予定：できあがり次第";return `提供予定 ${new Intl.DateTimeFormat("ja-JP",{hour:"2-digit",minute:"2-digit"}).format(new Date(readyAt))}ごろ`}
 
 function Empty({text}:{text:string}){return <div className="member-empty"><span>STATUS</span><p>{text}</p></div>}
-function ServiceSheet({panel,member,onClose}:{panel:Exclude<ServicePanel,null>;member:Member;onClose:()=>void}){const pointNotices=member.notices.filter(item=>item.category==="POINT"),history=member.notices.filter(item=>item.category!=="NEWS");return <div className="member-sheet-backdrop" onClick={onClose}><section className="member-sheet" role="dialog" aria-modal="true" aria-label={panel} onClick={event=>event.stopPropagation()}><button className="member-sheet-close" onClick={onClose}>×</button><p className="eyebrow">MEMBER SERVICE</p><h2>{panel}</h2>{panel==="注文状況"&&(member.activeOrder?<div className="member-sheet-content"><strong>{member.activeOrder.status==="WAITING_PAYMENT"?"お支払い待ち":member.activeOrder.status==="COOKING"?"ただいま調理中":member.activeOrder.status==="READY"?"商品ができあがりました":"注文受付済み"}</strong><p>{[member.activeOrder.foodCallNumber&&`フード ${String(member.activeOrder.foodCallNumber).padStart(3,"0")} ${fulfillmentLabel(member.activeOrder.foodStatus)}`,member.activeOrder.drinkCallNumber&&`ドリンク ${String(member.activeOrder.drinkCallNumber).padStart(3,"0")} ${fulfillmentLabel(member.activeOrder.drinkStatus)}`].filter(Boolean).join(" ／ ")}</p><p>{scheduleText(member.activeOrder.schedule,member.activeOrder.scheduleLabel)}</p></div>:<Empty text="進行中の注文はありません"/>)}{panel==="ポイント履歴"&&<div className="member-sheet-content"><strong>保有ポイント {member.points.toLocaleString("ja-JP")} P</strong>{pointNotices.length?pointNotices.map(item=><p key={item.id}>{item.createdAt}　{item.title}</p>):<Empty text="表示できるポイント履歴はまだありません"/>}</div>}{panel==="会員特典"&&<div className="member-sheet-content"><strong>現在のランク：{member.rank}</strong><p>会員限定価格や対象特典は、利用可能になったものからこちらに表示されます。</p></div>}{panel==="クーポン"&&<Empty text="現在利用できるクーポンはありません"/>}{panel==="利用履歴"&&<div className="member-sheet-content">{history.length?history.map(item=><p key={item.id}>{item.createdAt}　{item.title}</p>):<Empty text="表示できる利用履歴はまだありません"/>}</div>}{panel==="予約の変更・キャンセル"&&(member.nextReservation?<div className="member-sheet-content"><strong>{member.nextReservation.facilityName}</strong><p>{dateLabel(member.nextReservation.startsAt)}〜</p><a href="/availability">予約ページを開く</a></div>:<Empty text="変更できる予約はありません"/>)}{panel==="おもひで商店のご案内"&&<div className="member-sheet-content"><strong>おもひで商店</strong><p>会員限定のお知らせや入荷情報は、このポイントカードのお知らせ欄でご案内します。</p><a href="/product-request">取り寄せ・商品リクエスト</a></div>}<button className="flow-button" onClick={onClose}>閉じる</button></section></div>}
+function ServiceSheet({panel,member,onClose}:{panel:Exclude<ServicePanel,null>;member:Member;onClose:()=>void}){const pointNotices=member.notices.filter(item=>item.category==="POINT"),history=member.notices.filter(item=>item.category!=="NEWS"),ranks=["スタンダード","ブロンズ","シルバー","ゴールド","プラチナ","ダイヤモンド"];return <div className="member-sheet-backdrop" onClick={onClose}><section className="member-sheet" role="dialog" aria-modal="true" aria-label={panel} onClick={event=>event.stopPropagation()}><button className="member-sheet-close" onClick={onClose}>×</button><p className="eyebrow">MEMBER SERVICE</p><h2>{panel}</h2>{panel==="注文状況"&&(member.activeOrder?<div className="member-sheet-content"><strong>{member.activeOrder.status==="WAITING_PAYMENT"?"お支払い待ち":member.activeOrder.status==="COOKING"?"ただいま調理中":member.activeOrder.status==="READY"?"商品ができあがりました":"注文受付済み"}</strong><p>{[member.activeOrder.foodCallNumber&&`フード ${String(member.activeOrder.foodCallNumber).padStart(3,"0")} ${fulfillmentLabel(member.activeOrder.foodStatus)}`,member.activeOrder.drinkCallNumber&&`ドリンク ${String(member.activeOrder.drinkCallNumber).padStart(3,"0")} ${fulfillmentLabel(member.activeOrder.drinkStatus)}`].filter(Boolean).join(" ／ ")}</p><p>{scheduleText(member.activeOrder.schedule,member.activeOrder.scheduleLabel)}</p></div>:<Empty text="進行中の注文はありません"/>)}{panel==="ポイント履歴"&&<div className="member-sheet-content"><strong>保有ポイント {member.points.toLocaleString("ja-JP")} P</strong>{pointNotices.length?pointNotices.map(item=><p key={item.id}>{item.createdAt}　{item.title}</p>):<Empty text="表示できるポイント履歴はまだありません"/>}</div>}{panel==="会員特典"&&<div className="member-sheet-content"><strong>現在のランク：{member.rankLabel??member.rank}</strong>{member.membershipLabel&&<span className="resident-badge">{member.membershipLabel}</span>}<div className="rank-ladder">{ranks.map(label=><span className={label===(member.rankLabel??member.rank)?"active":""} key={label}>{label}</span>)}</div><p>還元率と昇格条件は、スマレジの商品原価・売価と接続後に設定します。住民会員はゴールド以上から表示します。</p></div>}{panel==="クーポン"&&<Empty text="現在利用できるクーポンはありません"/>}{panel==="利用履歴"&&<div className="member-sheet-content">{history.length?history.map(item=><p key={item.id}>{item.createdAt}　{item.title}</p>):<Empty text="表示できる利用履歴はまだありません"/>}</div>}{panel==="予約の変更・キャンセル"&&(member.nextReservation?<div className="member-sheet-content"><strong>{member.nextReservation.facilityName}</strong><p>{dateLabel(member.nextReservation.startsAt)}〜</p><a href="/availability">予約ページを開く</a></div>:<Empty text="変更できる予約はありません"/>)}{panel==="おもひで商店のご案内"&&<div className="member-sheet-content"><strong>おもひで商店</strong><p>会員限定のお知らせや入荷情報は、このポイントカードのお知らせ欄でご案内します。</p><a href="/product-request">取り寄せ・商品リクエスト</a></div>}<button className="flow-button" onClick={onClose}>閉じる</button></section></div>}
 
 export default function Home() {
   const [view, setView] = useState<View>("loading");
@@ -203,11 +209,11 @@ export default function Home() {
       {view === "member" && (
         <>
           <section className="wallet-card">
-            <div className="wallet-card-head"><div><span>会員証</span><strong>{member.displayName} 様</strong></div><button onClick={() => setNotice("会員番号を受付端末へ提示してください")}>拡大</button></div>
+            <div className="wallet-card-head"><div><span>会員証 {member.membershipLabel&&<b className="resident-badge">{member.membershipLabel}</b>}</span><strong>{member.displayName} 様</strong></div><button onClick={() => setNotice("会員番号を受付端末へ提示してください")}>拡大</button></div>
             <MemberQr value={member.memberCode} />
             <div className="wallet-balances">
               <button onClick={() => openFutureFeature("ポイント履歴")}><small>保有ポイント</small><strong>{member.points.toLocaleString("ja-JP")}<span> P</span></strong><em>履歴を見る ›</em></button>
-              <button onClick={() => openFutureFeature("会員特典")}><small>会員ランク</small><strong className="rank-value">{member.rank}</strong><em>特典を見る ›</em></button>
+              <button onClick={() => openFutureFeature("会員特典")}><small>会員ランク</small><strong className={`rank-value rank-${member.rank.toLowerCase()}`}>{member.rankLabel??member.rank}</strong><em>特典を見る ›</em></button>
             </div>
           </section>
 
@@ -246,7 +252,7 @@ export default function Home() {
 
           <section className="benefit-grid">
             <button onClick={() => openFutureFeature("クーポン")}><span>COUPON</span><strong>クーポン</strong><small>保有特典を確認</small></button>
-            <button onClick={() => openFutureFeature("会員特典")}><span>MEMBER</span><strong>{member.rank}</strong><small>会員限定価格・特典</small></button>
+            <button onClick={() => openFutureFeature("会員特典")}><span>MEMBER</span><strong>{member.rankLabel??member.rank}</strong><small>{member.membershipLabel?`${member.membershipLabel}・会員限定特典`:"会員限定価格・特典"}</small></button>
           </section>
 
           <section className="notice-list" id="notices">

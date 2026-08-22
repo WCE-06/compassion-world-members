@@ -493,3 +493,24 @@ test("初回登録・既存会員移行・会員サービス詳細を実画面�
   assert.match(members, /randomMemberCode/);
   assert.match(css, /member-sheet-backdrop/);
 });
+
+test("会員ランクを6段階化し住民を別表示して最低粗利12パーセントを守る", async () => {
+  const [page,membership,ranks,points,schema,css] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
+    readFile(new URL("lib/member-rank.ts", root), "utf8"),
+    readFile(new URL("lib/point-return-policy.ts", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+  ]);
+  for(const rank of ["STANDARD","BRONZE","SILVER","GOLD","PLATINUM","DIAMOND"])assert.match(ranks,new RegExp(rank));
+  assert.match(ranks, /storedRank==="RESIDENT"/);
+  assert.match(ranks, /resident\?"GOLD"/);
+  assert.match(membership, /memberPresentation/);
+  assert.match(page, /rank-ladder/);
+  assert.match(page, /resident-badge/);
+  assert.match(points, /MINIMUM_MARGIN_BPS=1_200/);
+  assert.match(points, /sellingPriceExcludingTax/);
+  assert.match(schema, /"DIAMOND"/);
+  assert.match(css, /rank-diamond/);
+});

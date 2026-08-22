@@ -13,7 +13,7 @@ export const members = sqliteTable("members", {
   prefecture: text("prefecture"),
   address: text("address"),
   pointsBalance: integer("points_balance").notNull().default(0),
-  memberRank: text("member_rank", { enum: ["STANDARD", "RESIDENT"] }),
+  memberRank: text("member_rank", { enum: ["STANDARD", "BRONZE", "SILVER", "GOLD", "PLATINUM", "DIAMOND", "RESIDENT"] }),
   status: text("status", { enum: ["ACTIVE", "INACTIVE"] }).notNull().default("ACTIVE"),
   sourceSystem: text("source_system").notNull().default("LEGACY"),
   sourceCustomerId: text("source_customer_id"),
