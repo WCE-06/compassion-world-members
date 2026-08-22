@@ -3,7 +3,9 @@ import { NextRequest,NextResponse } from "next/server";
 type Row={memberCode?:string;qualifyingSpendExcludingTax?:number;periodStart?:number;periodEnd?:number;sourceRevision?:string};
 export async function POST(request:NextRequest){
  const runtime=env as unknown as Record<string,string|undefined>;
- if(!runtime.MEMBER_MIGRATION_KEY||request.headers.get("x-compass-migration-key")!==runtime.MEMBER_MIGRATION_KEY)return NextResponse.json({error:"FORBIDDEN"},{status:403});
+ const supplied=request.headers.get("x-compass-migration-key");
+ const accepted=[runtime.SMAREGI_SPEND_SYNC_KEY,runtime.MEMBER_MIGRATION_KEY].filter(Boolean);
+ if(!supplied||!accepted.includes(supplied))return NextResponse.json({error:"FORBIDDEN"},{status:403});
  const body=await request.json().catch(()=>null) as {rows?:Row[]}|null;
  if(!Array.isArray(body?.rows)||body.rows.length<1||body.rows.length>100)return NextResponse.json({error:"INVALID_BATCH"},{status:400});
  const now=Date.now(),results:{memberCode:string;status:"SYNCED"|"MEMBER_NOT_FOUND"}[]=[];
