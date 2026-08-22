@@ -130,12 +130,15 @@ export default function Home() {
   const [demo, setDemo] = useState(false);
   const [memberCode, setMemberCode] = useState("");
   const [showAllNotices, setShowAllNotices] = useState(false);
+  const [lineToken,setLineToken]=useState("");
+  const [registering,setRegistering]=useState(false);
+  const [registration,setRegistration]=useState({displayName:"",phone:"",birthDate:"",postalCode:"",address:"",email:"",acceptedTerms:false});
 
   useEffect(() => {
     async function start() {
       const params = new URLSearchParams(window.location.search);
       const requested = params.get("state");
-      const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+      const liffId = await fetch("/api/v1/client-config").then(response=>response.ok?response.json():{liffId:""}).then(config=>String(config.liffId??"")).catch(()=>"");
 
       if (!liffId) {
         setDemo(true);
@@ -155,6 +158,7 @@ export default function Home() {
           return;
         }
         const token = window.liff!.getAccessToken();
+        setLineToken(token??"");
         const response = await fetch("/api/v1/me/membership", { headers: { Authorization: `Bearer ${token}` } });
         if (response.status === 404) return setView("unlinked");
         if (response.status === 422) return setView("new");
@@ -172,6 +176,7 @@ export default function Home() {
   const unreadCount = member.notices.filter((item) => item.unread).length;
   const visibleNotices = showAllNotices ? member.notices : member.notices.slice(0, 2);
   const openFutureFeature = (label: string) => setNotice(`${label}は共通システムとの接続準備中です`);
+  const register=async()=>{if(registering)return;setRegistering(true);setNotice("");try{if(demo){setMember(DEMO_MEMBER);setView("member");setNotice("開発用の新規登録が完了しました");return}const response=await fetch("/api/v1/members",{method:"POST",headers:{Authorization:`Bearer ${lineToken}`,"Content-Type":"application/json"},body:JSON.stringify(registration)});if(!response.ok)throw new Error("登録内容を確認してください");const membership=await fetch("/api/v1/me/membership",{headers:{Authorization:`Bearer ${lineToken}`}});if(!membership.ok)throw new Error("会員証を取得できませんでした");setMember(await membership.json());setView("member");setNotice("新しいポイントカードを発行しました")}catch(error){setNotice(error instanceof Error?error.message:"登録できませんでした")}finally{setRegistering(false)}};
 
   return (
     <main className="app-shell">
@@ -271,8 +276,9 @@ export default function Home() {
         <section className="flow-card">
           <div className="flow-icon">＋</div><p className="eyebrow">NEW MEMBER</p><h2>COMPASSION WORLDを<br />もっと身近に</h2>
           <p>ポイントカードを作ると、おもひで商店への入店、ポイント、予約、モバイルオーダーをご利用いただけます。</p>
-          <ul className="registration-list"><li>入力項目は必要最小限</li><li>SMS認証は現在使用しません</li><li>登録後すぐに会員QRを表示</li></ul>
-          <button className="flow-button" onClick={() => openFutureFeature("新規会員登録フォーム")}>新しいポイントカードを作る</button>
+          <ul className="registration-list"><li>SMS認証は現在使用しません</li><li>登録後すぐに会員QRを表示</li><li>空欄の既存LINE会員もこちらから登録</li></ul>
+          <div className="registration-form"><label>氏名（必須）<input autoComplete="name" value={registration.displayName} onChange={event=>setRegistration({...registration,displayName:event.target.value})}/></label><label>電話番号（必須）<input inputMode="tel" autoComplete="tel" value={registration.phone} onChange={event=>setRegistration({...registration,phone:event.target.value})}/></label><label>生年月日（必須）<input type="date" value={registration.birthDate} onChange={event=>setRegistration({...registration,birthDate:event.target.value})}/></label><label>郵便番号（必須）<input inputMode="numeric" autoComplete="postal-code" value={registration.postalCode} onChange={event=>setRegistration({...registration,postalCode:event.target.value})}/></label><label>住所（必須）<input autoComplete="street-address" value={registration.address} onChange={event=>setRegistration({...registration,address:event.target.value})}/></label><label>メールアドレス（任意）<input type="email" autoComplete="email" value={registration.email} onChange={event=>setRegistration({...registration,email:event.target.value})}/></label><label className="terms-check"><input type="checkbox" checked={registration.acceptedTerms} onChange={event=>setRegistration({...registration,acceptedTerms:event.target.checked})}/><span>利用規約・プライバシーポリシーに同意します</span></label></div>
+          <button className="flow-button" disabled={registering||!registration.displayName||!registration.phone||!registration.birthDate||!registration.postalCode||!registration.address||!registration.acceptedTerms} onClick={register}>{registering?"登録しています…":"新しいポイントカードを作る"}</button>
           <button className="text-button" onClick={() => setView("unlinked")}>以前の会員番号をお持ちの方</button>
         </section>
       )}

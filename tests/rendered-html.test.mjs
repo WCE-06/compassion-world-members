@@ -24,7 +24,7 @@ test("LIFF・移行・共通セッションの接続点を保持する", async (
     readFile(new URL("db/schema.ts", root), "utf8"),
     readFile(new URL(".openai/hosting.json", root), "utf8"),
   ]);
-  assert.match(page, /NEXT_PUBLIC_LIFF_ID/);
+  assert.match(page, /api\/v1\/client-config/);
   assert.match(page, /api\/v1\/me\/membership/);
   assert.match(page, /window\.location\.href = "\/availability"/);
   assert.match(page, /モバイルオーダー/);
@@ -192,4 +192,31 @@ test("基本営業時間の保存状態をその場で表示しプレビュー�
   assert.match(preview, /previewAdminState=\{\.\.\.previewAdminState,hours:body\}/);
   assert.match(css, /\.inline-save-status\.saved/);
   assert.match(css, /@keyframes save-spin/);
+});
+
+test("既存LINE会員を安全に移行し空欄会員を新規登録へ分ける", async () => {
+  const [schema, importApi, importer, membership, registration, page, lineAuth, migration] = await Promise.all([
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/admin/member-import/route.ts", root), "utf8"),
+    readFile(new URL("scripts/import-legacy-customers.mjs", root), "utf8"),
+    readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/members/route.ts", root), "utf8"),
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("lib/member-auth.ts", root), "utf8"),
+    readFile(new URL("drizzle/0008_loving_quentin_quire.sql", root), "utf8"),
+  ]);
+  assert.match(schema, /legacyMemberImports/);
+  assert.match(schema, /pointsBalance/);
+  assert.match(importApi, /MEMBER_MIGRATION_KEY/);
+  assert.match(importApi, /UNREGISTERED/);
+  assert.match(importer, /Dry run only/);
+  assert.match(membership, /REGISTRATION_REQUIRED/);
+  assert.match(membership, /points:member\.pointsBalance/);
+  assert.match(registration, /randomMemberCode/);
+  assert.match(registration, /acceptedTerms/);
+  assert.match(page, /登録しています…/);
+  assert.match(lineAuth, /oauth2\/v2\.1\/verify/);
+  assert.match(lineAuth, /LINE_LOGIN_CHANNEL_ID/);
+  assert.match(migration, /CREATE TABLE `legacy_member_imports`/);
+  assert.match(migration, /ADD `points_balance`/);
 });

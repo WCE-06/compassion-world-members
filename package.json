@@ -13,7 +13,8 @@
     "preview:sync": "node scripts/sync-preview-catalog.mjs",
     "preview:build": "pnpm preview:sync && vite build --config vite.preview.config.ts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "members:audit": "node scripts/import-legacy-customers.mjs"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

@@ -11,19 +11,20 @@ const ITEM_HEIGHT=72;
 export default function AvailabilityPage(){
   const today=useMemo(()=>new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Tokyo"}).format(new Date()),[]);
   const limit=useMemo(()=>{const d=new Date(`${today}T00:00:00+09:00`);d.setMonth(d.getMonth()+1);return new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Tokyo"}).format(d)},[today]);
-  const [date,setDate]=useState(today),[slots,setSlots]=useState<Slot[]>([]),[loading,setLoading]=useState(true),[selected,setSelected]=useState<number|null>(null),[duration,setDuration]=useState(1),[notice,setNotice]=useState(""),[reservations,setReservations]=useState<Reservation[]>([]),[token,setToken]=useState<string|null>(null);
+  const [date,setDate]=useState(today),[slots,setSlots]=useState<Slot[]>([]),[loading,setLoading]=useState(true),[selected,setSelected]=useState<number|null>(null),[duration,setDuration]=useState(1),[notice,setNotice]=useState(""),[reservations,setReservations]=useState<Reservation[]>([]),[token,setToken]=useState<string|null>(null),[liffId,setLiffId]=useState("");
   const wheelRef=useRef<HTMLDivElement>(null),scrollTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   useEffect(()=>{setLoading(true);setSelected(null);fetch(`/api/v1/availability?date=${date}`).then(r=>r.json()).then(x=>setSlots(x.slots??[])).catch(()=>setNotice("空き状況を取得できませんでした")).finally(()=>setLoading(false))},[date]);
   function authHeaders(json=false){const headers:Record<string,string>={};if(json)headers["Content-Type"]="application/json";if(token)headers.Authorization=`Bearer ${token}`;else headers["X-Compass-Preview"]="representative";return headers}
   async function loadReservations(accessToken:string|null=token){const headers:Record<string,string>=accessToken?{Authorization:`Bearer ${accessToken}`}:{"X-Compass-Preview":"representative"};const response=await fetch("/api/v1/reservations",{headers});if(response.ok)setReservations((await response.json()).reservations??[])}
   useEffect(()=>{loadReservations(null)},[]);
+  useEffect(()=>{fetch("/api/v1/client-config").then(response=>response.json()).then(config=>setLiffId(String(config.liffId??""))).catch(()=>{})},[]);
   const maxDuration=selected==null?1:Math.min(10,26-selected,...Array.from({length:10},(_,i)=>i+1).filter(h=>slots.some(s=>s.hour>=selected&&s.hour<selected+h&&!s.available)).map(h=>h-1));
   useEffect(()=>{if(duration>maxDuration)setDuration(maxDuration)},[maxDuration,duration]);
   useEffect(()=>{wheelRef.current?.scrollTo({top:(duration-1)*ITEM_HEIGHT,behavior:"smooth"})},[duration]);
   function moveDuration(next:number){setDuration(Math.max(1,Math.min(maxDuration,next)))}
   function wheelScroll(){if(scrollTimer.current)clearTimeout(scrollTimer.current);scrollTimer.current=setTimeout(()=>moveDuration(Math.round((wheelRef.current?.scrollTop??0)/ITEM_HEIGHT)+1),90)}
   async function reserve(){
-    const liffId=process.env.NEXT_PUBLIC_LIFF_ID;let accessToken=token;
+    let accessToken=token;
     if(liffId){if(!window.liff){await new Promise<void>((ok,ng)=>{const s=document.createElement("script");s.src="https://static.line-scdn.net/liff/edge/2/sdk.js";s.onload=()=>ok();s.onerror=()=>ng();document.head.appendChild(s)})}await window.liff!.init({liffId});if(!window.liff!.isLoggedIn()){window.liff!.login({redirectUri:location.href});return}accessToken=window.liff!.getAccessToken();setToken(accessToken)}
     const headers:Record<string,string>={"Content-Type":"application/json"};if(accessToken)headers.Authorization=`Bearer ${accessToken}`;else headers["X-Compass-Preview"]="representative";
     const response=await fetch("/api/v1/reservations",{method:"POST",headers,body:JSON.stringify({date,startHour:selected,durationHours:duration,requestId:crypto.randomUUID()})});
@@ -45,7 +46,7 @@ export default function AvailabilityPage(){
       {selected!==null&&<section className="duration-card">
         <div className="duration-copy"><small>STEP 2</small><h3>利用時間を選ぶ</h3><p>上下にスクロール、または矢印で選択できます。</p></div>
         <div className="duration-wheel-wrap"><button className="wheel-arrow up" aria-label="利用時間を短くする" disabled={duration===1} onClick={()=>moveDuration(duration-1)}>▲</button><div className="wheel-focus" aria-hidden="true"/><div className="duration-wheel" ref={wheelRef} onScroll={wheelScroll}>{Array.from({length:maxDuration},(_,i)=>i+1).map(hours=><button type="button" key={hours} className={duration===hours?"active":""} onClick={()=>moveDuration(hours)}><strong>{hours}</strong><span>時間</span></button>)}</div><button className="wheel-arrow down" aria-label="利用時間を長くする" disabled={duration===maxDuration} onClick={()=>moveDuration(duration+1)}>▼</button></div>
-        <div className="booking-summary"><small>ご利用予定</small><strong>{hourText(selected)} — {hourText(selected+duration)}</strong><span>{duration}時間</span><button onClick={reserve}>{process.env.NEXT_PUBLIC_LIFF_ID?"LINE会員として予約する":"代表会員でテスト予約する"}</button></div>
+        <div className="booking-summary"><small>ご利用予定</small><strong>{hourText(selected)} — {hourText(selected+duration)}</strong><span>{duration}時間</span><button onClick={reserve}>{liffId?"LINE会員として予約する":"代表会員でテスト予約する"}</button></div>
       </section>}
     </>}
     <section className="reservation-history"><div><small>MY RESERVATIONS</small><h2>予約履歴</h2></div>{reservations.length===0?<p>予約はまだありません。</p>:reservations.map(item=><article key={item.id}><span>{item.status==="CONFIRMED"?"予約確定":item.status==="CANCELLED"?"キャンセル":"利用完了"}</span><div><strong>{new Intl.DateTimeFormat("ja-JP",{month:"numeric",day:"numeric",weekday:"short",hour:"2-digit",minute:"2-digit",timeZone:"Asia/Tokyo"}).format(new Date(item.startsAt))}</strong><small>〜 {new Intl.DateTimeFormat("ja-JP",{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Tokyo"}).format(new Date(item.endsAt))}</small></div>{item.status==="CONFIRMED"&&item.startsAt>Date.now()&&<button onClick={()=>cancelReservation(item.id)}>キャンセル</button>}</article>)}</section>

@@ -4,6 +4,15 @@ export const members = sqliteTable("members", {
   id: text("id").primaryKey(),
   memberCode: text("member_code").notNull(),
   displayName: text("display_name").notNull(),
+  displayNameKana: text("display_name_kana"),
+  phone: text("phone"),
+  email: text("email"),
+  birthDate: text("birth_date"),
+  gender: text("gender"),
+  postalCode: text("postal_code"),
+  prefecture: text("prefecture"),
+  address: text("address"),
+  pointsBalance: integer("points_balance").notNull().default(0),
   memberRank: text("member_rank", { enum: ["STANDARD", "RESIDENT"] }),
   status: text("status", { enum: ["ACTIVE", "INACTIVE"] }).notNull().default("ACTIVE"),
   sourceSystem: text("source_system").notNull().default("LEGACY"),
@@ -11,6 +20,27 @@ export const members = sqliteTable("members", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 }, (table) => [uniqueIndex("members_member_code_unique").on(table.memberCode)]);
+
+export const legacyMemberImports = sqliteTable("legacy_member_imports", {
+  id: text("id").primaryKey(),
+  lineUserId: text("line_user_id"),
+  displayName: text("display_name"),
+  displayNameKana: text("display_name_kana"),
+  phone: text("phone"),
+  email: text("email"),
+  birthDate: text("birth_date"),
+  gender: text("gender"),
+  postalCode: text("postal_code"),
+  prefecture: text("prefecture"),
+  address: text("address"),
+  sourceRegisteredAt: text("source_registered_at"),
+  status: text("status", { enum: ["UNREGISTERED", "MIGRATED", "SKIPPED"] }).notNull().default("UNREGISTERED"),
+  importedAt: integer("imported_at", { mode: "timestamp_ms" }).notNull(),
+  migratedMemberId: text("migrated_member_id").references(() => members.id),
+}, (table) => [
+  uniqueIndex("legacy_import_line_user_unique").on(table.lineUserId),
+  index("legacy_import_status_idx").on(table.status),
+]);
 
 export const identityLinks = sqliteTable("identity_links", {
   id: text("id").primaryKey(),
