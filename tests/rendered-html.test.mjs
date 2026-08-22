@@ -360,6 +360,18 @@ test("磯辺揚げを調理目安3分として注文・キッチンへ引き継�
   assert.match(migration, /preparation_minutes/);
 });
 
+test("会員証は施設連携を並列取得し1.5秒で本体表示を優先する", async () => {
+  const [membership, facility, home] = await Promise.all([
+    readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
+    readFile(new URL("lib/facility-api.ts", root), "utf8"),
+    readFile(new URL("app/page.tsx", root), "utf8"),
+  ]);
+  assert.match(membership, /Promise\.all/);
+  assert.match(membership, /1_500/);
+  assert.match(facility, /AbortSignal\.timeout/);
+  assert.match(home, /会員情報を確認しています/);
+});
+
 test("モバイル注文のカテゴリタブが商品追加ボタンと重ならない", async () => {
   const [layout, fix] = await Promise.all([
     readFile(new URL("app/layout.tsx", root), "utf8"),

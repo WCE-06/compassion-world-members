@@ -21,7 +21,7 @@ export async function facilityPublicGet<T>(action: string, data: Record<string, 
   return body.data;
 }
 
-export async function facilityPost<T>(action: string, data: Record<string, unknown>, requestId = crypto.randomUUID()) {
+export async function facilityPost<T>(action: string, data: Record<string, unknown>, requestId = crypto.randomUUID(), timeoutMs = 15_000) {
   const url = runtimeValue("COMMON_FACILITY_GAS_URL");
   const apiToken = runtimeValue("FACILITY_API_TOKEN") || runtimeValue("RECEPTION_API_TOKEN");
   if (!url || !apiToken) throw new Error("FACILITY_API_NOT_CONFIGURED");
@@ -31,6 +31,7 @@ export async function facilityPost<T>(action: string, data: Record<string, unkno
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({ version: 1, action, requestId, deviceId: "MEMBER-CARD-WEB", apiToken, data }),
     cache: "no-store",
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) throw new Error("FACILITY_API_UNAVAILABLE");
   const body = await response.json() as FacilityEnvelope<T>;

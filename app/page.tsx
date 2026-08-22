@@ -189,7 +189,7 @@ export default function Home() {
       </header>
 
       {demo && <div className="demo-strip"><span>DEMO</span> 開発用URLで表示しています</div>}
-      {view === "loading" && <section className="loading-state"><div className="loader" /><p>ポイントカードを準備しています</p></section>}
+      {view === "loading" && <section className="loading-state"><div className="loader" /><p>会員情報を確認しています</p><small>ポイントカードはまもなく表示されます</small></section>}
 
       {view === "member" && (
         <>
