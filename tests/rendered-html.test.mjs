@@ -569,3 +569,16 @@ test("新規登録完了後に発行済み会員証へ遷移する", async () =>
   assert.match(members, /INSERT INTO identity_links/);
   assert.match(members, /status:201/);
 });
+
+test("受渡済みの部門注文を会員証へ残さず注文全体も自動修復する", async () => {
+  const [membership,kitchen,pos] = await Promise.all([
+    readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/kitchen/fulfillments/route.ts", root), "utf8"),
+    readFile(new URL("lib/order-pos.ts", root), "utf8"),
+  ]);
+  assert.match(membership,/reconcileCompletedOrders\(member\.id\)/);
+  assert.match(membership,/f\.status NOT IN \('PICKED_UP','CANCELLED'\)/);
+  assert.match(pos,/UPDATE orders SET status='PICKED_UP'/);
+  assert.doesNotMatch(kitchen,/existing\.status!==rule\.to[^}]+return NextResponse\.json\(\{id:fulfillmentId/s);
+  assert.match(kitchen,/values\.every\(status=>status==="PICKED_UP"\)\?"PICKED_UP"/);
+});

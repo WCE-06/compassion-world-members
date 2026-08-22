@@ -12,6 +12,11 @@ export async function expireStaleOrder(orderId?:string){
  await env.DB.batch(stale.results.flatMap(row=>[env.DB.prepare(`UPDATE orders SET status='EXPIRED',updated_at=? WHERE id=? AND status='WAITING_STORE_PAYMENT'`).bind(now,row.id),env.DB.prepare(`UPDATE order_fulfillments SET status='CANCELLED',updated_at=? WHERE order_id=? AND status='WAITING_PAYMENT'`).bind(now,row.id)]));
 }
 
+export async function reconcileCompletedOrders(memberId?:string){
+ const now=Date.now(),suffix=memberId?" AND member_id=?":"",bindings=memberId?[now,memberId]:[now];
+ await env.DB.prepare(`UPDATE orders SET status='PICKED_UP',updated_at=? WHERE status IN ('PAID','ACCEPTED','COOKING','READY')${suffix} AND EXISTS (SELECT 1 FROM order_fulfillments f WHERE f.order_id=orders.id) AND NOT EXISTS (SELECT 1 FROM order_fulfillments f WHERE f.order_id=orders.id AND f.status NOT IN ('PICKED_UP','CANCELLED'))`).bind(...bindings).run();
+}
+
 export async function expireStaleLocks(orderId?:string){
  const now=Date.now();const suffix=orderId?" AND order_id=?":"";const bindings=orderId?[now,orderId]:[now];
  const stale=await env.DB.prepare(`SELECT id,order_id AS orderId FROM order_payment_locks WHERE status='ACTIVE' AND expires_at<=?${suffix}`).bind(...bindings).all<{id:string;orderId:string}>();
