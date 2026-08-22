@@ -220,3 +220,15 @@ test("既存LINE会員を安全に移行し空欄会員を新規登録へ分け�
   assert.match(migration, /CREATE TABLE `legacy_member_imports`/);
   assert.match(migration, /ADD `points_balance`/);
 });
+
+test("LINE登録に必要なプライバシーポリシーと利用規約を公開する", async () => {
+  const [privacy, terms] = await Promise.all([
+    readFile(new URL("app/privacy/page.tsx", root), "utf8"),
+    readFile(new URL("app/terms/page.tsx", root), "utf8"),
+  ]);
+  assert.match(privacy, /LINE User ID/);
+  assert.match(privacy, /第三者提供/);
+  assert.match(privacy, /開示・訂正・退会/);
+  assert.match(terms, /ポイント・特典/);
+  assert.match(terms, /利用停止/);
+});
