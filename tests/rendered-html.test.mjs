@@ -536,3 +536,22 @@ test("会員ランクを利用実績で6段階化し住民のゴールド保証�
   assert.match(css, /rank-diamond/);
   for(const rank of ["standard","bronze","silver","gold","platinum","diamond"])assert.match(css,new RegExp(`rank-card-${rank}`));
 });
+
+test("スマレジの直近365日集計を正本として会員証とセルフレジへ安全に共有する", async () => {
+  const [membership,syncApi,benefitApi,migration,handoff] = await Promise.all([
+    readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/admin/smaregi-spend-sync/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/pos/member-benefit/route.ts", root), "utf8"),
+    readFile(new URL("drizzle/0016_tearful_randall.sql", root), "utf8"),
+    readFile(new URL("docs/SMAREGI_RANK_AND_POINT_HANDOFF.md", root), "utf8"),
+  ]);
+  assert.match(migration, /CREATE TABLE `member_spend_snapshots`/);
+  assert.match(membership, /smaregiSpend\?\.qualifyingSpend\?\?localSpend/);
+  assert.match(syncApi, /MEMBER_MIGRATION_KEY/);
+  assert.match(syncApi, /spanDays<360\|\|spanDays>370/);
+  assert.match(syncApi, /ON CONFLICT\(member_id\) DO UPDATE/);
+  assert.match(benefitApi, /requirePosToken/);
+  assert.match(benefitApi, /memberPresentation/);
+  assert.match(handoff, /二重計上しない/);
+  assert.match(handoff, /月額住民登録料はポイント対象外/);
+});

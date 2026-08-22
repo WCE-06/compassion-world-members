@@ -23,6 +23,16 @@ export const members = sqliteTable("members", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 }, (table) => [uniqueIndex("members_member_code_unique").on(table.memberCode)]);
 
+export const memberSpendSnapshots = sqliteTable("member_spend_snapshots", {
+  memberId: text("member_id").primaryKey().references(() => members.id),
+  source: text("source", { enum: ["SMAREGI"] }).notNull().default("SMAREGI"),
+  qualifyingSpendExcludingTax: integer("qualifying_spend_excluding_tax").notNull(),
+  periodStart: integer("period_start", { mode: "timestamp_ms" }).notNull(),
+  periodEnd: integer("period_end", { mode: "timestamp_ms" }).notNull(),
+  sourceRevision: text("source_revision"),
+  syncedAt: integer("synced_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("member_spend_snapshots_synced_idx").on(table.syncedAt)]);
+
 export const legacyMemberImports = sqliteTable("legacy_member_imports", {
   id: text("id").primaryKey(),
   lineUserId: text("line_user_id"),

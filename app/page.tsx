@@ -31,6 +31,8 @@ type Member = {
   nextRankLabel?: string|null;
   amountToNextRank?: number;
   rankPeriodMonths?: number;
+  qualifyingSpendSource?: "SMAREGI"|"LOCAL";
+  qualifyingSpendUpdatedAt?: string|null;
   nextReservation?: { facilityName: string; startsAt: string; endsAt: string } | null;
   session?: {
     facilityName: string;
