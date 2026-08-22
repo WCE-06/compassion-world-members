@@ -66,6 +66,35 @@ export const identityLinks = sqliteTable("identity_links", {
   index("identity_member_idx").on(table.memberId),
 ]);
 
+export const memberRegistrationSyncs = sqliteTable("member_registration_syncs", {
+  memberId: text("member_id").primaryKey().references(() => members.id),
+  status: text("status", { enum: ["PENDING", "SYNCING", "SYNCED", "FAILED"] }).notNull().default("PENDING"),
+  attempts: integer("attempts").notNull().default(0),
+  sourceCustomerId: text("source_customer_id"),
+  lastError: text("last_error"),
+  lastRequestId: text("last_request_id"),
+  syncedAt: integer("synced_at", { mode: "timestamp_ms" }),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("member_registration_sync_status_idx").on(table.status, table.updatedAt)]);
+
+export const memberTermsAcceptances = sqliteTable("member_terms_acceptances", {
+  id: text("id").primaryKey(),
+  memberId: text("member_id").notNull().references(() => members.id),
+  termsVersion: text("terms_version").notNull(),
+  privacyVersion: text("privacy_version").notNull(),
+  acceptedAt: integer("accepted_at", { mode: "timestamp_ms" }).notNull(),
+  userAgent: text("user_agent"),
+}, (table) => [index("member_terms_member_idx").on(table.memberId, table.acceptedAt)]);
+
+export const memberRegistrationEvents = sqliteTable("member_registration_events", {
+  id: text("id").primaryKey(),
+  memberId: text("member_id").references(() => members.id),
+  eventType: text("event_type").notNull(),
+  actor: text("actor").notNull(),
+  detailsJson: text("details_json").notNull().default("{}"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("member_registration_events_member_idx").on(table.memberId, table.createdAt)]);
+
 export const reservations = sqliteTable("reservations", {
   id: text("id").primaryKey(),
   memberId: text("member_id").notNull().references(() => members.id),

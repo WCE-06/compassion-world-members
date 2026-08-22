@@ -3,8 +3,9 @@
 import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
 import { Bell, CalendarDays, Coffee, History, House, IdCard, MessageSquarePlus, TicketPercent, UtensilsCrossed } from "lucide-react";
+import { validateRegistration } from "@/lib/member-registration";
 
-type View = "loading" | "member" | "unlinked" | "new" | "error";
+type View = "loading" | "member" | "unlinked" | "new" | "confirm" | "error";
 type ServicePanel="ポイント履歴"|"会員特典"|"クーポン"|"利用履歴"|"おもひで商店のご案内"|"予約の変更・キャンセル"|"注文状況"|null;
 
 type MemberNotice = {
@@ -33,6 +34,7 @@ type Member = {
   rankPeriodMonths?: number;
   qualifyingSpendSource?: "SMAREGI"|"LOCAL";
   qualifyingSpendUpdatedAt?: string|null;
+  smaregiSyncStatus?: "PENDING"|"SYNCING"|"SYNCED"|"FAILED"|null;
   nextReservation?: { facilityName: string; startsAt: string; endsAt: string } | null;
   session?: {
     facilityName: string;
@@ -159,6 +161,9 @@ export default function Home() {
   const [showAllNotices, setShowAllNotices] = useState(false);
   const [lineToken,setLineToken]=useState("");
   const [registering,setRegistering]=useState(false);
+  const [postalLoading,setPostalLoading]=useState(false);
+  const [registrationStage,setRegistrationStage]=useState("");
+  const [registrationErrors,setRegistrationErrors]=useState<string[]>([]);
   const [linking,setLinking]=useState(false),[linkVerification,setLinkVerification]=useState({phone:"",birthDate:""}),[servicePanel,setServicePanel]=useState<ServicePanel>(null);
   const [registration,setRegistration]=useState({displayName:"",phone:"",birthDate:"",postalCode:"",address:"",email:"",acceptedTerms:false});
 
@@ -205,7 +210,9 @@ export default function Home() {
   const visibleNotices = showAllNotices ? member.notices : member.notices.slice(0, 2);
   const openFutureFeature = (label: string) => setServicePanel(label as ServicePanel);
   const linkMembership=async()=>{if(linking)return;setLinking(true);setNotice("");try{if(demo){setMember({...DEMO_MEMBER,memberCode});setView("member");setNotice("会員情報を引き継ぎました");return}const response=await fetch("/api/v1/membership-links",{method:"POST",headers:{Authorization:`Bearer ${lineToken}`,"Content-Type":"application/json"},body:JSON.stringify({memberCode,...linkVerification})});const result=await response.json();if(!response.ok)throw new Error(result.message??"入力内容を確認してください");const membership=await fetch("/api/v1/me/membership",{headers:{Authorization:`Bearer ${lineToken}`}});if(!membership.ok)throw new Error("会員証を取得できませんでした");setMember(await membership.json());setView("member");setNotice("会員情報を引き継ぎました")}catch(error){setNotice(error instanceof Error?error.message:"引き継ぎできませんでした")}finally{setLinking(false)}};
-  const register=async()=>{if(registering)return;setRegistering(true);setNotice("");try{if(demo){setMember(DEMO_MEMBER);setView("member");setNotice("開発用の新規登録が完了しました");return}const response=await fetch("/api/v1/members",{method:"POST",headers:{Authorization:`Bearer ${lineToken}`,"Content-Type":"application/json"},body:JSON.stringify(registration)});if(!response.ok)throw new Error("登録内容を確認してください");const membership=await fetch("/api/v1/me/membership",{headers:{Authorization:`Bearer ${lineToken}`}});if(!membership.ok)throw new Error("会員証を取得できませんでした");setMember(await membership.json());setView("member");setNotice("新しいポイントカードを発行しました")}catch(error){setNotice(error instanceof Error?error.message:"登録できませんでした")}finally{setRegistering(false)}};
+  const confirmRegistration=()=>{const result=validateRegistration(registration);setRegistrationErrors(result.errors);if(result.ok){setRegistration(result.data);setView("confirm")}else setNotice("入力内容を確認してください")};
+  const lookupPostalCode=async()=>{if(postalLoading)return;setPostalLoading(true);setNotice("");try{const response=await fetch(`/api/v1/postal-code?postalCode=${encodeURIComponent(registration.postalCode)}`),result=await response.json();if(!response.ok)throw new Error(result.message??"住所を取得できませんでした");setRegistration(current=>({...current,postalCode:current.postalCode.replace(/\D/g,""),address:result.address}));setNotice("住所を入力しました")}catch(error){setNotice(error instanceof Error?error.message:"住所を取得できませんでした")}finally{setPostalLoading(false)}};
+  const register=async()=>{if(registering)return;setRegistering(true);setNotice("");setRegistrationStage("登録情報を安全に保存しています");try{if(demo){await new Promise(resolve=>setTimeout(resolve,500));const code="N8W4K2M7P5";setRegistrationStage("会員番号を発行しています");await new Promise(resolve=>setTimeout(resolve,350));setMember({...DEMO_MEMBER,memberCode:code,displayName:registration.displayName||DEMO_MEMBER.displayName,smaregiSyncStatus:"PENDING"});setView("member");setNotice(`新しいポイントカードを発行しました（会員番号 ${code}）`);return}const response=await fetch("/api/v1/members",{method:"POST",headers:{Authorization:`Bearer ${lineToken}`,"Content-Type":"application/json"},body:JSON.stringify(registration)}),result=await response.json();if(!response.ok)throw new Error(result.message??(result.error==="PHONE_ALREADY_REGISTERED"?"同じ電話番号の会員情報があります。以前の会員番号から引き継いでください":"登録内容を確認してください"));setRegistrationStage("会員番号を発行しています");const membership=await fetch("/api/v1/me/membership",{headers:{Authorization:`Bearer ${lineToken}`}});if(!membership.ok)throw new Error("会員証を取得できませんでした。もう一度お試しください");setRegistrationStage("会員証を準備しています");const registered=await membership.json();setMember(registered);setView("member");setNotice(`新しいポイントカードを発行しました（会員番号 ${registered.memberCode??result.memberCode}）`)}catch(error){setNotice(error instanceof Error?error.message:"登録できませんでした");setView("confirm")}finally{setRegistrationStage("");setRegistering(false)}};
 
   return (
     <main className="app-shell">
@@ -229,6 +236,8 @@ export default function Home() {
               <button onClick={() => openFutureFeature("ポイント履歴")}><small>保有ポイント</small><strong>{member.points.toLocaleString("ja-JP")}<span> P</span></strong><em>履歴を見る ›</em></button>
               <button onClick={() => openFutureFeature("会員特典")}><small>会員ランク</small><strong className={`rank-value rank-${member.rank.toLowerCase()}`}>{member.rankLabel??member.rank}</strong><em>特典を見る ›</em></button>
             </div>
+            {member.smaregiSyncStatus&&member.smaregiSyncStatus!=="SYNCED"&&<p className={`sync-status sync-${member.smaregiSyncStatus.toLowerCase()}`}>{member.smaregiSyncStatus==="FAILED"?"会員情報の連携を再確認しています":"スマレジ会員情報を連携しています"}</p>}
+            {member.qualifyingSpendSource!=="SMAREGI"&&<p className="sync-status">過去1年のお買い上げ金額をスマレジと同期しています</p>}
           </section>
 
           <section className="majica-actions" aria-label="よく使うサービス">
@@ -307,17 +316,20 @@ export default function Home() {
         <section className="flow-card">
           <div className="flow-icon">＋</div><p className="eyebrow">NEW MEMBER</p><h2>COMPASSION WORLDを<br />もっと身近に</h2>
           <p>ポイントカードを作ると、COMPASSION WORLDへの入館、ポイント、予約、モバイルオーダーをご利用いただけます。</p>
-          <div className="registration-form"><label>氏名（必須）<input autoComplete="name" value={registration.displayName} onChange={event=>setRegistration({...registration,displayName:event.target.value})}/></label><label>電話番号（必須）<input inputMode="tel" autoComplete="tel" value={registration.phone} onChange={event=>setRegistration({...registration,phone:event.target.value})}/></label><label>生年月日（必須）<input type="date" value={registration.birthDate} onChange={event=>setRegistration({...registration,birthDate:event.target.value})}/></label><label>郵便番号（必須）<input inputMode="numeric" autoComplete="postal-code" value={registration.postalCode} onChange={event=>setRegistration({...registration,postalCode:event.target.value})}/></label><label>住所（必須）<input autoComplete="street-address" value={registration.address} onChange={event=>setRegistration({...registration,address:event.target.value})}/></label><label>メールアドレス（任意）<input type="email" autoComplete="email" value={registration.email} onChange={event=>setRegistration({...registration,email:event.target.value})}/></label><label className="terms-check"><input type="checkbox" checked={registration.acceptedTerms} onChange={event=>setRegistration({...registration,acceptedTerms:event.target.checked})}/><span><a href="/terms" target="_blank">利用規約</a>・<a href="/privacy" target="_blank">プライバシーポリシー</a>に同意します</span></label></div>
-          <button className="flow-button" disabled={registering||!registration.displayName||!registration.phone||!registration.birthDate||!registration.postalCode||!registration.address||!registration.acceptedTerms} onClick={register}>{registering?"登録しています…":"新しいポイントカードを作る"}</button>
+          <div className="registration-form"><label>氏名（必須）<input autoComplete="name" value={registration.displayName} onChange={event=>setRegistration({...registration,displayName:event.target.value})}/></label><label>電話番号（必須）<input inputMode="tel" autoComplete="tel" value={registration.phone} onChange={event=>setRegistration({...registration,phone:event.target.value})}/></label><label>生年月日（必須）<input type="date" value={registration.birthDate} onChange={event=>setRegistration({...registration,birthDate:event.target.value})}/></label><label>郵便番号（必須）<span className="postal-row"><input inputMode="numeric" autoComplete="postal-code" value={registration.postalCode} onChange={event=>setRegistration({...registration,postalCode:event.target.value})}/><button type="button" disabled={postalLoading||registration.postalCode.replace(/\D/g,"").length!==7} onClick={lookupPostalCode}>{postalLoading?"検索中":"住所検索"}</button></span></label><label>住所（必須）<input autoComplete="street-address" value={registration.address} onChange={event=>setRegistration({...registration,address:event.target.value})}/></label><label>メールアドレス（任意）<input type="email" autoComplete="email" value={registration.email} onChange={event=>setRegistration({...registration,email:event.target.value})}/></label><label className="terms-check"><input type="checkbox" checked={registration.acceptedTerms} onChange={event=>setRegistration({...registration,acceptedTerms:event.target.checked})}/><span><a href="/terms" target="_blank">利用規約</a>・<a href="/privacy" target="_blank">プライバシーポリシー</a>に同意します</span></label></div>
+          {registrationErrors.length>0&&<p className="form-error">未入力または形式が正しくない項目があります。</p>}
+          <button className="flow-button" onClick={confirmRegistration}>入力内容を確認する</button>
           <button className="text-button" onClick={() => setView("unlinked")}>以前の会員番号をお持ちの方</button>
         </section>
       )}
+
+      {view === "confirm" && <section className="flow-card"><div className="flow-icon">✓</div><p className="eyebrow">CONFIRM</p><h2>登録内容をご確認ください</h2><dl className="registration-confirm"><div><dt>氏名</dt><dd>{registration.displayName}</dd></div><div><dt>電話番号</dt><dd>{registration.phone}</dd></div><div><dt>生年月日</dt><dd>{registration.birthDate}</dd></div><div><dt>住所</dt><dd>〒{registration.postalCode}<br/>{registration.address}</dd></div><div><dt>メール</dt><dd>{registration.email||"未登録"}</dd></div></dl>{registering&&<div className="registration-progress" role="status"><div className="loader"/><strong>{registrationStage}</strong><small>画面を閉じずにお待ちください</small></div>}<button className="flow-button" disabled={registering} onClick={register}>{registering?"登録しています…":"この内容でポイントカードを作る"}</button><button className="text-button" disabled={registering} onClick={()=>setView("new")}>入力内容を修正する</button></section>}
 
       {view === "error" && <section className="flow-card"><div className="flow-icon">!</div><h2>接続を確認してください</h2><p>{notice}</p><button className="flow-button" onClick={() => window.location.reload()}>もう一度読み込む</button></section>}
       {notice && view !== "error" && <div className="toast" role="status" onClick={() => setNotice("")}>{notice}<button aria-label="閉じる">×</button></div>}
       {servicePanel&&<ServiceSheet panel={servicePanel} member={member} onClose={()=>setServicePanel(null)}/>}
 
-      {demo && view !== "loading" && <nav className="demo-nav" aria-label="開発用画面切り替え"><button className={view === "member" ? "active" : ""} onClick={() => setView("member")}>カード</button><button className={view === "unlinked" ? "active" : ""} onClick={() => setView("unlinked")}>移行</button><button className={view === "new" ? "active" : ""} onClick={() => setView("new")}>新規</button></nav>}
+      {demo && view !== "loading" && <nav className="demo-nav" aria-label="開発用画面切り替え"><button className={view === "member" ? "active" : ""} onClick={() => setView("member")}>カード</button><button className={view === "unlinked" ? "active" : ""} onClick={() => setView("unlinked")}>移行</button><button className={view === "new"||view==="confirm" ? "active" : ""} onClick={() => setView("new")}>新規</button></nav>}
       <footer><span>COMPASSION</span><i /><span>CREATIVITY</span><i /><span>COMMUNITY</span></footer>
     </main>
   );
