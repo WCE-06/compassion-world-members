@@ -512,7 +512,8 @@ test("会員ランクを利用実績で6段階化し住民のゴールド保証�
   for(const amount of ["30_000","60_000","120_000","180_000","300_000"])assert.match(ranks,new RegExp(amount));
   for(const rate of [1,2,3,5,7,10])assert.match(ranks,new RegExp(`pointRatePercent:${rate}`));
   assert.match(page, /次の\{member.nextRankLabel\}まで/);
-  assert.match(page, /基本ポイント還元率/);
+  assert.match(page, /ランク還元率/);
+  assert.match(page, /スマレジへのポイント反映は接続準備中です/);
   assert.match(page, /rank-card-\$\{member\.rank\.toLowerCase\(\)\}/);
   assert.match(page, /rank-emblem/);
   assert.match(membership, /memberPresentation/);
