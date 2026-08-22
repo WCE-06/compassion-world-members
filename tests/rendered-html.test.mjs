@@ -494,7 +494,7 @@ test("初回登録・既存会員移行・会員サービス詳細を実画面�
   assert.match(css, /member-sheet-backdrop/);
 });
 
-test("会員ランクを6段階化し住民を別表示して最低粗利12パーセントを守る", async () => {
+test("会員ランクを利用実績で6段階化し住民のゴールド保証と最大10パーセント還元を行う", async () => {
   const [page,membership,ranks,points,schema,css] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
@@ -505,11 +505,17 @@ test("会員ランクを6段階化し住民を別表示して最低粗利12パ�
   ]);
   for(const rank of ["STANDARD","BRONZE","SILVER","GOLD","PLATINUM","DIAMOND"])assert.match(ranks,new RegExp(rank));
   assert.match(ranks, /storedRank==="RESIDENT"/);
-  assert.match(ranks, /resident\?"GOLD"/);
+  assert.match(ranks, /residentFloor=MEMBER_RANKS.indexOf\("GOLD"\)/);
+  for(const amount of ["30_000","60_000","120_000","180_000","300_000"])assert.match(ranks,new RegExp(amount));
+  for(const rate of [1,2,3,5,7,10])assert.match(ranks,new RegExp(`pointRatePercent:${rate}`));
+  assert.match(page, /次の\{member.nextRankLabel\}まで/);
+  assert.match(page, /基本ポイント還元率/);
   assert.match(membership, /memberPresentation/);
+  assert.match(membership, /365\*24\*60\*60\*1000/);
+  assert.match(membership, /unit_price_excluding_tax\*i.quantity/);
   assert.match(page, /rank-ladder/);
   assert.match(page, /resident-badge/);
-  assert.match(points, /MINIMUM_MARGIN_BPS=1_200/);
+  assert.match(points, /MINIMUM_MARGIN_BPS=0/);
   assert.match(points, /sellingPriceExcludingTax/);
   assert.match(schema, /"DIAMOND"/);
   assert.match(css, /rank-diamond/);
