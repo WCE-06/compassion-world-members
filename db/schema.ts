@@ -126,6 +126,8 @@ export const orders = sqliteTable("orders", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 }, (table) => [
   uniqueIndex("orders_order_number_unique").on(table.orderNumber),
+  uniqueIndex("orders_stripe_payment_intent_unique").on(table.stripePaymentIntentId),
+  uniqueIndex("orders_smaregi_transaction_unique").on(table.smaregiTransactionId),
   index("orders_member_created_idx").on(table.memberId, table.createdAt),
 ]);
 
@@ -135,10 +137,37 @@ export const orderItems = sqliteTable("order_items", {
   productId: text("product_id").notNull(),
   productCode: text("product_code").notNull(),
   productName: text("product_name").notNull(),
+  department: text("department", { enum: ["FOOD", "DRINK"] }).notNull().default("FOOD"),
   quantity: integer("quantity").notNull(),
   unitPriceIncludingTax: integer("unit_price_including_tax").notNull(),
   lineTotalIncludingTax: integer("line_total_including_tax").notNull(),
 }, (table) => [index("order_items_order_idx").on(table.orderId)]);
+
+export const orderCallCounters = sqliteTable("order_call_counters", {
+  callDate: text("call_date").notNull(),
+  department: text("department", { enum: ["FOOD", "DRINK"] }).notNull(),
+  lastNumber: integer("last_number").notNull().default(0),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [
+  uniqueIndex("order_call_counters_date_department_unique").on(table.callDate, table.department),
+]);
+
+export const orderFulfillments = sqliteTable("order_fulfillments", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id").notNull().references(() => orders.id),
+  department: text("department", { enum: ["FOOD", "DRINK"] }).notNull(),
+  callDate: text("call_date").notNull(),
+  callNumber: integer("call_number").notNull(),
+  status: text("status", { enum: ["WAITING_PAYMENT", "ACCEPTED", "COOKING", "READY", "CALLED", "PICKED_UP", "CANCELLED"] }).notNull().default("ACCEPTED"),
+  readyAt: integer("ready_at", { mode: "timestamp_ms" }),
+  calledAt: integer("called_at", { mode: "timestamp_ms" }),
+  pickedUpAt: integer("picked_up_at", { mode: "timestamp_ms" }),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [
+  uniqueIndex("order_fulfillments_order_department_unique").on(table.orderId, table.department),
+  uniqueIndex("order_fulfillments_call_unique").on(table.callDate, table.department, table.callNumber),
+  index("order_fulfillments_status_idx").on(table.department, table.status, table.updatedAt),
+]);
 
 export const catalogOverrides = sqliteTable("catalog_overrides", {
   productCode: text("product_code").primaryKey(),

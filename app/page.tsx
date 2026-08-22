@@ -30,7 +30,7 @@ type Member = {
     scheduledEndsAt?: string;
     unpaidAmount?: number;
   } | null;
-  activeOrder?: { orderNumber: string; status: "WAITING_PAYMENT" | "ACCEPTED" | "COOKING" | "READY" } | null;
+  activeOrder?: { orderNumber: string; foodCallNumber?:number|null; drinkCallNumber?:number|null; status: "WAITING_PAYMENT" | "ACCEPTED" | "COOKING" | "READY" } | null;
   notices: MemberNotice[];
 };
 
@@ -230,7 +230,7 @@ export default function Home() {
                 <article className="activity-row"><span className="date-chip">NEXT</span><div><small>次回予約</small><strong>{member.nextReservation.facilityName}</strong><p>{dateLabel(member.nextReservation.startsAt)}〜</p></div><button onClick={() => openFutureFeature("予約の変更・キャンセル")}>詳細</button></article>
               )}
               {member.activeOrder && (
-                <article className="activity-row"><span className="date-chip">ORDER</span><div><small>注文番号 {member.activeOrder.orderNumber}</small><strong>{{ WAITING_PAYMENT: "お支払い待ち", ACCEPTED: "注文受付済み", COOKING: "ただいま調理中", READY: "商品ができあがりました" }[member.activeOrder.status]}</strong></div><button onClick={() => openFutureFeature("注文状況")}>詳細</button></article>
+                <article className="activity-row"><span className="date-chip">ORDER</span><div><small>{[member.activeOrder.foodCallNumber&&`フード ${String(member.activeOrder.foodCallNumber).padStart(3,"0")}`,member.activeOrder.drinkCallNumber&&`ドリンク ${String(member.activeOrder.drinkCallNumber).padStart(3,"0")}`].filter(Boolean).join(" ／ ")||"注文受付済み"}</small><strong>{{ WAITING_PAYMENT: "お支払い待ち", ACCEPTED: "注文受付済み", COOKING: "ただいま調理中", READY: "商品ができあがりました" }[member.activeOrder.status]}</strong></div><button onClick={() => openFutureFeature("注文状況")}>詳細</button></article>
               )}
             </section>
           )}

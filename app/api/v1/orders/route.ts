@@ -4,6 +4,19 @@ import { authenticatedMember } from "@/lib/member-auth";
 import { getOrderProducts } from "@/lib/order-catalog";
 import { pointRuleFor } from "@/lib/point-policy";
 
+type Department="FOOD"|"DRINK";
+const departmentLabel:Record<Department,string>={FOOD:"フード",DRINK:"ドリンク"};
+
+function businessDate(now:number){
+  return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(now));
+}
+
+async function allocateCallNumber(callDate:string,department:Department,now:number){
+  const row=await env.DB.prepare(`INSERT INTO order_call_counters (call_date,department,last_number,updated_at) VALUES (?,?,1,?) ON CONFLICT(call_date,department) DO UPDATE SET last_number=CASE WHEN last_number>=999 THEN 1 ELSE last_number+1 END,updated_at=excluded.updated_at RETURNING last_number AS callNumber`).bind(callDate,department,now).first<{callNumber:number}>();
+  if(!row)throw new Error("CALL_NUMBER_ALLOCATION_FAILED");
+  return row.callNumber;
+}
+
 export async function GET(request: NextRequest) {
   const member = await authenticatedMember(request);
   if (!member) return NextResponse.json({ error: "MEMBER_LOGIN_REQUIRED" }, { status: 401 });
@@ -34,16 +47,17 @@ export async function POST(request: NextRequest) {
   const pointRule = pointRuleFor("MOBILE_ORDER");
   const requestId = body?.requestId?.match(/^[a-zA-Z0-9-]{10,80}$/) ? body.requestId : crypto.randomUUID();
   const id = `ord_${requestId}`;
-  const existing = await env.DB.prepare(`SELECT order_number AS orderNumber, status, total_including_tax AS totalIncludingTax FROM orders WHERE id = ? AND member_id = ?`).bind(id, member.id).first();
-  if (existing) return NextResponse.json({ orderId: id, ...existing });
-  const now = Date.now(); const orderNumber = `A-${String(now).slice(-5)}`; const expiresAt = now + 15 * 60_000;
-  await env.DB.prepare(
+  const existing = await env.DB.prepare(`SELECT order_number AS orderNumber, status, payment_method AS paymentMethod, total_including_tax AS totalIncludingTax FROM orders WHERE id = ? AND member_id = ?`).bind(id, member.id).first();
+  if (existing) {const result=await env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(id).all();return NextResponse.json({ orderId:id,...existing,fulfillments:result.results });}
+  const now = Date.now(); const orderNumber = `ORD-${String(now).slice(-8)}`; const expiresAt = now + 15 * 60_000;const callDate=businessDate(now);
+  const departments=[...new Set(items.map(item=>item.product.category))] as Department[];
+  const fulfillments=await Promise.all(departments.map(async department=>({department,callNumber:await allocateCallNumber(callDate,department,now),status:"WAITING_PAYMENT" as const,label:departmentLabel[department]})));
+  const statements=[env.DB.prepare(
     `INSERT INTO orders (id, order_number, member_id, status, payment_method, total_including_tax, point_eligible, point_status, pickup_at, expires_at, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?)`,
-  ).bind(id, orderNumber, member.id, paymentMethod === "STRIPE" ? "PENDING_PAYMENT" : "WAITING_STORE_PAYMENT", paymentMethod, total, pointRule.eligible ? 1 : 0, body?.pickupAt ?? null, expiresAt, now, now).run();
-  for (const item of items) await env.DB.prepare(
-    `INSERT INTO order_items (id, order_id, product_id, product_code, product_name, quantity, unit_price_including_tax, line_total_including_tax)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(crypto.randomUUID(), id, item.product.id, item.product.code, item.product.name, item.quantity, item.product.price, item.product.price * item.quantity).run();
-  return NextResponse.json({ orderId: id, orderNumber, status: paymentMethod === "STRIPE" ? "PENDING_PAYMENT" : "WAITING_STORE_PAYMENT", paymentMethod, paymentLabel:paymentMethod === "STRIPE" ? "スマート決済" : "現地決済", pointEligible:pointRule.eligible, pointStatus:"PENDING", totalIncludingTax: total, expiresAt }, { status: 201 });
+  ).bind(id, orderNumber, member.id, paymentMethod === "STRIPE" ? "PENDING_PAYMENT" : "WAITING_STORE_PAYMENT", paymentMethod, total, pointRule.eligible ? 1 : 0, body?.pickupAt ?? null, expiresAt, now, now),
+  ...items.map(item=>env.DB.prepare(`INSERT INTO order_items (id,order_id,product_id,product_code,product_name,department,quantity,unit_price_including_tax,line_total_including_tax) VALUES (?,?,?,?,?,?,?,?,?)`).bind(crypto.randomUUID(),id,item.product.id,item.product.code,item.product.name,item.product.category,item.quantity,item.product.price,item.product.price*item.quantity)),
+  ...fulfillments.map(item=>env.DB.prepare(`INSERT INTO order_fulfillments (id,order_id,department,call_date,call_number,status,updated_at) VALUES (?,?,?,?,?,'WAITING_PAYMENT',?)`).bind(crypto.randomUUID(),id,item.department,callDate,item.callNumber,now))];
+  await env.DB.batch(statements);
+  return NextResponse.json({ orderId: id, orderNumber, fulfillments, status: paymentMethod === "STRIPE" ? "PENDING_PAYMENT" : "WAITING_STORE_PAYMENT", paymentMethod, paymentLabel:paymentMethod === "STRIPE" ? "スマート決済" : "現地決済", pointEligible:pointRule.eligible, pointStatus:"PENDING", totalIncludingTax: total, expiresAt }, { status: 201 });
 }

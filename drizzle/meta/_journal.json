@@ -71,6 +71,20 @@
       "when": 1787396172662,
       "tag": "0009_rainy_rogue",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1787397855359,
+      "tag": "0010_jazzy_zaladane",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1787398017932,
+      "tag": "0011_mature_the_executioner",
+      "breakpoints": true
     }
   ]
 }

@@ -261,3 +261,32 @@ test("スマート決済の名称と用途別ポイント規則を共通化す�
   assert.match(migration, /payment_point_events/);
   assert.match(readme, /月額料金はポイント対象外/);
 });
+
+test("レシート番号を使わずフードとドリンクを別々に呼び出す", async () => {
+  const [schema, orders, payment, kitchen, mobileOrder, css, migration, indexes, guide] = await Promise.all([
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/payment-confirmation/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/kitchen/fulfillments/route.ts", root), "utf8"),
+    readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+    readFile(new URL("drizzle/0010_jazzy_zaladane.sql", root), "utf8"),
+    readFile(new URL("drizzle/0011_mature_the_executioner.sql", root), "utf8"),
+    readFile(new URL("docs/KITCHEN_CALLING_API.md", root), "utf8"),
+  ]);
+  assert.match(schema, /orderFulfillments/);
+  assert.match(schema, /orderCallCounters/);
+  assert.match(orders, /allocateCallNumber/);
+  assert.match(orders, /item\.product\.category/);
+  assert.match(kitchen, /START.*READY.*CALL.*PICKUP/s);
+  assert.match(kitchen, /KITCHEN_API_TOKEN|requireKitchenToken/);
+  assert.match(orders, /FOOD:"フード",DRINK:"ドリンク"/);
+  assert.match(mobileOrder, /item\.label} 呼出番号/);
+  assert.match(mobileOrder, /padStart\(3,"0"\)/);
+  assert.match(css, /font:800 74px/);
+  assert.match(migration, /order_fulfillments/);
+  assert.match(payment, /WAITING_PAYMENT/);
+  assert.match(payment, /smaregi_transaction_id/);
+  assert.match(indexes, /orders_smaregi_transaction_unique/);
+  assert.match(guide, /レシート番号は顧客呼出しに使用しません/);
+});

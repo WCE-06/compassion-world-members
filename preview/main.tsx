@@ -39,7 +39,7 @@ window.fetch = async (input, init) => {
   if (url.endsWith("/api/v1/admin/category-schedules") && init?.method === "PUT") return new Response(JSON.stringify({saved:true}), {status:200,headers:{"Content-Type":"application/json"}});
   if (url.endsWith("/api/v1/admin/category-schedules")) return new Response(JSON.stringify({schedules:[{category:"food-don",enabled:true,startTime:"11:30",endTime:"14:00",days:[6,7],note:"お米使用メニューは土日限定"}]}), {status:200,headers:{"Content-Type":"application/json"}});
   if (url.endsWith("/api/v1/admin/catalog")) return new Response(JSON.stringify({ products, sync:currentCatalog.sync }), { status:200, headers:{"Content-Type":"application/json"} });
-  if (url.endsWith("/api/v1/orders") && init?.method === "POST") return new Response(JSON.stringify({ orderNumber:"PREVIEW-001",status:"WAITING_STORE_PAYMENT",totalIncludingTax:980,expiresAt:Date.now()+900000 }), { status:200, headers:{"Content-Type":"application/json"} });
+  if (url.endsWith("/api/v1/orders") && init?.method === "POST") return new Response(JSON.stringify({ orderNumber:"PREVIEW-001",fulfillments:[{department:"FOOD",label:"フード",callNumber:12,status:"ACCEPTED"},{department:"DRINK",label:"ドリンク",callNumber:7,status:"ACCEPTED"}],status:"WAITING_STORE_PAYMENT",paymentMethod:"STORE",paymentLabel:"現地決済",pointEligible:true,pointStatus:"PENDING",totalIncludingTax:980,expiresAt:Date.now()+900000 }), { status:200, headers:{"Content-Type":"application/json"} });
   return originalFetch(input, init);
 };
 

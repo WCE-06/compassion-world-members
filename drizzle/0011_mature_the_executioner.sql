@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX `orders_stripe_payment_intent_unique` ON `orders` (`stripe_payment_intent_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `orders_smaregi_transaction_unique` ON `orders` (`smaregi_transaction_id`);
