@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   if (!member) return NextResponse.json({ error: "MEMBER_LOGIN_REQUIRED" }, { status: 401 });
   const body = await request.json().catch(() => null) as { items?: { productId?: string; quantity?: number }[]; pickupAt?: number; requestId?: string; paymentMethod?: "STORE"|"STRIPE" } | null;
   const requested = body?.items ?? [];
-  const {products}=await getOrderProducts();
+  const {products}=await getOrderProducts({timeoutMs:3_000,allowSnapshotFallback:true});
   const items = requested.map(item => {
     const product = products.find(candidate => candidate.id === item.productId&&!candidate.soldOut);
     const quantity = Number(item.quantity);

@@ -390,6 +390,21 @@ test("スマート決済後は呼出番号画面へ戻り現地決済は支払�
   assert.match(stripe, /UPDATE order_fulfillments SET status='ACCEPTED'/);
 });
 
+test("現地決済は商品同期遅延で固まらず同じ注文を安全に再試行する", async () => {
+  const [mobile, catalog, orders] = await Promise.all([
+    readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
+    readFile(new URL("lib/order-catalog.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/route.ts", root), "utf8"),
+  ]);
+  assert.match(catalog, /AbortSignal\.timeout/);
+  assert.match(catalog, /SNAPSHOT_FALLBACK/);
+  assert.match(orders, /timeoutMs:3_000,allowSnapshotFallback:true/);
+  assert.match(mobile, /AbortSignal\.timeout\(10_000\)/);
+  assert.match(mobile, /compassion-pending-order-request/);
+  assert.match(mobile, /finally\{setSending\(false\)\}/);
+  assert.match(mobile, /注文は重複しません/);
+});
+
 test("モバイル注文のカテゴリタブが商品追加ボタンと重ならない", async () => {
   const [layout, fix] = await Promise.all([
     readFile(new URL("app/layout.tsx", root), "utf8"),

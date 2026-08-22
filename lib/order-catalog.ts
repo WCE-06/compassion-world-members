@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { getDb } from "@/db";
 import { businessCalendar, catalogOverrides, categorySchedules, storeHours } from "@/db/schema";
 import { inferMocktailPair } from "@/lib/drink-pairing";
+import catalogSnapshot from "../preview/generated/catalog.json";
 
 export type OrderOptionChoice={id:string;name:string;priceDelta:number;productCode?:string};
 export type OrderOptionGroup={id:string;name:string;type:"single"|"multiple";required:boolean;choices:OrderOptionChoice[]};
@@ -9,11 +10,10 @@ export type OrderProduct={id:string;code:string;name:string;category:"FOOD"|"DRI
 type SourceProduct={code:string;name:string;price:number;basePrice?:number;taxDivision?:string;taxRate?:number;taxRounding?:string;priceLabel?:string;section:string;menuCategory:string;description?:string;imageUrl?:string;soldOut?:boolean;optionGroups?:OrderOptionGroup[];displaySequence?:number;cocktailBase?:string;cocktailMixer?:string;preparationMinutes?:number};
 type CatalogResponse={ok:boolean;result?:{products?:SourceProduct[];sync?:{state?:string;completedAt?:string;storedCount?:number}}};
 
-export async function getOrderProducts(options:{includeOverrides?:boolean;channel?:"MOBILE_ORDER"|"SELF_REGISTER"}={}){
+export async function getOrderProducts(options:{includeOverrides?:boolean;channel?:"MOBILE_ORDER"|"SELF_REGISTER";timeoutMs?:number;allowSnapshotFallback?:boolean}={}){
  const runtime=env as unknown as Record<string,string|undefined>;const url=runtime.SELF_REGISTER_CATALOG_URL;
  if(!url)throw new Error("CATALOG_URL_NOT_CONFIGURED");
- const response=await fetch(url,{redirect:"follow",cf:{cacheEverything:true,cacheTtl:300}});if(!response.ok)throw new Error("CATALOG_UNAVAILABLE");
- const body=await response.json() as CatalogResponse;if(!body.ok||!body.result)throw new Error("CATALOG_INVALID_RESPONSE");
+ let body:CatalogResponse;try{const response=await fetch(url,{redirect:"follow",cf:{cacheEverything:true,cacheTtl:300},signal:AbortSignal.timeout(options.timeoutMs??15_000)});if(!response.ok)throw new Error("CATALOG_UNAVAILABLE");body=await response.json() as CatalogResponse;if(!body.ok||!body.result)throw new Error("CATALOG_INVALID_RESPONSE")}catch(error){if(!options.allowSnapshotFallback)throw error;body={ok:true,result:{products:(catalogSnapshot.products as unknown as SourceProduct[]).map(product=>({...product,section:"kitchen"})),sync:{state:"SNAPSHOT_FALLBACK"}}}}
  let overrides:Record<string,typeof catalogOverrides.$inferSelect>={};
  let hours:typeof storeHours.$inferSelect|undefined;
  let exceptions:typeof businessCalendar.$inferSelect[]=[];
