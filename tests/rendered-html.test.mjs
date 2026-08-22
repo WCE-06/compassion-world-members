@@ -68,6 +68,8 @@ test("モバイル注文は直前メニューを即表示し商品取得を背�
     readFile(new URL("lib/order-catalog.ts", root), "utf8"),
   ]);
   assert.match(page, /compassion-mobile-order-catalog-v1/);
+  assert.match(page, /catalogSnapshot/);
+  assert.match(page, /useState<Product\[\]>\(initialProducts\)/);
   assert.match(page, /localStorage\.getItem\(catalogCacheKey\)/);
   assert.match(page, /setLoading\(false\);cached=true/);
   assert.match(route, /s-maxage=300, stale-while-revalidate=900/);

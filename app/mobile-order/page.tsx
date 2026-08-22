@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Coffee, CreditCard, GlassWater, Minus, Plus, ShoppingBasket, Store, UtensilsCrossed, Wine } from "lucide-react";
+import catalogSnapshot from "../../preview/generated/catalog.json";
 
 type OptionChoice={id:string;name:string;priceDelta:number;productCode?:string};
 type OptionGroup={id:string;name:string;type:"single"|"multiple";required:boolean;choices:OptionChoice[]};
@@ -10,9 +11,10 @@ type OrderResult={orderId:string;orderNumber:string;fulfillments:{department:"FO
 const tabs=[['food-tsukemen','つけ麺'],['food-udon','うどん・ほうとう'],['food-pasta','パスタ'],['food-don','ご飯もの'],['food-side','サイド'],['drink','ドリンク'],['dessert','デザート']] as const;
 const drinkTabs=[['soft-cafe','カフェ'],['soft-simple','ソフトドリンク'],['soft-mocktail','モクテル'],['alcohol-main','ビール・焼酎など'],['alcohol-cocktail','カクテル']] as const;
 const catalogCacheKey="compassion-mobile-order-catalog-v1";
+const initialProducts=(catalogSnapshot.products??[]) as Product[];
 
 export default function MobileOrderPage(){
- const [products,setProducts]=useState<Product[]>([]),[category,setCategory]=useState("food-tsukemen"),[cart,setCart]=useState<Record<string,number>>({}),[loading,setLoading]=useState(true),[sending,setSending]=useState(false),[message,setMessage]=useState(""),[complete,setComplete]=useState<OrderResult|null>(null),[cocktailMode,setCocktailMode]=useState(false),[cocktailBase,setCocktailBase]=useState(""),[choosingPayment,setChoosingPayment]=useState(false),[smartPaymentEnabled,setSmartPaymentEnabled]=useState(false);
+ const [products,setProducts]=useState<Product[]>(initialProducts),[category,setCategory]=useState("food-tsukemen"),[cart,setCart]=useState<Record<string,number>>({}),[loading,setLoading]=useState(initialProducts.length===0),[sending,setSending]=useState(false),[message,setMessage]=useState(""),[complete,setComplete]=useState<OrderResult|null>(null),[cocktailMode,setCocktailMode]=useState(false),[cocktailBase,setCocktailBase]=useState(""),[choosingPayment,setChoosingPayment]=useState(false),[smartPaymentEnabled,setSmartPaymentEnabled]=useState(false);
  useEffect(()=>{let cached=false;try{const saved=JSON.parse(localStorage.getItem(catalogCacheKey)??"null") as {products?:Product[]}|null;if(saved?.products?.length){setProducts(saved.products);setLoading(false);cached=true}}catch{}fetch("/api/v1/catalog").then(r=>{if(!r.ok)throw new Error("CATALOG_UNAVAILABLE");return r.json()}).then(catalog=>{const next=Array.isArray(catalog.products)?catalog.products:[];if(!next.length)throw new Error("CATALOG_EMPTY");setProducts(next);localStorage.setItem(catalogCacheKey,JSON.stringify({products:next,storedAt:Date.now()}))}).catch(()=>{if(!cached)setMessage("メニューを取得できませんでした")}).finally(()=>setLoading(false));fetch("/api/v1/client-config").then(r=>r.json()).then(config=>setSmartPaymentEnabled(Boolean(config.smartPaymentEnabled))).catch(()=>setSmartPaymentEnabled(false))},[]);
  const bucket=(p:Product)=>p.menuCategory==="cocktail"?"alcohol-cocktail":p.menuCategory==="mocktail"?"soft-mocktail":p.menuCategory;
  const visible=products.filter(p=>bucket(p)===category);
