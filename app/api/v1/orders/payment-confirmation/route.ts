@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { NextRequest,NextResponse } from "next/server";
 import { requirePosToken } from "@/lib/pos-api";
 import { expireStaleLocks } from "@/lib/order-pos";
+import { confirmKitchenSchedule } from "@/lib/kitchen-schedule";
 
 type Body={orderId?:string;paymentId?:string;requestId?:string;lockId?:string;deviceId?:string;paidAt?:string|number};
 
@@ -21,5 +22,6 @@ export async function POST(request:NextRequest){
  else if(order.status!=="WAITING_STORE_PAYMENT")return NextResponse.json({ok:false,error:"PAYMENT_CONFIRMATION_CONFLICT"},{status:409});
  const paidAt=typeof body?.paidAt==="number"?body.paidAt:body?.paidAt?Date.parse(body.paidAt):Date.now(),now=Date.now();if(!Number.isFinite(paidAt))return NextResponse.json({ok:false,error:"INVALID_REQUEST"},{status:400});const eventId=crypto.randomUUID();
  await env.DB.batch([env.DB.prepare(`UPDATE orders SET status='PAID',smaregi_transaction_id=?,updated_at=? WHERE id=? AND status IN ('WAITING_STORE_PAYMENT','PAYMENT_PROCESSING')`).bind(paymentId,now,orderId),env.DB.prepare(`UPDATE order_fulfillments SET status='ACCEPTED',updated_at=? WHERE order_id=? AND status='WAITING_PAYMENT'`).bind(now,orderId),env.DB.prepare(`INSERT INTO order_payment_events (id,request_id,order_id,payment_id,lock_id,device_id,paid_at,created_at) VALUES (?,?,?,?,?,?,?,?)`).bind(eventId,requestId,orderId,paymentId,lockId||null,deviceId||null,paidAt,now),env.DB.prepare(`UPDATE order_payment_locks SET status='CONSUMED',released_at=?,release_reason='PAYMENT_CONFIRMED' WHERE id=? AND order_id=? AND status='ACTIVE'`).bind(now,lockId,orderId)]);
+ await confirmKitchenSchedule(orderId);
  return success(orderId,paymentId,false);
 }

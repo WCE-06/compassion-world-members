@@ -425,6 +425,26 @@ test("現地決済は15分後に注文と呼出情報を自動取消する", asy
   assert.match(mobile, /お支払い期限を過ぎました/);
 });
 
+test("提供予定はキッチン計算を正本としセルフレジへ部門別呼出番号を渡す", async () => {
+  const [mobile, orders, schedule, pos, confirmation, stripe] = await Promise.all([
+    readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/route.ts", root), "utf8"),
+    readFile(new URL("lib/kitchen-schedule.ts", root), "utf8"),
+    readFile(new URL("lib/order-pos.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/payment-confirmation/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/stripe/webhook/route.ts", root), "utf8"),
+  ]);
+  assert.doesNotMatch(mobile, /Date\.now\(\)\+30\*60_000/);
+  assert.match(mobile, /提供予定：できあがり次第/);
+  assert.match(orders, /estimateKitchenSchedule/);
+  assert.match(schedule, /WITH_FOOD/);
+  assert.match(schedule, /AbortSignal\.timeout\(2_500\)/);
+  assert.match(pos, /foodCallNumber/);
+  assert.match(pos, /drinkCallNumber/);
+  assert.match(confirmation, /confirmKitchenSchedule\(orderId\)/);
+  assert.match(stripe, /confirmKitchenSchedule\(metadata\.order_id\)/);
+});
+
 test("モバイル注文のカテゴリタブが商品追加ボタンと重ならない", async () => {
   const [layout, fix] = await Promise.all([
     readFile(new URL("app/layout.tsx", root), "utf8"),

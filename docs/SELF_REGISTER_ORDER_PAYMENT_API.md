@@ -29,6 +29,21 @@
 }
 ```
 
+注文がある場合は、従来の商品・金額に加えて部門別呼出番号を返す。
+
+```json
+{
+  "foodCallNumber": "F012",
+  "drinkCallNumber": "D008",
+  "fulfillments": [
+    { "department": "FOOD", "callNumber": 12, "status": "WAITING_PAYMENT" },
+    { "department": "DRINK", "callNumber": 8, "status": "WAITING_PAYMENT" }
+  ]
+}
+```
+
+セルフレジはレシート番号を呼出番号にせず、この値を決済確認・完了画面へ表示する。
+
 ## 2. 精算ロック取得
 
 `POST /api/v1/orders/{orderId}/payment-lock`
