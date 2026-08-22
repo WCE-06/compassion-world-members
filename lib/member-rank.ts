@@ -17,8 +17,16 @@ export function earnedRankForSpend(qualifyingSpend:number):MemberRank{
  return [...RANK_RULES].reverse().find(rule=>spend>=rule.minimumSpend)?.rank??"STANDARD";
 }
 
-export function memberPresentation(storedRank:string|null,qualifyingSpend=0){
- const resident=storedRank==="RESIDENT";
+export function importedResidentStatus(value:string|null|undefined){
+ const normalized=(value??"").trim().toUpperCase();
+ if(!normalized)return "UNKNOWN" as const;
+ if(normalized==="RESIDENT"||normalized==="住民会員"||normalized.includes("住民登録証"))return "ACTIVE" as const;
+ if(normalized==="STANDARD"||normalized.includes("通行許可証"))return "INACTIVE" as const;
+ return null;
+}
+
+export function memberPresentation(storedRank:string|null,qualifyingSpend=0,residentStatus:"UNKNOWN"|"ACTIVE"|"INACTIVE"="UNKNOWN",legacyResident=false){
+ const resident=residentStatus==="ACTIVE"||storedRank==="RESIDENT"||legacyResident;
  const earnedRank=earnedRankForSpend(qualifyingSpend);
  const earnedIndex=MEMBER_RANKS.indexOf(earnedRank);
  const residentFloor=MEMBER_RANKS.indexOf("GOLD");

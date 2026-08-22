@@ -495,13 +495,16 @@ test("初回登録・既存会員移行・会員サービス詳細を実画面�
 });
 
 test("会員ランクを利用実績で6段階化し住民のゴールド保証と最大10パーセント還元を行う", async () => {
-  const [page,membership,ranks,points,schema,css] = await Promise.all([
+  const [page,membership,ranks,points,schema,css,memberImport,residentApi,migration] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
     readFile(new URL("lib/member-rank.ts", root), "utf8"),
     readFile(new URL("lib/point-return-policy.ts", root), "utf8"),
     readFile(new URL("db/schema.ts", root), "utf8"),
     readFile(new URL("app/globals.css", root), "utf8"),
+    readFile(new URL("app/api/v1/admin/member-import/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/admin/resident-status/route.ts", root), "utf8"),
+    readFile(new URL("drizzle/0015_early_wild_child.sql", root), "utf8"),
   ]);
   for(const rank of ["STANDARD","BRONZE","SILVER","GOLD","PLATINUM","DIAMOND"])assert.match(ranks,new RegExp(rank));
   assert.match(ranks, /storedRank==="RESIDENT"/);
@@ -518,5 +521,14 @@ test("会員ランクを利用実績で6段階化し住民のゴールド保証�
   assert.match(points, /MINIMUM_MARGIN_BPS=0/);
   assert.match(points, /sellingPriceExcludingTax/);
   assert.match(schema, /"DIAMOND"/);
+  assert.match(schema, /residentStatus/);
+  assert.match(ranks, /includes\("住民登録証"\)/);
+  assert.match(ranks, /includes\("通行許可証"\)/);
+  assert.match(memberImport, /UNKNOWN_MEMBERSHIP_TYPE/);
+  assert.match(memberImport, /resident_status=excluded\.resident_status/);
+  assert.match(residentApi, /MEMBER_MIGRATION_KEY/);
+  assert.match(residentApi, /resident_status=\?/);
+  assert.match(membership, /LEGACY_RESIDENT_MEMBER_CODES/);
+  assert.match(migration, /resident_status/);
   assert.match(css, /rank-diamond/);
 });
