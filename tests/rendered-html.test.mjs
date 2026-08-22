@@ -60,6 +60,7 @@ test("予約・利用情報は認証会員本人の会員番号で再検証す�
   assert.match(membershipApi, /isOwnedFacilityRow\(sessionResult\.session,member\.memberCode\)/);
   assert.match(reservationsApi, /filterOwnedFacilityRows\(rows, member\.memberCode\)/);
   assert.match(cancellationApi, /memberCode:member\.memberCode/);
+  assert.match(cancellationApi, /facilityId:"FEBBRAIO"/);
 });
 
 test("モバイル注文の商品画像を切り抜かず、飲料を段階選択する", async () => {
