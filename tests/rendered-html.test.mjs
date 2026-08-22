@@ -72,7 +72,7 @@ test("モバイル注文は直前メニューを即表示し商品取得を背�
   assert.match(page, /useState<Product\[\]>\(initialProducts\)/);
   assert.match(page, /localStorage\.getItem\(catalogCacheKey\)/);
   assert.match(page, /setLoading\(false\);cached=true/);
-  assert.match(route, /s-maxage=300, stale-while-revalidate=900/);
+  assert.match(route, /s-maxage=60, stale-while-revalidate=120/);
   assert.match(catalog, /cacheEverything:true,cacheTtl:300/);
   assert.match(catalog, /Promise\.all/);
 });
