@@ -63,6 +63,19 @@ test("予約・利用情報は認証会員本人の会員番号で再検証す�
   assert.match(cancellationApi, /facilityId:"FEBBRAIO"/);
 });
 
+test("予約ページは代表会員へフォールバックせずLINE本人の履歴だけを取得する", async () => {
+  const [page, reservationsApi, cancellationApi] = await Promise.all([
+    readFile(new URL("app/availability/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/v1/reservations/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/reservations/[id]/route.ts", root), "utf8"),
+  ]);
+  assert.doesNotMatch(page, /X-Compass-Preview/);
+  assert.match(page, /本人の予約を確認しています/);
+  assert.match(page, /if\(!accessToken\)\{setReservations\(\[\]\);return\}/);
+  assert.match(reservationsApi, /LINE_AUTH_REQUIRED/);
+  assert.match(cancellationApi, /LINE_AUTH_REQUIRED/);
+});
+
 test("モバイル注文の商品画像を切り抜かず、飲料を段階選択する", async () => {
   const [page, css] = await Promise.all([
     readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),

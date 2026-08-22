@@ -6,6 +6,7 @@ import { authenticatedMember } from "@/lib/member-auth";
 type FacilityReservation={reservationId:string;memberCode:string;facilityId:string;startAt:string;endAt:string;status:"CONFIRMED"|"CANCELLED"|"COMPLETED"};
 
 export async function GET(request: NextRequest) {
+  if (!request.headers.get("authorization")?.startsWith("Bearer ")) return NextResponse.json({ error: "LINE_AUTH_REQUIRED" }, { status: 401 });
   const member = await authenticatedMember(request);
   if (!member) return NextResponse.json({ error: "MEMBER_LOGIN_REQUIRED" }, { status: 401 });
   try {
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!request.headers.get("authorization")?.startsWith("Bearer ")) return NextResponse.json({ error: "LINE_AUTH_REQUIRED" }, { status: 401 });
   const member = await authenticatedMember(request);
   if (!member) return NextResponse.json({ error: "MEMBER_LOGIN_REQUIRED" }, { status: 401 });
   const body = await request.json().catch(() => null) as { date?: string; startHour?: number; durationHours?: number; requestId?: string } | null;

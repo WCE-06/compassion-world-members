@@ -3,6 +3,7 @@ import { facilityPost, filterOwnedFacilityRows } from "@/lib/facility-api";
 import { authenticatedMember } from "@/lib/member-auth";
 
 export async function DELETE(request:NextRequest,context:{params:Promise<{id:string}>}){
+ if(!request.headers.get("authorization")?.startsWith("Bearer "))return NextResponse.json({error:"LINE_AUTH_REQUIRED"},{status:401});
  const member=await authenticatedMember(request);if(!member)return NextResponse.json({error:"MEMBER_LOGIN_REQUIRED"},{status:401});
  const {id}=await context.params;
  try{
