@@ -23,6 +23,13 @@ async function allocateCallNumber(callDate:string,department:Department,now:numb
 export async function GET(request: NextRequest) {
   const member = await authenticatedMember(request);
   if (!member) return NextResponse.json({ error: "MEMBER_LOGIN_REQUIRED" }, { status: 401 });
+  const orderId=request.nextUrl.searchParams.get("orderId")?.trim();
+  if(orderId){
+    const order=await env.DB.prepare(`SELECT id AS orderId,order_number AS orderNumber,status,payment_method AS paymentMethod,total_including_tax AS totalIncludingTax,point_eligible AS pointEligible,point_status AS pointStatus,expires_at AS expiresAt FROM orders WHERE id=? AND member_id=?`).bind(orderId,member.id).first<{orderId:string;orderNumber:string;status:string;paymentMethod:"STORE"|"STRIPE";totalIncludingTax:number;pointEligible:number;pointStatus:string;expiresAt:number}>();
+    if(!order)return NextResponse.json({error:"ORDER_NOT_FOUND"},{status:404});
+    const fulfillments=await env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(orderId).all<{department:Department;callNumber:number;status:string}>();
+    return NextResponse.json({...order,pointEligible:Boolean(order.pointEligible),paymentLabel:order.paymentMethod==="STRIPE"?"スマート決済":"現地決済",fulfillments:fulfillments.results.map(item=>({...item,label:departmentLabel[item.department]}))},{headers:{"Cache-Control":"no-store"}});
+  }
   const result = await env.DB.prepare(
     `SELECT id, order_number AS orderNumber, status, payment_method AS paymentMethod, total_including_tax AS totalIncludingTax,
      point_eligible AS pointEligible, point_status AS pointStatus, points_earned AS pointsEarned,

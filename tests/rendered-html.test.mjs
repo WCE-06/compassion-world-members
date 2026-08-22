@@ -372,6 +372,24 @@ test("会員証は施設連携を並列取得し1.5秒で本体表示を優先�
   assert.match(home, /会員情報を確認しています/);
 });
 
+test("スマート決済後は呼出番号画面へ戻り現地決済は支払い後だけキッチン受付する", async () => {
+  const [mobile, orders, kitchen, confirmation, stripe] = await Promise.all([
+    readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/kitchen/fulfillments/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/payment-confirmation/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/stripe/webhook/route.ts", root), "utf8"),
+  ]);
+  assert.match(mobile, /payment!=="success"/);
+  assert.match(mobile, /orderId=.*encodeURIComponent/);
+  assert.match(mobile, /お支払い・ご注文を受け付けました/);
+  assert.match(orders, /request\.nextUrl\.searchParams\.get\("orderId"\)/);
+  assert.match(kitchen, /status IN \('ACCEPTED','COOKING','READY','CALLED'\)/);
+  assert.doesNotMatch(kitchen, /WAITING_PAYMENT.*ORDER BY/);
+  assert.match(confirmation, /UPDATE order_fulfillments SET status='ACCEPTED'/);
+  assert.match(stripe, /UPDATE order_fulfillments SET status='ACCEPTED'/);
+});
+
 test("モバイル注文のカテゴリタブが商品追加ボタンと重ならない", async () => {
   const [layout, fix] = await Promise.all([
     readFile(new URL("app/layout.tsx", root), "utf8"),
