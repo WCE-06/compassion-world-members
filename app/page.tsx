@@ -30,7 +30,7 @@ type Member = {
     scheduledEndsAt?: string;
     unpaidAmount?: number;
   } | null;
-  activeOrder?: { orderNumber: string; foodCallNumber?:number|null; drinkCallNumber?:number|null; status: "WAITING_PAYMENT" | "ACCEPTED" | "COOKING" | "READY" } | null;
+  activeOrder?: { orderNumber: string; foodCallNumber?:number|null; foodStatus?:string|null; drinkCallNumber?:number|null; drinkStatus?:string|null; status: "WAITING_PAYMENT" | "ACCEPTED" | "COOKING" | "READY"; schedule?:{food?:{readyAt:string}|null;drink?:{readyAt:string}|null}|null;scheduleLabel?:string|null } | null;
   notices: MemberNotice[];
 };
 
@@ -122,6 +122,9 @@ function dateLabel(value: string) {
 function paymentLabel(status: NonNullable<Member["session"]>["paymentStatus"]) {
   return { UNCONFIRMED: "料金未確定", UNPAID: "未精算", PROCESSING: "決済処理中", PAID: "精算済み", FAILED: "決済を確認してください" }[status];
 }
+
+function fulfillmentLabel(status?:string|null){return{WAITING_PAYMENT:"決済待ち",ACCEPTED:"受付済み",COOKING:"調理中",READY:"完成",CALLED:"お呼び出し中",PICKED_UP:"受渡済み"}[status??""]??""}
+function scheduleText(schedule:NonNullable<Member["activeOrder"]>["schedule"],fallback?:string|null){const readyAt=schedule?.food?.readyAt??schedule?.drink?.readyAt;if(!readyAt)return fallback??"提供予定：できあがり次第";return `提供予定 ${new Intl.DateTimeFormat("ja-JP",{hour:"2-digit",minute:"2-digit"}).format(new Date(readyAt))}ごろ`}
 
 export default function Home() {
   const [view, setView] = useState<View>("loading");
@@ -230,7 +233,7 @@ export default function Home() {
                 <article className="activity-row"><span className="date-chip">NEXT</span><div><small>次回予約</small><strong>{member.nextReservation.facilityName}</strong><p>{dateLabel(member.nextReservation.startsAt)}〜</p></div><button onClick={() => openFutureFeature("予約の変更・キャンセル")}>詳細</button></article>
               )}
               {member.activeOrder && (
-                <article className="activity-row"><span className="date-chip">ORDER</span><div><small>{[member.activeOrder.foodCallNumber&&`フード ${String(member.activeOrder.foodCallNumber).padStart(3,"0")}`,member.activeOrder.drinkCallNumber&&`ドリンク ${String(member.activeOrder.drinkCallNumber).padStart(3,"0")}`].filter(Boolean).join(" ／ ")||"注文受付済み"}</small><strong>{{ WAITING_PAYMENT: "お支払い待ち", ACCEPTED: "注文受付済み", COOKING: "ただいま調理中", READY: "商品ができあがりました" }[member.activeOrder.status]}</strong></div><button onClick={() => openFutureFeature("注文状況")}>詳細</button></article>
+                <article className="activity-row"><span className="date-chip">ORDER</span><div><small>{[member.activeOrder.foodCallNumber&&`フード ${String(member.activeOrder.foodCallNumber).padStart(3,"0")} ${fulfillmentLabel(member.activeOrder.foodStatus)}`,member.activeOrder.drinkCallNumber&&`ドリンク ${String(member.activeOrder.drinkCallNumber).padStart(3,"0")} ${fulfillmentLabel(member.activeOrder.drinkStatus)}`].filter(Boolean).join(" ／ ")||"注文受付済み"}</small><strong>{{ WAITING_PAYMENT: "お支払い待ち", ACCEPTED: "注文受付済み", COOKING: "ただいま調理中", READY: "商品ができあがりました" }[member.activeOrder.status]}</strong><p>{scheduleText(member.activeOrder.schedule,member.activeOrder.scheduleLabel)}</p></div><button onClick={() => openFutureFeature("注文状況")}>詳細</button></article>
               )}
             </section>
           )}

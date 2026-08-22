@@ -2,13 +2,15 @@ import { env } from "cloudflare:workers";
 import { NextRequest,NextResponse } from "next/server";
 import { requirePosToken } from "@/lib/pos-api";
 import { expireStaleLocks } from "@/lib/order-pos";
-import { confirmKitchenSchedule } from "@/lib/kitchen-schedule";
+import { confirmOrderSchedule } from "@/lib/kitchen-schedule";
 
 type Body={orderId?:string;paymentId?:string;requestId?:string;lockId?:string;deviceId?:string;paidAt?:string|number};
 
 async function success(orderId:string,paymentId:string,idempotentReplay:boolean){
  const fulfillments=await env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(orderId).all<{department:"FOOD"|"DRINK";callNumber:number;status:string}>();const food=fulfillments.results.find(item=>item.department==="FOOD"),drink=fulfillments.results.find(item=>item.department==="DRINK");
- return NextResponse.json({ok:true,orderId,paymentId,orderStatus:"PAID",kitchenStatus:fulfillments.results.every(item=>item.status==="ACCEPTED")?"ACCEPTED":"PARTIAL",foodCallNumber:food?`F${String(food.callNumber).padStart(3,"0")}`:null,drinkCallNumber:drink?`D${String(drink.callNumber).padStart(3,"0")}`:null,idempotentReplay,fulfillments:fulfillments.results});
+ const schedule=await confirmOrderSchedule(orderId,idempotentReplay?"決済完了予定の再同期":"セルフレジ決済完了時の確定計算").catch(()=>null);
+ if(!schedule)return NextResponse.json({ok:false,error:"KITCHEN_SCHEDULE_PENDING",message:"決済は完了しました。提供予定の同期を再試行してください",paymentConfirmed:true,orderId,paymentId,retryable:true},{status:503});
+ return NextResponse.json({ok:true,orderId,paymentId,orderStatus:"PAID",kitchenStatus:fulfillments.results.every(item=>item.status==="ACCEPTED")?"ACCEPTED":"PARTIAL",foodCallNumber:food?`F${String(food.callNumber).padStart(3,"0")}`:null,drinkCallNumber:drink?`D${String(drink.callNumber).padStart(3,"0")}`:null,idempotentReplay,fulfillments:fulfillments.results,schedule});
 }
 
 export async function POST(request:NextRequest){
@@ -22,6 +24,5 @@ export async function POST(request:NextRequest){
  else if(order.status!=="WAITING_STORE_PAYMENT")return NextResponse.json({ok:false,error:"PAYMENT_CONFIRMATION_CONFLICT"},{status:409});
  const paidAt=typeof body?.paidAt==="number"?body.paidAt:body?.paidAt?Date.parse(body.paidAt):Date.now(),now=Date.now();if(!Number.isFinite(paidAt))return NextResponse.json({ok:false,error:"INVALID_REQUEST"},{status:400});const eventId=crypto.randomUUID();
  await env.DB.batch([env.DB.prepare(`UPDATE orders SET status='PAID',smaregi_transaction_id=?,updated_at=? WHERE id=? AND status IN ('WAITING_STORE_PAYMENT','PAYMENT_PROCESSING')`).bind(paymentId,now,orderId),env.DB.prepare(`UPDATE order_fulfillments SET status='ACCEPTED',updated_at=? WHERE order_id=? AND status='WAITING_PAYMENT'`).bind(now,orderId),env.DB.prepare(`INSERT INTO order_payment_events (id,request_id,order_id,payment_id,lock_id,device_id,paid_at,created_at) VALUES (?,?,?,?,?,?,?,?)`).bind(eventId,requestId,orderId,paymentId,lockId||null,deviceId||null,paidAt,now),env.DB.prepare(`UPDATE order_payment_locks SET status='CONSUMED',released_at=?,release_reason='PAYMENT_CONFIRMED' WHERE id=? AND order_id=? AND status='ACTIVE'`).bind(now,lockId,orderId)]);
- await confirmKitchenSchedule(orderId);
  return success(orderId,paymentId,false);
 }
