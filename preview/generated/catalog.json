@@ -284,6 +284,7 @@
       "soldOut": false,
       "cocktailBase": "",
       "cocktailMixer": "",
+      "preparationMinutes": 3,
       "displaySequence": 60,
       "showOnSelfRegister": true,
       "showOnMobileOrder": true,

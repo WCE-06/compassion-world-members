@@ -68,6 +68,7 @@ const products = body.result.products
     soldOut: Boolean(product.soldOut),
     cocktailBase: String(product.cocktailBase || inferred.base),
     cocktailMixer: String(product.cocktailMixer || inferred.mixer),
+    preparationMinutes: Number(product.preparationMinutes ?? (String(product.code) === "isobeage" ? 3 : 0)),
     displaySequence: Number(product.displaySequence ?? 999999999),
     showOnSelfRegister: true,
     showOnMobileOrder: true,

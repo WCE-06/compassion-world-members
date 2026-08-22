@@ -167,6 +167,7 @@ export const orderItems = sqliteTable("order_items", {
   taxRate: integer("tax_rate").notNull().default(10),
   taxDivision: text("tax_division").notNull().default("INCLUDED"),
   taxRounding: text("tax_rounding").notNull().default("FLOOR"),
+  preparationMinutes: integer("preparation_minutes").notNull().default(0),
   selectedOptionsJson: text("selected_options_json").notNull().default("[]"),
   lineTotalIncludingTax: integer("line_total_including_tax").notNull(),
 }, (table) => [index("order_items_order_idx").on(table.orderId)]);

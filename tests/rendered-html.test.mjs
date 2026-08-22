@@ -347,6 +347,19 @@ test("セルフレジ現地決済を未決済一覧・5分ロック・冪等通�
   assert.match(guide, /5分/);
 });
 
+test("磯辺揚げを調理目安3分として注文・キッチンへ引き継ぐ", async () => {
+  const [catalog, orders, kitchen, migration] = await Promise.all([
+    readFile(new URL("lib/order-catalog.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/kitchen/fulfillments/route.ts", root), "utf8"),
+    readFile(new URL("drizzle/0014_cute_vulture.sql", root), "utf8"),
+  ]);
+  assert.match(catalog, /product\.code==="isobeage"\?3:0/);
+  assert.match(orders, /preparation_minutes/);
+  assert.match(kitchen, /estimatedMinutes/);
+  assert.match(migration, /preparation_minutes/);
+});
+
 test("モバイル注文のカテゴリタブが商品追加ボタンと重ならない", async () => {
   const [layout, fix] = await Promise.all([
     readFile(new URL("app/layout.tsx", root), "utf8"),

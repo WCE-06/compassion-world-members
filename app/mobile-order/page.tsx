@@ -5,7 +5,7 @@ import catalogSnapshot from "../../preview/generated/catalog.json";
 
 type OptionChoice={id:string;name:string;priceDelta:number;productCode?:string};
 type OptionGroup={id:string;name:string;type:"single"|"multiple";required:boolean;choices:OptionChoice[]};
-type Product={id:string;code:string;name:string;category:"FOOD"|"DRINK";menuCategory:string;description:string;price:number;basePrice?:number;taxDivision?:string;taxRate?:number;taxRounding?:string;priceLabel?:string;imageUrl:string;soldOut:boolean;optionGroups?:OptionGroup[];cocktailBase:string;cocktailMixer:string};
+type Product={id:string;code:string;name:string;category:"FOOD"|"DRINK";menuCategory:string;description:string;price:number;basePrice?:number;taxDivision?:string;taxRate?:number;taxRounding?:string;priceLabel?:string;imageUrl:string;soldOut:boolean;optionGroups?:OptionGroup[];cocktailBase:string;cocktailMixer:string;preparationMinutes?:number};
 type PaymentMethod="STORE"|"STRIPE";
 type OrderResult={orderId:string;orderNumber:string;fulfillments:{department:"FOOD"|"DRINK";label:string;callNumber:number;status:string}[];status:string;paymentMethod:PaymentMethod;paymentLabel:string;pointEligible:boolean;pointStatus:string;totalIncludingTax:number;expiresAt:number};
 const tabs=[['food-tsukemen','つけ麺'],['food-udon','うどん・ほうとう'],['food-pasta','パスタ'],['food-don','ご飯もの'],['food-side','サイド'],['drink','ドリンク'],['dessert','デザート']] as const;
