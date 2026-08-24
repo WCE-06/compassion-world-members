@@ -16,21 +16,37 @@ async function authorized(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   if (!await authorized(request)) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-  const memberCode = request.nextUrl.searchParams.get("memberCode")?.trim() ?? "";
-  if (!/^[A-Za-z0-9_-]{4,64}$/.test(memberCode)) {
+  const memberCode = request.nextUrl.searchParams.get("memberCode")?.trim().toUpperCase() ?? "";
+  if (!/^[A-Z0-9]{10}$/.test(memberCode)) {
     return NextResponse.json({ error: "INVALID_MEMBER_CODE" }, { status: 400 });
   }
   const member = await env.DB.prepare(
-    "SELECT id, display_name, member_rank FROM members WHERE member_code=? AND status='ACTIVE' LIMIT 1",
-  ).bind(memberCode).first<{ id: string; display_name: string; member_rank: "STANDARD" | "RESIDENT" | null }>();
+    `SELECT m.id,m.member_code,m.display_name,m.member_rank,m.resident_status,m.status,
+      r.membership_type,r.resident_plan_active
+      FROM members m LEFT JOIN member_rank_states r ON r.member_id=m.id
+      WHERE m.member_code=? LIMIT 1`,
+  ).bind(memberCode).first<{
+    id: string;
+    member_code: string;
+    display_name: string;
+    member_rank: string | null;
+    resident_status: "UNKNOWN" | "ACTIVE" | "INACTIVE";
+    status: "ACTIVE" | "INACTIVE";
+    membership_type: "GENERAL" | "RESIDENT" | null;
+    resident_plan_active: number | null;
+  }>();
   if (!member) return NextResponse.json({ error: "MEMBER_NOT_FOUND" }, { status: 404 });
-  if (!member.member_rank) return NextResponse.json({ error: "MEMBER_RANK_NOT_SYNCED" }, { status: 409 });
+  if (member.status !== "ACTIVE") return NextResponse.json({ error: "MEMBER_INACTIVE" }, { status: 403 });
+  const resident = member.resident_status === "ACTIVE" || member.membership_type === "RESIDENT" || Boolean(member.resident_plan_active) || member.member_rank === "RESIDENT";
+  const memberRank = resident ? "RESIDENT" : "STANDARD";
   return NextResponse.json({
     memberId: member.id,
+    memberCode: member.member_code,
     name: member.display_name || "会員",
-    memberRank: member.member_rank,
-    planCode: member.member_rank,
-    planName: member.member_rank === "RESIDENT" ? "住民限定プラン" : "通常プラン",
+    status: member.status,
+    memberRank,
+    planCode: memberRank,
+    planName: resident ? "住民限定プラン" : "通常プラン",
   }, { headers: { "Cache-Control": "no-store" } });
 }
 
