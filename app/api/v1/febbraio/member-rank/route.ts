@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   }
   const member = await env.DB.prepare(
     `SELECT m.id,m.member_code,m.display_name,m.member_rank,m.resident_status,m.status,
-      r.membership_type,r.resident_plan_active
+      r.current_rank,r.current_rate_percent,r.membership_type,r.resident_plan_active
       FROM members m LEFT JOIN member_rank_states r ON r.member_id=m.id
       WHERE m.member_code=? LIMIT 1`,
   ).bind(memberCode).first<{
@@ -34,17 +34,25 @@ export async function GET(request: NextRequest) {
     status: "ACTIVE" | "INACTIVE";
     membership_type: "GENERAL" | "RESIDENT" | null;
     resident_plan_active: number | null;
+    current_rank: string | null;
+    current_rate_percent: number | null;
   }>();
   if (!member) return NextResponse.json({ error: "MEMBER_NOT_FOUND" }, { status: 404 });
   if (member.status !== "ACTIVE") return NextResponse.json({ error: "MEMBER_INACTIVE" }, { status: 403 });
   const resident = member.resident_status === "ACTIVE" || member.membership_type === "RESIDENT" || Boolean(member.resident_plan_active) || member.member_rank === "RESIDENT";
   const memberRank = resident ? "RESIDENT" : "STANDARD";
+  const rank = member.current_rank ?? (resident ? "GOLD" : "STANDARD");
+  const pointRatePercent = Number.isInteger(member.current_rate_percent)
+    ? Math.max(1, Math.min(10, Number(member.current_rate_percent)))
+    : resident ? 5 : 1;
   return NextResponse.json({
     memberId: member.id,
     memberCode: member.member_code,
     name: member.display_name || "会員",
     status: member.status,
     memberRank,
+    rank,
+    pointRatePercent,
     planCode: memberRank,
     planName: resident ? "住民限定プラン" : "通常プラン",
   }, { headers: { "Cache-Control": "no-store" } });
