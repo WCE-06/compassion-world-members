@@ -11,6 +11,28 @@ export const RANK_RULES=[
 ] as const satisfies readonly {rank:MemberRank;label:string;minimumSpend:number;pointRatePercent:number}[];
 
 export const rankLabels=Object.fromEntries(RANK_RULES.map(rule=>[rule.rank,rule.label])) as Record<MemberRank,string>;
+export const MEMBER_RANK_TERMS_VERSION="2026-08-24-membership-points-v1";
+
+export function rankIndex(rank:string|null|undefined){const index=MEMBER_RANKS.indexOf(rank as MemberRank);return index<0?0:index}
+export function rankRule(rank:string|null|undefined){return RANK_RULES[rankIndex(rank)]??RANK_RULES[0]}
+
+export function addRankYear(start:number){const date=new Date(start);date.setUTCFullYear(date.getUTCFullYear()+1);return date.getTime()}
+
+export function rankPeriodFor(startedAt:number,now=Date.now()){
+ let start=startedAt,end=addRankYear(startedAt)-1;
+ while(now>end){start=end+1;end=addRankYear(start)-1}
+ return{rankPeriodStartedAt:start,rankPeriodEndsAt:end,nextReviewAt:end+1};
+}
+
+export function effectiveRank(qualifyingSpend:number,residentPlanActive:boolean){
+ const earned=earnedRankForSpend(qualifyingSpend),residentFloor=MEMBER_RANKS.indexOf("GOLD"),floorIndex=residentPlanActive?residentFloor:0;
+ return MEMBER_RANKS[Math.max(rankIndex(earned),floorIndex)];
+}
+
+export function retainedRank(previousRank:string|null|undefined,qualifyingSpend:number,residentPlanActive:boolean,annualReview=false){
+ const calculated=effectiveRank(qualifyingSpend,residentPlanActive);
+ return annualReview?calculated:MEMBER_RANKS[Math.max(rankIndex(previousRank),rankIndex(calculated))];
+}
 
 export function earnedRankForSpend(qualifyingSpend:number):MemberRank{
  const spend=Math.max(0,Math.floor(qualifyingSpend));
@@ -27,10 +49,7 @@ export function importedResidentStatus(value:string|null|undefined){
 
 export function memberPresentation(storedRank:string|null,qualifyingSpend=0,residentStatus:"UNKNOWN"|"ACTIVE"|"INACTIVE"="UNKNOWN",legacyResident=false){
  const resident=residentStatus==="ACTIVE"||storedRank==="RESIDENT"||legacyResident;
- const earnedRank=earnedRankForSpend(qualifyingSpend);
- const earnedIndex=MEMBER_RANKS.indexOf(earnedRank);
- const residentFloor=MEMBER_RANKS.indexOf("GOLD");
- const rank=MEMBER_RANKS[resident?Math.max(earnedIndex,residentFloor):earnedIndex];
+ const rank=retainedRank(storedRank,qualifyingSpend,resident,false);
  const rule=RANK_RULES.find(item=>item.rank===rank)??RANK_RULES[0];
  const nextRule=RANK_RULES[RANK_RULES.findIndex(item=>item.rank===rank)+1]??null;
  return{

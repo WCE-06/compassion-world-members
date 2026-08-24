@@ -33,6 +33,48 @@ export const memberSpendSnapshots = sqliteTable("member_spend_snapshots", {
   syncedAt: integer("synced_at", { mode: "timestamp_ms" }).notNull(),
 }, (table) => [index("member_spend_snapshots_synced_idx").on(table.syncedAt)]);
 
+export const memberRankStates = sqliteTable("member_rank_states", {
+  memberId: text("member_id").primaryKey().references(() => members.id),
+  currentRank: text("current_rank", { enum: ["STANDARD", "BRONZE", "SILVER", "GOLD", "PLATINUM", "DIAMOND"] }).notNull(),
+  currentRatePercent: integer("current_rate_percent").notNull(),
+  rankPeriodStartedAt: integer("rank_period_started_at", { mode: "timestamp_ms" }).notNull(),
+  rankPeriodEndsAt: integer("rank_period_ends_at", { mode: "timestamp_ms" }).notNull(),
+  qualifyingSpendExcludingTax: integer("qualifying_spend_excluding_tax").notNull().default(0),
+  rankUpdatedAt: integer("rank_updated_at", { mode: "timestamp_ms" }).notNull(),
+  nextReviewAt: integer("next_review_at", { mode: "timestamp_ms" }).notNull(),
+  membershipType: text("membership_type", { enum: ["GENERAL", "RESIDENT"] }).notNull().default("GENERAL"),
+  residentPlanActive: integer("resident_plan_active", { mode: "boolean" }).notNull().default(false),
+  spendSource: text("spend_source", { enum: ["SMAREGI", "NOT_SYNCED"] }).notNull().default("NOT_SYNCED"),
+  spendSourceRevision: text("spend_source_revision"),
+  spendSyncedAt: integer("spend_synced_at", { mode: "timestamp_ms" }),
+}, (table) => [index("member_rank_states_review_idx").on(table.nextReviewAt)]);
+
+export const memberRankEvents = sqliteTable("member_rank_events", {
+  id: text("id").primaryKey(),
+  memberId: text("member_id").notNull().references(() => members.id),
+  eventType: text("event_type", { enum: ["INITIALIZED", "PROMOTED", "ANNUAL_REVIEW", "SYNCED", "FORCED"] }).notNull(),
+  previousRank: text("previous_rank"),
+  nextRank: text("next_rank").notNull(),
+  qualifyingSpendExcludingTax: integer("qualifying_spend_excluding_tax").notNull(),
+  source: text("source").notNull(),
+  sourceRevision: text("source_revision"),
+  detailsJson: text("details_json").notNull().default("{}"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("member_rank_events_member_idx").on(table.memberId, table.createdAt)]);
+
+export const memberPolicyConsents = sqliteTable("member_policy_consents", {
+  id: text("id").primaryKey(),
+  memberId: text("member_id").notNull().references(() => members.id),
+  termsVersion: text("terms_version").notNull(),
+  consentType: text("consent_type", { enum: ["MEMBERSHIP_AND_POINTS"] }).notNull(),
+  source: text("source", { enum: ["MEMBER_CARD"] }).notNull().default("MEMBER_CARD"),
+  agreedAt: integer("agreed_at", { mode: "timestamp_ms" }).notNull(),
+  userAgent: text("user_agent"),
+}, (table) => [
+  uniqueIndex("member_policy_consents_member_version_unique").on(table.memberId, table.termsVersion, table.consentType),
+  index("member_policy_consents_member_idx").on(table.memberId, table.agreedAt),
+]);
+
 export const legacyMemberImports = sqliteTable("legacy_member_imports", {
   id: text("id").primaryKey(),
   lineUserId: text("line_user_id"),
