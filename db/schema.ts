@@ -535,7 +535,6 @@ export const memberNotifications = sqliteTable("member_notifications", {
   uniqueIndex("member_notifications_event_unique").on(table.eventId),
   index("member_notifications_member_created_idx").on(table.memberId, table.createdAt),
 ]);
-
 export const automationRules = sqliteTable("automation_rules", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
