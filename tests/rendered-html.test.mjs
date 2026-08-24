@@ -720,6 +720,8 @@ test("スタッフ管理をLメンバーズ型の検索と個人履歴タブへ�
   assert.match(listApi,/line_display_name/);assert.match(listApi,/legacy_tags/);assert.match(listApi,/acquisition_source/);
   assert.match(detail,/予約・受付/);assert.match(detail,/ポイント・特典/);assert.match(detail,/サブスク・決済/);assert.match(detail,/操作履歴/);
   assert.match(detailApi,/FROM orders WHERE member_id/);assert.match(detailApi,/FROM payment_point_events WHERE member_id/);assert.match(detailApi,/FROM stripe_customers WHERE member_id/);
+  assert.match(list,/登録日が新しい順/);assert.match(list,/利用金額が多い順/);assert.match(list,/保有ポイントが多い順/);
+  assert.match(listApi,/POINTS_DESC/);assert.match(listApi,/SPEND_DESC/);assert.match(listApi,/m\.points_balance/);
 });
 
 test("スタッフ手動予約は内容確認後に確定し処理中を明示する", async () => {
