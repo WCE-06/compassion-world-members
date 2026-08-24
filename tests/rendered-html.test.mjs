@@ -70,8 +70,9 @@ test("予約ページは代表会員へフォールバックせずLINE本人の�
     readFile(new URL("app/api/v1/reservations/[id]/route.ts", root), "utf8"),
   ]);
   assert.doesNotMatch(page, /X-Compass-Preview/);
-  assert.match(page, /本人の予約を確認しています/);
-  assert.match(page, /if\(!accessToken\)\{setReservations\(\[\]\);return\}/);
+  assert.match(page, /FEBBRAIO予約画面を開いています/);
+  assert.match(page, /開始時刻は15分単位で選択できます/);
+  assert.match(page, /fetch\("\/api\/v1\/febbraio\/launch"/);
   assert.match(reservationsApi, /LINE_AUTH_REQUIRED/);
   assert.match(cancellationApi, /LINE_AUTH_REQUIRED/);
 });
