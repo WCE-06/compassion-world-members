@@ -743,7 +743,8 @@ test("管理者パスワード変更と会員データ同期を安全に提供�
   assert.match(page,/管理者パスワード変更/);assert.match(page,/全員の対象額を一回だけ再計算/);
   assert.match(session,/PBKDF2/);assert.match(session,/admin_accounts/);
   assert.match(passwordApi,/PASSWORD_POLICY/);assert.match(passwordApi,/verifyAdminPassword/);
-  assert.match(passwordApi,/\[A-Za-z0-9\]\{10\}/);assert.match(page,/半角英字と数字を両方含む10文字/);
+  assert.match(passwordApi,/\\x21-\\x7E/);assert.match(page,/10文字以上で英字と数字を両方含めてください。記号も使用できます/);
+  assert.match(session,/pbkdf2_sha256_120000/);assert.match(session,/pbkdf2_sha256_210000/);
   assert.match(syncApi,/LINE_NAMES/);assert.match(syncApi,/SPEND_RECALC/);assert.match(syncApi,/LINE_CHANNEL_ACCESS_TOKEN/);assert.match(syncApi,/SMAREGI_SPEND_RECALC_URL/);
   assert.match(memberAuth,/line_display_name/);assert.match(memberAuth,/profile\.displayName/);
   assert.match(migration,/CREATE TABLE IF NOT EXISTS `?admin_accounts`?/);
