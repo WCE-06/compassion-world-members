@@ -679,3 +679,19 @@ test("スタッフ統合管理からスタジオ予約と手動受付を共通�
   assert.match(api,/ADMIN_EMAILS/);
   assert.match(api,/STAFF_STUDIO_/);
 });
+
+test("スタッフが会員詳細を安全に編集し操作履歴を確認できる", async () => {
+  const [list,detail,api]=await Promise.all([
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/members/[memberCode]/page.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/members/[memberCode]/route.ts",root),"utf8"),
+  ]);
+  assert.match(list,/詳細・編集/);
+  assert.match(detail,/基本情報/);
+  assert.match(detail,/操作履歴/);
+  assert.match(detail,/外部連携/);
+  assert.match(api,/REVISION_CONFLICT/);
+  assert.match(api,/MEMBER_PROFILE_UPDATED/);
+  assert.match(api,/changedFields/);
+  assert.doesNotMatch(api,/provider_user_id AS/);
+});

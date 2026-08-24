@@ -1,0 +1,27 @@
+import { env } from "cloudflare:workers";
+import { NextRequest,NextResponse } from "next/server";
+
+type Editable={displayName:string;displayNameKana:string;phone:string;email:string;birthDate:string;gender:string;postalCode:string;prefecture:string;address:string};
+const text=(value:unknown,max:number)=>typeof value==="string"?value.trim().replace(/\s+/g," ").slice(0,max):"";
+const code=(value:string)=>value.trim().toUpperCase();
+const editable=(body:Record<string,unknown>):Editable=>({displayName:text(body.displayName,120),displayNameKana:text(body.displayNameKana,120),phone:text(body.phone,40).replace(/[^0-9+()-]/g,""),email:text(body.email,160).toLowerCase(),birthDate:text(body.birthDate,20),gender:text(body.gender,20),postalCode:text(body.postalCode,16).replace(/[^0-9-]/g,""),prefecture:text(body.prefecture,40),address:text(body.address,240)});
+const valid=(value:Editable)=>Boolean(value.displayName&&(!value.email||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email))&&(!value.birthDate||/^\d{4}-\d{2}-\d{2}$/.test(value.birthDate))&&(!value.phone||value.phone.replace(/\D/g,"").length>=10)&&(!value.postalCode||value.postalCode.replace(/\D/g,"").length===7));
+
+export async function GET(_:NextRequest,{params}:{params:Promise<{memberCode:string}>}){
+ const memberCode=code((await params).memberCode);if(!/^[A-Z0-9]{10}$/.test(memberCode))return NextResponse.json({error:"INVALID_MEMBER_CODE"},{status:400});
+ const member=await env.DB.prepare(`SELECT m.id,m.member_code AS memberCode,m.display_name AS displayName,m.display_name_kana AS displayNameKana,m.phone,m.email,m.birth_date AS birthDate,m.gender,m.postal_code AS postalCode,m.prefecture,m.address,m.points_balance AS pointsBalance,m.status,m.source_system AS sourceSystem,m.created_at AS createdAt,m.updated_at AS updatedAt,m.resident_status AS residentStatus,m.resident_checked_at AS residentCheckedAt,r.current_rank AS currentRank,r.current_rate_percent AS pointRatePercent,r.qualifying_spend_excluding_tax AS qualifyingSpend,r.membership_type AS membershipType,r.resident_plan_active AS residentPlanActive,r.next_review_at AS nextReviewAt,r.spend_synced_at AS spendSyncedAt,s.status AS syncStatus,s.attempts AS syncAttempts,s.last_error AS syncError,s.synced_at AS syncedAt FROM members m LEFT JOIN member_rank_states r ON r.member_id=m.id LEFT JOIN member_registration_syncs s ON s.member_id=m.id WHERE m.member_code=? LIMIT 1`).bind(memberCode).first<Record<string,unknown>>();
+ if(!member)return NextResponse.json({error:"MEMBER_NOT_FOUND"},{status:404});
+ const [identities,events]=await Promise.all([env.DB.prepare("SELECT provider,linked_at AS linkedAt,revoked_at AS revokedAt FROM identity_links WHERE member_id=? ORDER BY linked_at DESC").bind(member.id).all(),env.DB.prepare("SELECT event_type AS eventType,actor,details_json AS detailsJson,created_at AS createdAt FROM member_registration_events WHERE member_id=? ORDER BY created_at DESC LIMIT 50").bind(member.id).all()]);
+ return NextResponse.json({member,identities:identities.results,events:events.results.map(row=>({...row,details:JSON.parse(String(row.detailsJson??"{}")),detailsJson:undefined}))},{headers:{"Cache-Control":"no-store"}});
+}
+
+export async function PATCH(request:NextRequest,{params}:{params:Promise<{memberCode:string}>}){
+ const actor=request.headers.get("oai-authenticated-user-email")?.trim().toLowerCase(),memberCode=code((await params).memberCode),body=await request.json().catch(()=>null) as (Record<string,unknown>&{updatedAt?:number;requestId?:string})|null;
+ if(!actor||!/^[A-Z0-9]{10}$/.test(memberCode)||!body?.requestId||!Number.isFinite(body.updatedAt))return NextResponse.json({error:"INVALID_REQUEST"},{status:400});
+ const values=editable(body);if(!valid(values))return NextResponse.json({error:"INVALID_MEMBER_DATA"},{status:400});
+ const current=await env.DB.prepare("SELECT id,display_name AS displayName,display_name_kana AS displayNameKana,phone,email,birth_date AS birthDate,gender,postal_code AS postalCode,prefecture,address,updated_at AS updatedAt FROM members WHERE member_code=? LIMIT 1").bind(memberCode).first<Record<string,unknown>>();if(!current)return NextResponse.json({error:"MEMBER_NOT_FOUND"},{status:404});if(Number(current.updatedAt)!==Number(body.updatedAt))return NextResponse.json({error:"REVISION_CONFLICT"},{status:409});
+ const changed=(Object.keys(values) as (keyof Editable)[]).filter(key=>String(current[key]??"")!==values[key]);if(!changed.length)return NextResponse.json({ok:true,memberCode,updatedAt:current.updatedAt,changed:[]});const now=Date.now();
+ const result=await env.DB.prepare("UPDATE members SET display_name=?,display_name_kana=?,phone=?,email=?,birth_date=?,gender=?,postal_code=?,prefecture=?,address=?,updated_at=? WHERE id=? AND updated_at=?").bind(values.displayName,values.displayNameKana||null,values.phone||null,values.email||null,values.birthDate||null,values.gender||null,values.postalCode||null,values.prefecture||null,values.address||null,now,current.id,current.updatedAt).run();if(!result.meta.changes)return NextResponse.json({error:"REVISION_CONFLICT"},{status:409});
+ await env.DB.prepare("INSERT INTO member_registration_events (id,member_id,event_type,actor,details_json,created_at) VALUES (?,?,?,?,?,?)").bind(crypto.randomUUID(),current.id,"MEMBER_PROFILE_UPDATED",actor,JSON.stringify({requestId:body.requestId,changedFields:changed}),now).run();
+ return NextResponse.json({ok:true,memberCode,updatedAt:now,changed});
+}
