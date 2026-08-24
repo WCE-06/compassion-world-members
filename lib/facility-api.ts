@@ -37,7 +37,9 @@ export async function facilityPublicGet<T>(action: string, data: Record<string, 
 
 export async function facilityPost<T>(action: string, data: Record<string, unknown>, requestId = crypto.randomUUID(), timeoutMs = 15_000) {
   const url = runtimeValue("COMMON_FACILITY_GAS_URL");
-  const apiToken = runtimeValue("FACILITY_API_TOKEN") || runtimeValue("RECEPTION_API_TOKEN");
+  const apiToken = action.startsWith("staff.")
+    ? runtimeValue("FACILITY_STAFF_API_TOKEN") || runtimeValue("FACILITY_API_TOKEN")
+    : runtimeValue("FACILITY_API_TOKEN") || runtimeValue("RECEPTION_API_TOKEN");
   if (!url || !apiToken) throw new Error("FACILITY_API_NOT_CONFIGURED");
   const response = await fetch(url, {
     method: "POST",

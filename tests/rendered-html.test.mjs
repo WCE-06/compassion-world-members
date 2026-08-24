@@ -798,3 +798,13 @@ test("商品マスタ登録と販売期間を共通商品管理へ追加する",
   assert.match(menu,/ProductMasterRegistration/);
   assert.match(guide,/予約/);assert.match(guide,/確定/);assert.match(guide,/値引き用JAN/);
 });
+
+test("スタッフ予約一覧は共通施設APIの専用認証を使用する",async()=>{
+  const [facility,operations]=await Promise.all([
+    readFile(new URL("lib/facility-api.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/operations/route.ts",root),"utf8"),
+  ]);
+  assert.match(facility,/action\.startsWith\(\"staff\.\"\)/);
+  assert.match(facility,/FACILITY_STAFF_API_TOKEN/);
+  assert.match(operations,/COMMON_FACILITY_GAS_URL&&\(runtime\.FACILITY_STAFF_API_TOKEN\|\|runtime\.FACILITY_API_TOKEN\)/);
+});
