@@ -1,7 +1,7 @@
 import { NextRequest,NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/admin-session";
 
-const browserAdminApis=["/api/v1/admin/members","/api/v1/admin/studio","/api/v1/admin/catalog","/api/v1/admin/category-schedules","/api/v1/admin/store-hours"];
+const browserAdminApis=["/api/v1/admin/members","/api/v1/admin/member-csv-import","/api/v1/admin/studio","/api/v1/admin/catalog","/api/v1/admin/category-schedules","/api/v1/admin/store-hours"];
 export async function proxy(request:NextRequest){
  const path=request.nextUrl.pathname;
  if(path.startsWith("/api/v1/admin/auth/")||path==="/member-admin/login")return NextResponse.next();
