@@ -26,7 +26,7 @@ test("LIFF・移行・共通セッションの接続点を保持する", async (
   ]);
   assert.match(page, /api\/v1\/client-config/);
   assert.match(page, /api\/v1\/me\/membership/);
-  assert.match(page, /window\.location\.href = "\/availability"/);
+  assert.match(page, /fetch\("\/api\/v1\/febbraio\/launch"/);
   assert.match(page, /モバイルオーダー/);
   assert.match(page, /A7K4P9X2M6/);
   assert.match(page, /ポイント履歴/);
@@ -88,6 +88,21 @@ test("読み込み中の仮通知を表示せず無料会員を住民登録へ�
   assert.match(residentPage, /ゴールドランク以上を保証/);
   assert.match(upgradeApi, /RESIDENT_SUBSCRIPTION_CHECKOUT_URL/);
   assert.match(upgradeApi, /client_reference_id/);
+});
+
+test("LINE本人を5分有効の署名トークンでFEBBRAIO予約サイトへ引き継ぐ", async () => {
+  const [page, launchApi] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/v1/febbraio/launch/route.ts", root), "utf8"),
+  ]);
+  assert.match(launchApi, /FEBBRAIO_RESERVATION_SIGNING_SECRET/);
+  assert.match(launchApi, /FEBBRAIO_RESERVATION_EXCHANGE_URL/);
+  assert.match(launchApi, /HMAC/);
+  assert.match(launchApi, /TOKEN_LIFETIME_MS=5\*60\*1000/);
+  assert.match(launchApi, /purpose:PURPOSE,memberId:member\.id,memberCode/);
+  assert.match(page, /form\.method="POST"/);
+  assert.match(page, /input\.name="token"/);
+  assert.doesNotMatch(page, /memberCode=/);
 });
 
 test("モバイル注文の商品画像を切り抜かず、飲料を段階選択する", async () => {
