@@ -49,6 +49,8 @@ export async function PUT(request: NextRequest) {
     scheduleStart: typeof body?.scheduleStart === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(body.scheduleStart) ? body.scheduleStart : "11:00",
     scheduleEnd: typeof body?.scheduleEnd === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(body.scheduleEnd) ? body.scheduleEnd : "20:00",
     scheduleDays: Array.isArray(body?.scheduleDays) ? [...new Set(body.scheduleDays.map(Number).filter(day => day >= 1 && day <= 7))].sort().join(",") || "1,2,3,4,5,6,7" : "1,2,3,4,5,6,7",
+    saleStartsAt: typeof body?.saleStartsAt === "number" && Number.isFinite(body.saleStartsAt) ? new Date(body.saleStartsAt) : null,
+    saleEndsAt: typeof body?.saleEndsAt === "number" && Number.isFinite(body.saleEndsAt) ? new Date(body.saleEndsAt) : null,
     updatedBy: email,
     updatedAt: new Date(),
   };

@@ -771,3 +771,30 @@ test("統合管理でタスク・予約一覧・クーポン・配信・会員�
   assert.match(page,/BulkMemberActions/);assert.match(bulk,/MEMBER_TAG_ADDED/);assert.match(bulk,/MEMBER_STATUS_CHANGED/);
   assert.match(migration,/CREATE TABLE `coupons`/);assert.match(migration,/CREATE TABLE `surveys`/);assert.match(migration,/CREATE TABLE `operations_tasks`/);
 });
+
+test("管理画面は概要と詳細を分離し検索入力を待ってから取得する",async()=>{
+  const [page,api]=await Promise.all([
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/members/route.ts",root),"utf8"),
+  ]);
+  assert.match(page,/mode:\"SUMMARY\"/);
+  assert.match(page,/setTimeout/);
+  assert.match(page,/250/);
+  assert.match(api,/p\.get\(\"mode\"\)===\"SUMMARY\"/);
+});
+
+test("商品マスタ登録と販売期間を共通商品管理へ追加する",async()=>{
+  const [route,component,catalog,migration,menu,guide]=await Promise.all([
+    readFile(new URL("app/api/v1/admin/product-master/route.ts",root),"utf8"),
+    readFile(new URL("app/menu-admin/ProductMasterRegistration.tsx",root),"utf8"),
+    readFile(new URL("lib/order-catalog.ts",root),"utf8"),
+    readFile(new URL("drizzle/0022_catalog_sale_period.sql",root),"utf8"),
+    readFile(new URL("app/menu-admin/page.tsx",root),"utf8"),
+    readFile(new URL("docs/COUPON_AND_PRODUCT_MASTER_OPERATIONS.md",root),"utf8"),
+  ]);
+  assert.match(route,/SMAREGI_PRODUCT_CREATE_URL/);assert.match(route,/product\.create/);assert.match(route,/Idempotency-Key/);
+  assert.match(component,/5分ごとに自動更新/);assert.match(component,/販売開始/);assert.match(component,/販売終了/);
+  assert.match(catalog,/saleWindowOpen/);assert.match(migration,/sale_starts_at/);assert.match(migration,/sale_ends_at/);
+  assert.match(menu,/ProductMasterRegistration/);
+  assert.match(guide,/予約/);assert.match(guide,/確定/);assert.match(guide,/値引き用JAN/);
+});
