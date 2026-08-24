@@ -2,16 +2,26 @@ import { env } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
 
 async function authorized(request: NextRequest) {
-  const configured = (env as unknown as { RECEPTION_API_TOKEN?: string }).RECEPTION_API_TOKEN ?? "";
+  const runtime = env as unknown as {
+    RECEPTION_API_TOKEN?: string;
+    CHECKIN_POINT_API_TOKEN?: string;
+  };
+  const configuredTokens = [runtime.RECEPTION_API_TOKEN, runtime.CHECKIN_POINT_API_TOKEN].filter(
+    (value): value is string => Boolean(value),
+  );
   const authorization = request.headers.get("authorization") ?? "";
   const supplied = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-  if (!configured || !supplied) return false;
+  if (!configuredTokens.length || !supplied) return false;
   const encode = (value: string) => crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  const [expected, actual] = await Promise.all([encode(configured), encode(supplied)]);
-  const left = new Uint8Array(expected), right = new Uint8Array(actual);
-  let difference = left.length ^ right.length;
-  for (let index = 0; index < Math.min(left.length, right.length); index += 1) difference |= left[index] ^ right[index];
-  return difference === 0;
+  const actual = new Uint8Array(await encode(supplied));
+  const expectedTokens = await Promise.all(configuredTokens.map(async (token) => new Uint8Array(await encode(token))));
+  return expectedTokens.some((expected) => {
+    let difference = expected.length ^ actual.length;
+    for (let index = 0; index < Math.min(expected.length, actual.length); index += 1) {
+      difference |= expected[index] ^ actual[index];
+    }
+    return difference === 0;
+  });
 }
 
 export async function GET(request: NextRequest) {
