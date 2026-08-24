@@ -697,13 +697,13 @@ test("スタッフが会員詳細を安全に編集し操作履歴を確認で�
 });
 
 test("LメンバーズのLINE名・追加経路・タグを移行後も保持する", async () => {
-  const [migration,importer,api,detail]=await Promise.all([
-    readFile(new URL("drizzle/0019_slimy_imperial_guard.sql",root),"utf8"),
+  const [schema,importer,api,detail]=await Promise.all([
+    readFile(new URL("db/schema.ts",root),"utf8"),
     readFile(new URL("scripts/import-member-completion.mjs",root),"utf8"),
     readFile(new URL("app/api/v1/admin/member-csv-import/route.ts",root),"utf8"),
     readFile(new URL("app/member-admin/members/[memberCode]/page.tsx",root),"utf8"),
   ]);
-  assert.match(migration,/line_display_name/);assert.match(migration,/acquisition_source/);assert.match(migration,/legacy_tags/);
+  assert.match(schema,/line_display_name/);assert.match(schema,/acquisition_source/);assert.match(schema,/legacy_tags/);
   assert.match(importer,/value\(row,"LINE名"\)/);assert.match(importer,/value\(row,"追加経路"\)/);assert.match(importer,/value\(row,"タグ"\)/);
   assert.match(api,/line_display_name/);assert.match(api,/acquisition_source/);assert.match(api,/legacy_tags/);
   assert.match(detail,/LINE名/);assert.match(detail,/追加経路/);assert.match(detail,/タグ/);
