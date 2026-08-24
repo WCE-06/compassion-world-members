@@ -13,6 +13,9 @@ type EntryThankYou = {
   pointGranted?: boolean;
   alreadyGranted?: boolean;
   grantedPoint?: number;
+  pointsGranted?: number;
+  visitPoints?: number;
+  visitPointGranted?: boolean;
   pointReason?: string;
   pointError?: string;
   storeCode?: string;
@@ -33,6 +36,11 @@ function messageFor(body: EntryThankYou, memberName: string) {
   return `${greeting}\n\n来店ポイントは現在確認中です。ポイント履歴への反映まで少しお待ちください。\n\nどうぞごゆっくりお過ごしください。\nまたのご来店を心よりお待ちしております。`;
 }
 
+function normalizedPointResult(body: EntryThankYou): EntryThankYou {
+  const grantedPoint = Math.max(0, Math.floor(Number(body.grantedPoint ?? body.pointsGranted ?? body.visitPoints) || 0));
+  return { ...body, grantedPoint, pointGranted: body.pointGranted ?? body.visitPointGranted ?? grantedPoint > 0 };
+}
+
 export async function POST(request: NextRequest) {
   if (!await requireCheckinNotificationToken(request)) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   const body = await request.json().catch(() => null) as EntryThankYou | null;
@@ -42,6 +50,7 @@ export async function POST(request: NextRequest) {
   if (body?.eventType !== "ENTRY_THANK_YOU" || !/^[A-Za-z0-9:_-]{8,160}$/.test(eventId) || !/^[A-Z0-9]{10}$/.test(memberCode) || !Number.isFinite(occurredAt)) {
     return NextResponse.json({ ok: false, error: "INVALID_REQUEST" }, { status: 400 });
   }
+  const result = normalizedPointResult(body);
   const member = await env.DB.prepare("SELECT id,display_name AS displayName,status FROM members WHERE member_code=? LIMIT 1")
     .bind(memberCode).first<{ id: string; displayName: string; status: string }>();
   if (!member) return NextResponse.json({ ok: false, error: "MEMBER_NOT_FOUND" }, { status: 404 });
@@ -51,9 +60,9 @@ export async function POST(request: NextRequest) {
   const id = crypto.randomUUID();
   const metadata = {
     rank: String(body.rank ?? "STANDARD").toUpperCase(),
-    pointGranted: Boolean(body.pointGranted),
-    alreadyGranted: Boolean(body.alreadyGranted),
-    grantedPoint: Math.max(0, Math.floor(Number(body.grantedPoint) || 0)),
+    pointGranted: Boolean(result.pointGranted),
+    alreadyGranted: Boolean(result.alreadyGranted),
+    grantedPoint: result.grantedPoint,
     pointReason: body.pointReason ?? "DAILY_CHECKIN",
     pointError: body.pointError ?? null,
     storeCode: body.storeCode ?? "MAIN_BUILDING",
@@ -62,10 +71,13 @@ export async function POST(request: NextRequest) {
   const inserted = await env.DB.prepare(`INSERT OR IGNORE INTO member_notifications
     (id,event_id,member_id,event_type,category,title,body,sender,channel,delivery_status,metadata_json,occurred_at,created_at,updated_at)
     VALUES (?,?,?,'ENTRY_THANK_YOU','POINT',?,?,'COMPASSION WORLD','CARD','SAVED',?,?,?,?)`)
-    .bind(id, eventId, member.id, "COMPASSION WORLDへご来店ありがとうございます", messageFor(body, member.displayName), JSON.stringify(metadata), occurredAt, now, now).run();
+    .bind(id, eventId, member.id, "COMPASSION WORLDへご来店ありがとうございます", messageFor(result, member.displayName), JSON.stringify(metadata), occurredAt, now, now).run();
   if (!inserted.meta.changes) {
     const existing = await env.DB.prepare("SELECT id FROM member_notifications WHERE event_id=? LIMIT 1").bind(eventId).first<{ id: string }>();
-    return NextResponse.json({ ok: true, duplicate: true, notificationId: existing?.id ?? null });
+    const confirmed = (result.pointGranted && Number(result.grantedPoint)>0) || result.alreadyGranted;
+    if (existing && confirmed) await env.DB.prepare("UPDATE member_notifications SET body=?,metadata_json=?,read_at=NULL,updated_at=? WHERE id=?")
+      .bind(messageFor(result, member.displayName), JSON.stringify(metadata), now, existing.id).run();
+    return NextResponse.json({ ok: true, duplicate: true, updated: Boolean(existing&&confirmed), notificationId: existing?.id ?? null });
   }
   return NextResponse.json({ ok: true, duplicate: false, notificationId: id }, { status: 201 });
 }

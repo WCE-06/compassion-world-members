@@ -174,7 +174,6 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [demo, setDemo] = useState(false);
   const [memberCode, setMemberCode] = useState("");
-  const [showAllNotices, setShowAllNotices] = useState(false);
   const [selectedNotice,setSelectedNotice]=useState<MemberNotice|null>(null);
   const [pushNotice,setPushNotice]=useState<MemberNotice|null>(null);
   const seenNoticeIds=useRef(new Set<string>());
@@ -233,7 +232,7 @@ export default function Home() {
   useEffect(()=>{if(view!=="member"||demo||!lineToken)return;let active=true;const refresh=async()=>{try{const response=await fetch("/api/v1/me/notifications",{headers:{Authorization:`Bearer ${lineToken}`},cache:"no-store"});if(!response.ok)return;const result=await response.json() as {notices:MemberNotice[]};if(!active)return;const newUnread=result.notices.filter(item=>item.unread&&!seenNoticeIds.current.has(item.id));result.notices.forEach(item=>seenNoticeIds.current.add(item.id));setMember(current=>({...current,notices:[...result.notices,...current.notices.filter(item=>item.id.startsWith("welcome:"))]}));if(newUnread[0])setPushNotice(newUnread[0])}catch{/* 次回の自動取得で再試行する */}};const timer=window.setInterval(refresh,10_000);const onVisible=()=>{if(document.visibilityState==="visible")void refresh()};document.addEventListener("visibilitychange",onVisible);return()=>{active=false;window.clearInterval(timer);document.removeEventListener("visibilitychange",onVisible)}},[view,demo,lineToken]);
 
   const unreadCount = view === "member" ? member.notices.filter((item) => item.unread).length : 0;
-  const visibleNotices = showAllNotices ? member.notices : member.notices.slice(0, 2);
+  const visibleNotices = member.notices.slice(0, 3);
   const activeReservations=member.reservations??(member.nextReservation?[{...member.nextReservation,reservationId:"next",status:"CONFIRMED"}]:[]);
   const activeOrders=member.orders??(member.activeOrder?[member.activeOrder]:[]);
   const openFutureFeature = (label: string) => setServicePanel(label as ServicePanel);
@@ -249,7 +248,7 @@ export default function Home() {
       <header className="brand-header">
         <div className="brand-mark" aria-hidden="true"><span>C</span><span>W</span></div>
         <div><p className="eyebrow">COMPASSION WORLD</p><h1>POINT CARD</h1></div>
-        <button className="notice-button" aria-label={`お知らせ 未読${unreadCount}件`} onClick={() => document.getElementById("notices")?.scrollIntoView({ behavior: "smooth" })}>
+        <button className="notice-button" aria-label={`受信ボックス 未読${unreadCount}件`} onClick={() => { window.location.href="/inbox"; }}>
           <Bell aria-hidden="true" size={17} strokeWidth={1.7} />{unreadCount > 0 && <b>{unreadCount}</b>}
         </button>
       </header>
@@ -308,7 +307,7 @@ export default function Home() {
                 <div><strong>{item.title}</strong><small>{item.createdAt}</small></div>{item.unread && <i aria-label="未読" />}<b>›</b>
               </button>
             ))}
-            {member.notices.length > 2 && <button className="all-notices" onClick={() => setShowAllNotices((value) => !value)}>{showAllNotices ? "閉じる" : "すべてのお知らせを見る"}</button>}
+            <button className="all-notices inbox-link" onClick={() => { window.location.href="/inbox"; }}>受信ボックスを確認する　›</button>
           </section>
 
           <nav className="bottom-tabs" aria-label="メインメニュー">
@@ -316,7 +315,7 @@ export default function Home() {
             <button onClick={() => openFutureFeature("クーポン")}><span><TicketPercent aria-hidden="true" size={18} strokeWidth={1.7} /></span><strong>クーポン</strong></button>
             <button className="card-tab" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}><span><IdCard aria-hidden="true" size={23} strokeWidth={1.6} /></span><strong>会員証</strong></button>
             <button onClick={launchReservation} disabled={openingReservation}><span><CalendarDays aria-hidden="true" size={18} strokeWidth={1.7} /></span><strong>予約</strong></button>
-            <button onClick={() => document.getElementById("notices")?.scrollIntoView({ behavior: "smooth" })}><span><Bell aria-hidden="true" size={17} strokeWidth={1.7} /></span><strong>お知らせ</strong>{unreadCount > 0 && <i>{unreadCount}</i>}</button>
+            <button onClick={() => { window.location.href="/inbox"; }}><span><Bell aria-hidden="true" size={17} strokeWidth={1.7} /></span><strong>お知らせ</strong>{unreadCount > 0 && <i>{unreadCount}</i>}</button>
           </nav>
         </>
       )}
