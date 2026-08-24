@@ -628,8 +628,8 @@ test("新規登録完了後に発行済み会員証へ遷移する", async () =>
   ]);
   assert.match(page, /COMPASSION WORLDへの入館/);
   assert.doesNotMatch(page, /SMS認証は現在使用しません/);
-  assert.match(page, /setMember\(await membership\.json\(\)\);setView\("member"\)/);
-  assert.match(page, /新しいポイントカードを発行しました/);
+  assert.match(page, /const registered=await membership\.json\(\);setMember\(registered\);setView\("member"\)/);
+  assert.match(page, /会員番号を発行しています/);
   assert.match(members, /randomMemberCode/);
   assert.match(members, /INSERT INTO identity_links/);
   assert.match(members, /status:201/);
@@ -694,4 +694,30 @@ test("スタッフが会員詳細を安全に編集し操作履歴を確認で�
   assert.match(api,/MEMBER_PROFILE_UPDATED/);
   assert.match(api,/changedFields/);
   assert.doesNotMatch(api,/provider_user_id AS/);
+});
+
+test("LメンバーズのLINE名・追加経路・タグを移行後も保持する", async () => {
+  const [migration,importer,api,detail]=await Promise.all([
+    readFile(new URL("drizzle/0019_slimy_imperial_guard.sql",root),"utf8"),
+    readFile(new URL("scripts/import-member-completion.mjs",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/member-csv-import/route.ts",root),"utf8"),
+    readFile(new URL("app/member-admin/members/[memberCode]/page.tsx",root),"utf8"),
+  ]);
+  assert.match(migration,/line_display_name/);assert.match(migration,/acquisition_source/);assert.match(migration,/legacy_tags/);
+  assert.match(importer,/value\(row,"LINE名"\)/);assert.match(importer,/value\(row,"追加経路"\)/);assert.match(importer,/value\(row,"タグ"\)/);
+  assert.match(api,/line_display_name/);assert.match(api,/acquisition_source/);assert.match(api,/legacy_tags/);
+  assert.match(detail,/LINE名/);assert.match(detail,/追加経路/);assert.match(detail,/タグ/);
+});
+
+test("スタッフ管理をLメンバーズ型の検索と個人履歴タブへ拡張する", async () => {
+  const [list,detail,listApi,detailApi]=await Promise.all([
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/members/[memberCode]/page.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/members/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/members/[memberCode]/route.ts",root),"utf8"),
+  ]);
+  assert.match(list,/全ランク/);assert.match(list,/タグ/);assert.match(list,/追加経路/);assert.match(list,/LINE連携/);
+  assert.match(listApi,/line_display_name/);assert.match(listApi,/legacy_tags/);assert.match(listApi,/acquisition_source/);
+  assert.match(detail,/予約・受付/);assert.match(detail,/ポイント・特典/);assert.match(detail,/サブスク・決済/);assert.match(detail,/操作履歴/);
+  assert.match(detailApi,/FROM orders WHERE member_id/);assert.match(detailApi,/FROM payment_point_events WHERE member_id/);assert.match(detailApi,/FROM stripe_customers WHERE member_id/);
 });
