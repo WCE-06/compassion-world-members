@@ -1,4 +1,4 @@
-CREATE TABLE `member_notifications` (
+CREATE TABLE IF NOT EXISTS `member_notifications` (
   `id` text PRIMARY KEY NOT NULL,
   `event_id` text NOT NULL,
   `member_id` text NOT NULL,
@@ -20,6 +20,6 @@ CREATE TABLE `member_notifications` (
   FOREIGN KEY (`member_id`) REFERENCES `members`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `member_notifications_event_unique` ON `member_notifications` (`event_id`);
+CREATE UNIQUE INDEX IF NOT EXISTS `member_notifications_event_unique` ON `member_notifications` (`event_id`);
 --> statement-breakpoint
-CREATE INDEX `member_notifications_member_created_idx` ON `member_notifications` (`member_id`,`created_at`);
+CREATE INDEX IF NOT EXISTS `member_notifications_member_created_idx` ON `member_notifications` (`member_id`,`created_at`);

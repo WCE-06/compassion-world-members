@@ -11,7 +11,7 @@ test("来店通知は認証とeventIdによる冪等性を必須にする", () =
   assert.match(entryRoute, /requireCheckinNotificationToken/);
   assert.match(entryRoute, /body\?\.eventType !== "ENTRY_THANK_YOU"/);
   assert.match(entryRoute, /INSERT OR IGNORE INTO member_notifications/);
-  assert.match(migration, /UNIQUE INDEX `member_notifications_event_unique`/);
+  assert.match(migration, /UNIQUE INDEX IF NOT EXISTS `member_notifications_event_unique`/);
 });
 
 test("ポイント付与結果ごとに誤解のない文面を生成する", () => {
