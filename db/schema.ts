@@ -414,3 +414,27 @@ export const categorySchedules = sqliteTable("category_schedules", {
   updatedBy: text("updated_by").notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
+
+export const memberNotifications = sqliteTable("member_notifications", {
+  id: text("id").primaryKey(),
+  eventId: text("event_id").notNull(),
+  memberId: text("member_id").notNull().references(() => members.id),
+  eventType: text("event_type").notNull(),
+  category: text("category", { enum: ["PAYMENT", "POINT", "RESERVATION", "ORDER", "NEWS"] }).notNull().default("NEWS"),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  sender: text("sender").notNull().default("COMPASSION WORLD"),
+  channel: text("channel", { enum: ["CARD", "LINE", "EMAIL"] }).notNull().default("CARD"),
+  deliveryStatus: text("delivery_status", { enum: ["SAVED", "SENT", "FAILED", "SKIPPED"] }).notNull().default("SAVED"),
+  externalMessageId: text("external_message_id"),
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").notNull().default(0),
+  metadataJson: text("metadata_json").notNull().default("{}"),
+  readAt: integer("read_at", { mode: "timestamp_ms" }),
+  occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [
+  uniqueIndex("member_notifications_event_unique").on(table.eventId),
+  index("member_notifications_member_created_idx").on(table.memberId, table.createdAt),
+]);

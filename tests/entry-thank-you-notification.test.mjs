@@ -5,7 +5,7 @@ import test from "node:test";
 const entryRoute = readFileSync(new URL("../app/api/v1/notifications/entry-thank-you/route.ts", import.meta.url), "utf8");
 const membershipRoute = readFileSync(new URL("../app/api/v1/me/membership/route.ts", import.meta.url), "utf8");
 const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
-const migration = readFileSync(new URL("../drizzle/0021_member_notifications.sql", import.meta.url), "utf8");
+const migration = readFileSync(new URL("../drizzle/0020_member_notifications.sql", import.meta.url), "utf8");
 
 test("来店通知は認証とeventIdによる冪等性を必須にする", () => {
   assert.match(entryRoute, /requireCheckinNotificationToken/);
