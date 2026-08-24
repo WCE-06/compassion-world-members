@@ -1,7 +1,7 @@
 "use client";
 
 import QRCode from "qrcode";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, CalendarDays, Coffee, History, House, IdCard, MessageSquarePlus, TicketPercent, UtensilsCrossed } from "lucide-react";
 import { validateRegistration } from "@/lib/member-registration";
 
@@ -164,6 +164,7 @@ function scheduleText(schedule:NonNullable<Member["activeOrder"]>["schedule"],fa
 
 function Empty({text}:{text:string}){return <div className="member-empty"><span>STATUS</span><p>{text}</p></div>}
 function NoticeMail({item,onClose}:{item:MemberNotice;onClose:()=>void}){return <div className="notice-mail-backdrop" onClick={onClose}><article className="notice-mail" role="dialog" aria-modal="true" aria-labelledby="notice-mail-title" onClick={event=>event.stopPropagation()}><header><button onClick={onClose} aria-label="お知らせ一覧へ戻る">‹</button><div><small>INFORMATION</small><strong>お知らせ</strong></div><span>COMPASSION WORLD</span></header><section><p className="notice-mail-category">{item.category==="PAYMENT"?"決済":item.category==="POINT"?"ポイント":item.category==="ORDER"?"注文":item.category==="RESERVATION"?"予約":"お知らせ"}</p><h2 id="notice-mail-title">{item.title}</h2><dl><div><dt>差出人</dt><dd>{item.sender??"COMPASSION WORLD"}</dd></div><div><dt>受信日時</dt><dd>{item.createdAt}</dd></div></dl><div className="notice-mail-body">{item.body.split("\n").map((line,index)=><p key={index}>{line||<br/>}</p>)}</div>{item.ctaUrl&&<a className="notice-mail-cta" href={item.ctaUrl}>{item.ctaLabel??"詳しく見る"}</a>}<p className="notice-mail-signature">COMPASSION WORLD<br/><small>このメッセージは会員証内のお知らせです。</small></p></section><footer><button onClick={onClose}>受信箱へ戻る</button></footer></article></div>}
+function MemberPush({item,onOpen,onDismiss}:{item:MemberNotice;onOpen:()=>void;onDismiss:()=>void}){return <aside className="member-push" role="status" aria-live="polite"><button className="member-push-main" onClick={onOpen}><span><Bell aria-hidden="true" size={18}/></span><div><small>COMPASSION WORLD・たった今</small><strong>{item.title}</strong><p>{item.body.split("\n").find(Boolean)}</p></div></button><button className="member-push-close" onClick={onDismiss} aria-label="通知を閉じる">×</button></aside>}
 function rankDate(value?:number){return value?new Date(value).toLocaleDateString("ja-JP",{timeZone:"Asia/Tokyo",year:"numeric",month:"numeric",day:"numeric"}):"未設定"}
 function ServiceSheet({panel,member,onClose,onReservation}:{panel:Exclude<ServicePanel,null>;member:Member;onClose:()=>void;onReservation:()=>void}){const pointNotices=member.notices.filter(item=>item.category==="POINT"),ranks=["スタンダード","ブロンズ","シルバー","ゴールド","プラチナ","ダイヤモンド"];return <div className="member-sheet-backdrop" onClick={onClose}><section className="member-sheet" role="dialog" aria-modal="true" aria-label={panel} onClick={event=>event.stopPropagation()}><button className="member-sheet-close" onClick={onClose}>×</button><p className="eyebrow">MEMBER SERVICE</p><h2>{panel}</h2>{panel==="注文状況"&&((member.orders?.length??0)>0?<div className="member-sheet-content">{member.orders!.map(order=><div className="history-entry" key={order.orderNumber}><strong>{order.status==="WAITING_PAYMENT"?"お支払い待ち":order.status==="COOKING"?"ただいま調理中":order.status==="READY"?"商品ができあがりました":"注文受付済み"}</strong><p>{[order.foodCallNumber&&`フード ${String(order.foodCallNumber).padStart(3,"0")} ${fulfillmentLabel(order.foodStatus)}`,order.drinkCallNumber&&`ドリンク ${String(order.drinkCallNumber).padStart(3,"0")} ${fulfillmentLabel(order.drinkStatus)}`].filter(Boolean).join(" ／ ")}</p><p>{scheduleText(order.schedule,order.scheduleLabel)}</p></div>)}</div>:<Empty text="進行中の注文はありません"/>)}{panel==="ポイント履歴"&&<div className="member-sheet-content"><strong>保有ポイント {member.points.toLocaleString("ja-JP")} P</strong>{pointNotices.length?pointNotices.map(item=><p key={item.id}>{item.createdAt}　{item.title}</p>):<Empty text="表示できるポイント履歴はまだありません"/>}</div>}{panel==="会員特典"&&<div className="member-sheet-content"><strong>現在のランク：{member.rankLabel??member.rank}</strong>{member.membershipLabel&&<span className="resident-badge">{member.membershipLabel}</span>}<p className="rank-rate">ランク還元率 <b>{member.pointRatePercent??1}%</b></p><p className="integration-note">スマレジへのポイント反映は接続準備中です</p><div className="rank-ladder">{ranks.map(label=><span className={label===(member.rankLabel??member.rank)?"active":""} key={label}>{label}</span>)}</div>{member.qualifyingSpendSource==="SMAREGI"?<><p>直近{member.rankPeriodMonths??12}か月の対象利用額：¥{(member.qualifyingSpend??0).toLocaleString("ja-JP")}</p>{member.qualifyingSpendUpdatedAt&&<p className="sync-status">最終集計：{new Date(member.qualifyingSpendUpdatedAt).toLocaleString("ja-JP")}</p>}{member.nextRankLabel?<p className="rank-progress">次の{member.nextRankLabel}まで <b>あと¥{(member.amountToNextRank??0).toLocaleString("ja-JP")}</b></p>:<p className="rank-progress"><b>最高ランクに到達しています</b></p>}</>:<div className="integration-note"><strong>年間購入額をスマレジから集計しています</strong><p>集計完了まで、一部の購入額を年間実績として表示しません。</p></div>}<p>住民会員はゴールド以上を保証。無料会員も利用実績でダイヤモンドまで上がれます。</p></div>}{panel==="クーポン"&&<Empty text="現在利用できるクーポンはありません"/>}{panel==="利用履歴"&&<div className="member-sheet-content history-list">{[...(member.reservationHistory??[]).map(item=>({key:`r:${item.reservationId}`,date:item.startsAt,title:`スタジオ ${item.status==="CANCELLED"?"キャンセル":"利用済み"}`,detail:`${dateLabel(item.startsAt)}〜`})),...(member.orderHistory??[]).map(item=>({key:`o:${item.orderNumber}`,date:item.createdAt,title:item.status==="CANCELLED"||item.status==="EXPIRED"?"注文取消":"商品お渡し済み",detail:`注文番号 ${item.orderNumber}`}))].sort((a,b)=>Date.parse(b.date)-Date.parse(a.date)).map(item=><div className="history-entry" key={item.key}><strong>{item.title}</strong><p>{item.detail}</p></div>)}{!(member.reservationHistory?.length||member.orderHistory?.length)&&<Empty text="表示できる利用履歴はまだありません"/>}</div>}{panel==="予約の変更・キャンセル"&&(member.nextReservation?<div className="member-sheet-content"><strong>{member.nextReservation.facilityName}</strong><p>{dateLabel(member.nextReservation.startsAt)}〜</p><button className="flow-button" onClick={onReservation}>FEBBRAIO予約サイトを開く</button></div>:<Empty text="変更できる予約はありません"/>)}{panel==="おもひで商店のご案内"&&<div className="member-sheet-content"><strong>おもひで商店</strong><p>会員限定のお知らせや入荷情報は、このポイントカードのお知らせ欄でご案内します。</p><a href="/product-request">取り寄せ・商品リクエスト</a></div>}<button className="flow-button" onClick={onClose}>閉じる</button></section></div>}
 
@@ -175,6 +176,8 @@ export default function Home() {
   const [memberCode, setMemberCode] = useState("");
   const [showAllNotices, setShowAllNotices] = useState(false);
   const [selectedNotice,setSelectedNotice]=useState<MemberNotice|null>(null);
+  const [pushNotice,setPushNotice]=useState<MemberNotice|null>(null);
+  const seenNoticeIds=useRef(new Set<string>());
   const [lineToken,setLineToken]=useState("");
   const [registering,setRegistering]=useState(false);
   const [postalLoading,setPostalLoading]=useState(false);
@@ -185,6 +188,7 @@ export default function Home() {
   const [openingReservation,setOpeningReservation]=useState(false);
   const [agreeingRankTerms,setAgreeingRankTerms]=useState(false);
   const openNotice=(item:MemberNotice)=>{setSelectedNotice({...item,unread:false});if(!item.unread||item.id.startsWith("welcome:"))return;setMember(current=>current?{...current,notices:current.notices.map(notice=>notice.id===item.id?{...notice,unread:false}:notice)}:current);if(!demo)void fetch(`/api/v1/me/notifications/${encodeURIComponent(item.id)}`,{method:"PATCH",headers:{Authorization:`Bearer ${lineToken}`}}).catch(()=>undefined)};
+  const installMembership=useCallback((next:Member)=>{setMember(next);next.notices.forEach(item=>seenNoticeIds.current.add(item.id));setPushNotice(next.notices.find(item=>item.unread&&!item.id.startsWith("welcome:"))??null)},[]);
 
   useEffect(() => {
     async function start() {
@@ -198,7 +202,7 @@ export default function Home() {
         if (requested === "unlinked") return setView("unlinked");
         if (requested === "new") return setView("new");
         const response = await fetch("/api/v1/me/membership", { headers: { "X-Compass-Preview": "representative" } });
-        if (response.ok) setMember(await response.json());
+        if (response.ok) installMembership(await response.json());
         setView("member");
         return;
       }
@@ -216,7 +220,7 @@ export default function Home() {
         if (response.status === 404) return setView(entry === "join" ? "new" : "unlinked");
         if (response.status === 422) {const staged=await fetch("/api/v1/me/registration",{headers:{Authorization:`Bearer ${token}`}}).then(result=>result.ok?result.json():null).catch(()=>null);if(staged?.registration)setRegistration(current=>({...current,...Object.fromEntries(Object.entries(staged.registration).filter(([,value])=>Boolean(value)))}));return setView("new")}
         if (!response.ok) throw new Error("会員情報を取得できませんでした");
-        setMember(await response.json());
+        installMembership(await response.json());
         setView("member");
       } catch (error) {
         setNotice(error instanceof Error ? error.message : "読み込みに失敗しました");
@@ -224,7 +228,9 @@ export default function Home() {
       }
     }
     start();
-  }, []);
+  }, [installMembership]);
+
+  useEffect(()=>{if(view!=="member"||demo||!lineToken)return;let active=true;const refresh=async()=>{try{const response=await fetch("/api/v1/me/notifications",{headers:{Authorization:`Bearer ${lineToken}`},cache:"no-store"});if(!response.ok)return;const result=await response.json() as {notices:MemberNotice[]};if(!active)return;const newUnread=result.notices.filter(item=>item.unread&&!seenNoticeIds.current.has(item.id));result.notices.forEach(item=>seenNoticeIds.current.add(item.id));setMember(current=>({...current,notices:[...result.notices,...current.notices.filter(item=>item.id.startsWith("welcome:"))]}));if(newUnread[0])setPushNotice(newUnread[0])}catch{/* 次回の自動取得で再試行する */}};const timer=window.setInterval(refresh,10_000);const onVisible=()=>{if(document.visibilityState==="visible")void refresh()};document.addEventListener("visibilitychange",onVisible);return()=>{active=false;window.clearInterval(timer);document.removeEventListener("visibilitychange",onVisible)}},[view,demo,lineToken]);
 
   const unreadCount = view === "member" ? member.notices.filter((item) => item.unread).length : 0;
   const visibleNotices = showAllNotices ? member.notices : member.notices.slice(0, 2);
@@ -344,6 +350,7 @@ export default function Home() {
       {view === "error" && <section className="flow-card"><div className="flow-icon">!</div><h2>接続を確認してください</h2><p>{notice}</p><button className="flow-button" onClick={() => window.location.reload()}>もう一度読み込む</button></section>}
       {notice && view !== "error" && <div className="toast" role="status" onClick={() => setNotice("")}>{notice}<button aria-label="閉じる">×</button></div>}
       {selectedNotice&&<NoticeMail item={selectedNotice} onClose={()=>setSelectedNotice(null)}/>} 
+      {pushNotice&&!selectedNotice&&<MemberPush item={pushNotice} onDismiss={()=>setPushNotice(null)} onOpen={()=>{const item=pushNotice;setPushNotice(null);openNotice(item)}}/>}
       {servicePanel&&<ServiceSheet panel={servicePanel} member={member} onClose={()=>setServicePanel(null)} onReservation={launchReservation}/>} 
       {view==="member"&&member.rankTermsConsentRequired&&<div className="terms-modal-backdrop"><section className="terms-modal" role="dialog" aria-modal="true" aria-labelledby="rank-terms-title"><p className="eyebrow">MEMBERSHIP UPDATE</p><h2 id="rank-terms-title">会員制度およびポイントサービス改定のお知らせ</h2><p>COMPASSION WORLDでは、新しい会員証への移行に伴い、会員ランク制度およびポイントサービスを改定いたしました。</p><p>会員ランクは対象期間中のお買い上げ実績などに応じて決まり、条件達成時は期間途中でもランクアップします。ランクの見直しは原則として年1回行います。</p><p>住民登録プランをご契約中のお客様には、契約期間中、ゴールド会員以上の特典を適用します。</p><div className="terms-summary"><strong>現在のランク：{member.rankLabel??member.rank}</strong><span>100円につき {member.pointRatePercent??1}ポイント</span><span>ランク期間：{rankDate(member.rankPeriodStartedAt)}〜{rankDate(member.rankPeriodEndsAt)}</span></div><a className="terms-link" href="/terms" target="_blank">利用規約を確認する</a><button className="flow-button" disabled={agreeingRankTerms} onClick={agreeRankTerms}>{agreeingRankTerms?"保存しています…":"同意して会員証を利用する"}</button></section></div>}
 
