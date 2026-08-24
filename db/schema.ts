@@ -26,6 +26,15 @@ export const members = sqliteTable("members", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 }, (table) => [uniqueIndex("members_member_code_unique").on(table.memberCode)]);
 
+export const adminAccounts = sqliteTable("admin_accounts", {
+  email: text("email").primaryKey(),
+  passwordScheme: text("password_scheme").notNull(),
+  passwordSalt: text("password_salt").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  passwordChangedAt: integer("password_changed_at", { mode: "timestamp_ms" }).notNull(),
+  updatedBy: text("updated_by").notNull(),
+});
+
 export const memberSpendSnapshots = sqliteTable("member_spend_snapshots", {
   memberId: text("member_id").primaryKey().references(() => members.id),
   source: text("source", { enum: ["SMAREGI"] }).notNull().default("SMAREGI"),

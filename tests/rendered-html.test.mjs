@@ -730,3 +730,20 @@ test("スタッフ手動予約は内容確認後に確定し処理中を明示�
   assert.match(page,/登録処理中…/);
   assert.match(page,/if\(action==="CREATE_RESERVATION"\)setReservationConfirm\(false\)/);
 });
+
+test("管理者パスワード変更と会員データ同期を安全に提供する", async () => {
+  const [page,session,passwordApi,syncApi,memberAuth,migration]=await Promise.all([
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+    readFile(new URL("lib/admin-session.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/auth/password/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/sync-center/route.ts",root),"utf8"),
+    readFile(new URL("lib/member-auth.ts",root),"utf8"),
+    readFile(new URL("drizzle/0019_admin_accounts.sql",root),"utf8"),
+  ]);
+  assert.match(page,/管理者パスワード変更/);assert.match(page,/全員の対象額を一回だけ再計算/);
+  assert.match(session,/PBKDF2/);assert.match(session,/admin_accounts/);
+  assert.match(passwordApi,/PASSWORD_POLICY/);assert.match(passwordApi,/verifyAdminPassword/);
+  assert.match(syncApi,/LINE_NAMES/);assert.match(syncApi,/SPEND_RECALC/);assert.match(syncApi,/LINE_CHANNEL_ACCESS_TOKEN/);assert.match(syncApi,/SMAREGI_SPEND_RECALC_URL/);
+  assert.match(memberAuth,/line_display_name/);assert.match(memberAuth,/profile\.displayName/);
+  assert.match(migration,/CREATE TABLE IF NOT EXISTS `?admin_accounts`?/);
+});
