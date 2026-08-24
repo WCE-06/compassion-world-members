@@ -141,6 +141,20 @@
       "when": 1787616000000,
       "tag": "0019_admin_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1787648400000,
+      "tag": "0020_operations_console",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1787684400000,
+      "tag": "0021_member_notifications",
+      "breakpoints": true
     }
   ]
 }

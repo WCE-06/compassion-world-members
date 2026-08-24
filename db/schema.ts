@@ -414,3 +414,137 @@ export const categorySchedules = sqliteTable("category_schedules", {
   updatedBy: text("updated_by").notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
+
+export const operationsTasks = sqliteTable("operations_tasks", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  status: text("status", { enum: ["OPEN", "IN_PROGRESS", "WAITING", "DONE", "CANCELLED"] }).notNull().default("OPEN"),
+  priority: text("priority", { enum: ["LOW", "NORMAL", "HIGH", "URGENT"] }).notNull().default("NORMAL"),
+  category: text("category", { enum: ["GENERAL", "MEMBER", "STUDIO", "ORDER", "PAYMENT", "INVENTORY", "SNS", "SYSTEM"] }).notNull().default("GENERAL"),
+  assignee: text("assignee"),
+  dueAt: integer("due_at", { mode: "timestamp_ms" }),
+  sourceType: text("source_type"),
+  sourceId: text("source_id"),
+  memberId: text("member_id").references(() => members.id),
+  createdBy: text("created_by").notNull(),
+  completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("operations_tasks_status_due_idx").on(table.status, table.dueAt), index("operations_tasks_source_idx").on(table.sourceType, table.sourceId)]);
+
+export const memberTags = sqliteTable("member_tags", {
+  memberId: text("member_id").notNull().references(() => members.id),
+  tag: text("tag").notNull(),
+  source: text("source").notNull().default("STAFF"),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [uniqueIndex("member_tags_member_tag_unique").on(table.memberId, table.tag), index("member_tags_tag_idx").on(table.tag)]);
+
+export const adminSavedFilters = sqliteTable("admin_saved_filters", {
+  id: text("id").primaryKey(),
+  ownerEmail: text("owner_email").notNull(),
+  name: text("name").notNull(),
+  scope: text("scope").notNull().default("MEMBERS"),
+  conditionsJson: text("conditions_json").notNull().default("{}"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [uniqueIndex("admin_saved_filters_owner_name_unique").on(table.ownerEmail, table.scope, table.name)]);
+
+export const coupons = sqliteTable("coupons", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  status: text("status", { enum: ["DRAFT", "ACTIVE", "PAUSED", "ENDED"] }).notNull().default("DRAFT"),
+  benefitType: text("benefit_type", { enum: ["FIXED", "PERCENT", "POINTS", "MEMBER_PRICE"] }).notNull(),
+  benefitValue: integer("benefit_value").notNull().default(0),
+  startsAt: integer("starts_at", { mode: "timestamp_ms" }),
+  endsAt: integer("ends_at", { mode: "timestamp_ms" }),
+  usageLimit: integer("usage_limit"),
+  smaregiCouponId: text("smaregi_coupon_id"),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("coupons_status_period_idx").on(table.status, table.startsAt, table.endsAt)]);
+
+export const memberCoupons = sqliteTable("member_coupons", {
+  id: text("id").primaryKey(),
+  couponId: text("coupon_id").notNull().references(() => coupons.id),
+  memberId: text("member_id").notNull().references(() => members.id),
+  status: text("status", { enum: ["HELD", "USED", "EXPIRED", "REVOKED"] }).notNull().default("HELD"),
+  issuedAt: integer("issued_at", { mode: "timestamp_ms" }).notNull(),
+  usedAt: integer("used_at", { mode: "timestamp_ms" }),
+  smaregiTransactionId: text("smaregi_transaction_id"),
+}, (table) => [uniqueIndex("member_coupons_coupon_member_unique").on(table.couponId, table.memberId), index("member_coupons_member_status_idx").on(table.memberId, table.status)]);
+
+export const surveys = sqliteTable("surveys", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  status: text("status", { enum: ["DRAFT", "ACTIVE", "CLOSED"] }).notNull().default("DRAFT"),
+  questionsJson: text("questions_json").notNull().default("[]"),
+  rewardPoints: integer("reward_points").notNull().default(0),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const surveyResponses = sqliteTable("survey_responses", {
+  id: text("id").primaryKey(),
+  surveyId: text("survey_id").notNull().references(() => surveys.id),
+  memberId: text("member_id").references(() => members.id),
+  answersJson: text("answers_json").notNull().default("{}"),
+  rewardStatus: text("reward_status", { enum: ["NONE", "PENDING", "AWARDED", "FAILED"] }).notNull().default("NONE"),
+  submittedAt: integer("submitted_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("survey_responses_survey_idx").on(table.surveyId, table.submittedAt)]);
+
+export const messageCampaigns = sqliteTable("message_campaigns", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  status: text("status", { enum: ["DRAFT", "SCHEDULED", "SENDING", "SENT", "FAILED", "CANCELLED"] }).notNull().default("DRAFT"),
+  channel: text("channel", { enum: ["CARD", "LINE", "EMAIL", "MULTI"] }).notNull().default("CARD"),
+  audienceJson: text("audience_json").notNull().default("{}"),
+  contentJson: text("content_json").notNull().default("{}"),
+  scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }),
+  sentAt: integer("sent_at", { mode: "timestamp_ms" }),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("message_campaigns_status_schedule_idx").on(table.status, table.scheduledAt)]);
+
+export const memberNotifications = sqliteTable("member_notifications", {
+  id: text("id").primaryKey(),
+  eventId: text("event_id").notNull(),
+  memberId: text("member_id").notNull().references(() => members.id),
+  eventType: text("event_type").notNull(),
+  category: text("category", { enum: ["PAYMENT", "POINT", "RESERVATION", "ORDER", "NEWS"] }).notNull().default("NEWS"),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  sender: text("sender").notNull().default("COMPASSION WORLD"),
+  channel: text("channel", { enum: ["CARD", "LINE", "EMAIL"] }).notNull().default("CARD"),
+  deliveryStatus: text("delivery_status", { enum: ["SAVED", "SENT", "FAILED", "SKIPPED"] }).notNull().default("SAVED"),
+  externalMessageId: text("external_message_id"),
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").notNull().default(0),
+  metadataJson: text("metadata_json").notNull().default("{}"),
+  readAt: integer("read_at", { mode: "timestamp_ms" }),
+  occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [
+  uniqueIndex("member_notifications_event_unique").on(table.eventId),
+  index("member_notifications_member_created_idx").on(table.memberId, table.createdAt),
+]);
+
+export const automationRules = sqliteTable("automation_rules", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  triggerType: text("trigger_type").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
+  conditionsJson: text("conditions_json").notNull().default("{}"),
+  actionJson: text("action_json").notNull().default("{}"),
+  lastRunAt: integer("last_run_at", { mode: "timestamp_ms" }),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});

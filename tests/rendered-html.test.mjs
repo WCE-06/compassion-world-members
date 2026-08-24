@@ -754,3 +754,20 @@ test("管理者パスワード変更と会員データ同期を安全に提供�
   assert.match(memberAuth,/line_display_name/);assert.match(memberAuth,/profile\.displayName/);
   assert.match(migration,/CREATE TABLE IF NOT EXISTS `?admin_accounts`?/);
 });
+
+test("統合管理でタスク・予約一覧・クーポン・配信・会員一括操作を管理する",async()=>{
+  const [page,sidebar,tasks,reservations,engagement,bulk,migration]=await Promise.all([
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/tasks/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/studio/reservations/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/engagement/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/members/bulk/route.ts",root),"utf8"),
+    readFile(new URL("drizzle/0020_operations_console.sql",root),"utf8"),
+  ]);
+  assert.match(sidebar,/SNSコントロール/);assert.match(sidebar,/精算・売上/);assert.match(sidebar,/在庫確認/);assert.match(sidebar,/作業タスク/);
+  assert.match(page,/StudioReservationOverview/);assert.match(reservations,/staff\.reservations\.list/);
+  assert.match(tasks,/operations_tasks/);assert.match(engagement,/message_campaigns/);assert.match(engagement,/automation_rules/);
+  assert.match(page,/BulkMemberActions/);assert.match(bulk,/MEMBER_TAG_ADDED/);assert.match(bulk,/MEMBER_STATUS_CHANGED/);
+  assert.match(migration,/CREATE TABLE `coupons`/);assert.match(migration,/CREATE TABLE `surveys`/);assert.match(migration,/CREATE TABLE `operations_tasks`/);
+});
