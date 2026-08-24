@@ -663,3 +663,19 @@ test("未完了の予約と注文をすべて表示し完了分を履歴へ分�
   assert.match(membership,/新しいポイントカードのご利用ありがとうございます/);
   assert.match(membership,/cardStartedAt/);
 });
+
+test("スタッフ統合管理からスタジオ予約と手動受付を共通台帳へ反映する", async () => {
+  const [page,api]=await Promise.all([
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/studio/route.ts",root),"utf8"),
+  ]);
+  assert.match(page,/統合会員管理/);
+  assert.match(page,/スタジオ予約・受付/);
+  assert.match(page,/スタッフ予約を登録/);
+  assert.match(page,/予約なしで今すぐ受付/);
+  assert.match(api,/facility\.session\.start/);
+  assert.match(api,/reservation\.create/);
+  assert.match(api,/reservation\.cancel/);
+  assert.match(api,/ADMIN_EMAILS/);
+  assert.match(api,/STAFF_STUDIO_/);
+});
