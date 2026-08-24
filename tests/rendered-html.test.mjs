@@ -721,3 +721,12 @@ test("スタッフ管理をLメンバーズ型の検索と個人履歴タブへ�
   assert.match(detail,/予約・受付/);assert.match(detail,/ポイント・特典/);assert.match(detail,/サブスク・決済/);assert.match(detail,/操作履歴/);
   assert.match(detailApi,/FROM orders WHERE member_id/);assert.match(detailApi,/FROM payment_point_events WHERE member_id/);assert.match(detailApi,/FROM stripe_customers WHERE member_id/);
 });
+
+test("スタッフ手動予約は内容確認後に確定し処理中を明示する", async () => {
+  const page=await readFile(new URL("app/member-admin/page.tsx",root),"utf8");
+  assert.match(page,/この内容で予約しますか？/);
+  assert.match(page,/この内容で予約を確定/);
+  assert.match(page,/予約登録を開始しました/);
+  assert.match(page,/登録処理中…/);
+  assert.match(page,/if\(action==="CREATE_RESERVATION"\)setReservationConfirm\(false\)/);
+});
