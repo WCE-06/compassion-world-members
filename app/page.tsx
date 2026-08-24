@@ -184,6 +184,7 @@ export default function Home() {
   const [registration,setRegistration]=useState({displayName:"",phone:"",birthDate:"",postalCode:"",address:"",email:"",acceptedTerms:false});
   const [openingReservation,setOpeningReservation]=useState(false);
   const [agreeingRankTerms,setAgreeingRankTerms]=useState(false);
+  const openNotice=(item:MemberNotice)=>{setSelectedNotice({...item,unread:false});if(!item.unread||item.id.startsWith("welcome:"))return;setMember(current=>current?{...current,notices:current.notices.map(notice=>notice.id===item.id?{...notice,unread:false}:notice)}:current);if(!demo)void fetch(`/api/v1/me/notifications/${encodeURIComponent(item.id)}`,{method:"PATCH",headers:{Authorization:`Bearer ${lineToken}`}}).catch(()=>undefined)};
 
   useEffect(() => {
     async function start() {
@@ -296,7 +297,7 @@ export default function Home() {
           <section className="notice-list" id="notices">
             <div className="section-heading"><div><p className="eyebrow">INFORMATION</p><h2>お知らせ</h2></div>{unreadCount > 0 && <span className="unread-label">未読 {unreadCount}</span>}</div>
             {visibleNotices.map((item) => (
-              <button className="notice-row" key={item.id} onClick={() => setSelectedNotice(item)}>
+              <button className="notice-row" key={item.id} onClick={() => openNotice(item)}>
                 <span className={`notice-category ${item.category.toLowerCase()}`}>{item.category === "PAYMENT" ? "決済" : item.category === "POINT" ? "ポイント" : item.category === "ORDER" ? "注文" : item.category === "RESERVATION" ? "予約" : "お知らせ"}</span>
                 <div><strong>{item.title}</strong><small>{item.createdAt}</small></div>{item.unread && <i aria-label="未読" />}<b>›</b>
               </button>
