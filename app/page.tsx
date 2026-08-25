@@ -122,7 +122,7 @@ function loadScript(src: string, ready: () => boolean) {
   });
 }
 
-function MemberQr({ value }: { value: string }) {
+function MemberQr({ value, large = false }: { value: string; large?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [failed, setFailed] = useState(false);
 
@@ -132,7 +132,7 @@ function MemberQr({ value }: { value: string }) {
       .then(async () => {
         if (!active || !canvasRef.current) return;
         await QRCode.toCanvas(canvasRef.current, value, {
-          width: 196,
+          width: large ? 360 : 196,
           margin: 1,
           errorCorrectionLevel: "M",
           color: { dark: "#142d26", light: "#ffffff" },
@@ -140,11 +140,11 @@ function MemberQr({ value }: { value: string }) {
       })
       .catch(() => active && setFailed(true));
     return () => { active = false; };
-  }, [value]);
+  }, [large, value]);
 
   return (
-    <div className="qr-panel" aria-label={`会員番号 ${value} のQRコード`}>
-      {failed ? <div className="qr-fallback">QR<br />読み込み中</div> : <canvas ref={canvasRef} width="196" height="196" />}
+    <div className={`qr-panel${large ? " qr-panel-large" : ""}`} aria-label={`会員番号 ${value} のQRコード`}>
+      {failed ? <div className="qr-fallback">QR<br />読み込み中</div> : <canvas ref={canvasRef} width={large ? 360 : 196} height={large ? 360 : 196} />}
       <div><small>MEMBER No.</small><strong>{value}</strong></div>
     </div>
   );
@@ -185,7 +185,9 @@ export default function Home() {
   const [linking,setLinking]=useState(false),[linkVerification,setLinkVerification]=useState({phone:"",birthDate:""}),[servicePanel,setServicePanel]=useState<ServicePanel>(null);
   const [registration,setRegistration]=useState({displayName:"",phone:"",birthDate:"",postalCode:"",address:"",email:"",acceptedTerms:false});
   const [openingReservation,setOpeningReservation]=useState(false);
+  const [qrExpanded,setQrExpanded]=useState(false);
   const [agreeingRankTerms,setAgreeingRankTerms]=useState(false);
+  useEffect(()=>{if(!qrExpanded)return;const onKey=(event:KeyboardEvent)=>{if(event.key==="Escape")setQrExpanded(false)};const previous=document.body.style.overflow;document.body.style.overflow="hidden";window.addEventListener("keydown",onKey);return()=>{document.body.style.overflow=previous;window.removeEventListener("keydown",onKey)}},[qrExpanded]);
   const openNotice=(item:MemberNotice)=>{setSelectedNotice({...item,unread:false});if(!item.unread||item.id.startsWith("welcome:"))return;setMember(current=>current?{...current,notices:current.notices.map(notice=>notice.id===item.id?{...notice,unread:false}:notice)}:current);if(!demo)void fetch(`/api/v1/me/notifications/${encodeURIComponent(item.id)}`,{method:"PATCH",headers:{Authorization:`Bearer ${lineToken}`}}).catch(()=>undefined)};
   const installMembership=useCallback((next:Member)=>{setMember(next);next.notices.forEach(item=>seenNoticeIds.current.add(item.id));setPushNotice(next.notices.find(item=>item.unread&&!item.id.startsWith("welcome:"))??null)},[]);
 
@@ -259,7 +261,7 @@ export default function Home() {
       {view === "member" && (
         <>
           <section className={`wallet-card rank-card rank-card-${member.rank.toLowerCase()}`}>
-            <div className="wallet-card-head"><div><span>会員証 {member.membershipLabel&&<b className="resident-badge">{member.membershipLabel}</b>}</span><strong>{member.displayName} 様</strong></div><div className="rank-emblem"><small>{member.rankLabel??member.rank}</small><b>{member.pointRatePercent??1}%</b><span>POINT</span></div><button onClick={() => setNotice("会員番号を受付端末へ提示してください")}>拡大</button></div>
+            <div className="wallet-card-head"><div><span>会員証 {member.membershipLabel&&<b className="resident-badge">{member.membershipLabel}</b>}</span><strong>{member.displayName} 様</strong></div><div className="rank-emblem"><small>{member.rankLabel??member.rank}</small><b>{member.pointRatePercent??1}%</b><span>POINT</span></div><button onClick={() => setQrExpanded(true)} aria-haspopup="dialog">拡大</button></div>
             <MemberQr value={member.memberCode} />
             <div className="wallet-balances">
               <button onClick={() => openFutureFeature("ポイント履歴")}><small>保有ポイント</small><strong>{member.points.toLocaleString("ja-JP")}<span> P</span></strong><em>履歴を見る ›</em></button>
@@ -268,6 +270,8 @@ export default function Home() {
             {member.smaregiSyncStatus&&member.smaregiSyncStatus!=="SYNCED"&&<p className={`sync-status sync-${member.smaregiSyncStatus.toLowerCase()}`}>{member.smaregiSyncStatus==="FAILED"?"会員情報の連携を再確認しています":"スマレジ会員情報を連携しています"}</p>}
             {member.qualifyingSpendSource!=="SMAREGI"&&<p className="sync-status">過去1年のお買い上げ金額をスマレジと同期しています</p>}
           </section>
+
+          {qrExpanded&&<div className="qr-zoom-backdrop" onClick={()=>setQrExpanded(false)}><section className="qr-zoom" role="dialog" aria-modal="true" aria-label="会員証QRコードを拡大表示" onClick={event=>event.stopPropagation()}><header><div><small>COMPASSION WORLD</small><strong>会員証</strong></div><button onClick={()=>setQrExpanded(false)} aria-label="拡大表示を閉じる">×</button></header><MemberQr value={member.memberCode} large/><p>受付端末へこのQRコードをご提示ください</p><button className="qr-zoom-close" onClick={()=>setQrExpanded(false)}>元のサイズへ戻す</button></section></div>}
 
           {member.membershipType!=="RESIDENT"&&<button className="resident-upgrade-banner" onClick={()=>{window.location.href="/resident"}}><span>RESIDENT MEMBERSHIP</span><strong>住民登録へアップグレード</strong><small>住民限定特典とゴールドランク保証を確認する　›</small></button>}
 
