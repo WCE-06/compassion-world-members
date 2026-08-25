@@ -86,7 +86,7 @@ export default function AvailabilityPage() {
     } })(); }, [loadDay]);
     async function reserve() { if (!selected || !authHeaders || saving)
         return; setSaving(true); setMessage("予約内容を確認しています…"); try {
-        const response = await fetch("/api/v1/reservations", { method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" }, body: JSON.stringify({ startAt: new Date(selected.startAt).toISOString(), durationHours: duration, requestId: crypto.randomUUID() }) }), result = await response.json();
+        const response = await fetch("/api/v1/reservations", { method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" }, body: JSON.stringify({startAt:new Date(selected.startAt).toISOString(), durationHours: duration, requestId: crypto.randomUUID() }) }), result = await response.json();
         if (!response.ok)
             throw new Error(result.error === "TIME_NOT_AVAILABLE" ? "選択した時間は直前に予約不可となりました。別の時間をお選びください。" : "予約を確定できませんでした");
         setReservations(current => [{ id: result.reservationId, startsAt: result.startsAt, endsAt: result.endsAt, status: result.status }, ...current]);

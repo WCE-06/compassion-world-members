@@ -162,6 +162,13 @@
       "when": 1787691600000,
       "tag": "0022_catalog_sale_period",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1787711400000,
+      "tag": "0023_inventory_control",
+      "breakpoints": true
     }
   ]
 }
