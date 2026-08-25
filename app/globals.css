@@ -146,6 +146,31 @@
   color:#fff;
   text-shadow:0 1px 2px #0008,0 0 14px #fff7;
 }
+.rank-card:not(.rank-card-standard) .wallet-card-head>div:first-child{
+  text-shadow:0 1px 2px #000,0 0 7px #000b;
+}
+.rank-card:not(.rank-card-standard) .wallet-card-head>div:first-child>span{
+  color:#fff!important;
+}
+.rank-card:not(.rank-card-standard) .rank-emblem{
+  padding:5px 8px;
+  border:1px solid #ffffff30;
+  border-radius:8px;
+  background:#10251e35;
+  box-shadow:0 2px 8px #0003,inset 0 1px #ffffff18;
+  backdrop-filter:blur(2px);
+  -webkit-backdrop-filter:blur(2px);
+}
+.rank-card:not(.rank-card-standard) .rank-emblem small,
+.rank-card:not(.rank-card-standard) .rank-emblem span{
+  color:#fff!important;
+  text-shadow:0 1px 2px #000,0 0 5px #000c;
+}
+.rank-card:not(.rank-card-standard) .wallet-card-head>button{
+  background:#10251e3d;
+  text-shadow:0 1px 2px #000b;
+  box-shadow:0 2px 7px #0002;
+}
 .rank-card:not(.rank-card-standard) .wallet-balances{
   background:
     linear-gradient(118deg,var(--rank-pale),#fff 44%,color-mix(in srgb,var(--rank-pale) 72%,#fff));
