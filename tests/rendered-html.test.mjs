@@ -793,7 +793,8 @@ test("商品マスタ登録と販売期間を共通商品管理へ追加する",
     readFile(new URL("app/menu-admin/page.tsx",root),"utf8"),
     readFile(new URL("docs/COUPON_AND_PRODUCT_MASTER_OPERATIONS.md",root),"utf8"),
   ]);
-  assert.match(route,/SMAREGI_PRODUCT_CREATE_URL/);assert.match(route,/product\.create/);assert.match(route,/Idempotency-Key/);
+  assert.match(route,/SMAREGI_PRODUCT_MASTER_URL/);assert.match(route,/product\.create/);assert.match(route,/product\.update/);assert.match(route,/product\.status/);assert.match(route,/Idempotency-Key/);
+  assert.match(component,/スマレジ商品マスタ/);assert.match(component,/販売を停止/);assert.match(component,/ポイント付与対象/);assert.match(component,/JANコード/);
   assert.match(component,/5分ごとに自動更新/);assert.match(component,/販売開始/);assert.match(component,/販売終了/);
   assert.match(catalog,/saleWindowOpen/);assert.match(migration,/sale_starts_at/);assert.match(migration,/sale_ends_at/);
   assert.match(menu,/ProductMasterRegistration/);
