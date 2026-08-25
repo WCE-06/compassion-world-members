@@ -1,4 +1,5 @@
 import assert from"node:assert/strict";import{readFileSync}from"node:fs";import test from"node:test";
 const membership=readFileSync(new URL("../app/api/v1/me/membership/route.ts",import.meta.url),"utf8"),inbox=readFileSync(new URL("../app/api/v1/me/notifications/route.ts",import.meta.url),"utf8"),shared=readFileSync(new URL("../lib/member-notices.ts",import.meta.url),"utf8");
-test("会員証トップと受信ボックスは同じ通知生成関数を使う",()=>{assert.match(membership,/welcomeNotice\(member\)/);assert.match(inbox,/welcomeNotice\(profile\)/);assert.match(membership,/storedNotice/);assert.match(inbox,/storedNotice/)});
-test("ウェルカムメッセージのIDと本文は一か所で定義する",()=>{assert.match(shared,/id:`welcome:\$\{member\.id\}`/);assert.equal((shared.match(/新しいポイントカードのご利用ありがとうございます/g)??[]).length,1)});
+test("会員証トップと受信ボックスは同じ通知整理関数を使う",()=>{assert.match(membership,/memberNotices\(notificationRows\.results,member\)/);assert.match(inbox,/memberNotices\(rows\.results,profile\)/);assert.match(membership,/event_type AS eventType/);assert.match(inbox,/metadata_json AS metadataJson/)});
+test("保存済みウェルカム通知があれば自動生成を追加しない",()=>{assert.match(shared,/unique\.some\(isWelcomeNotice\)\?\[\]:\[welcomeNotice\(member\)\]/);assert.match(shared,/key="MEMBER_WELCOME"/);assert.equal((shared.match(/新しいポイントカードのご利用ありがとうございます/g)??[]).length,1)});
+test("異なる通知IDでも種別・対象・日付・内容で重複を抑止する",()=>{assert.match(shared,/orderId/);assert.match(shared,/reservationId/);assert.match(shared,/normalizedText\(item\.body\)/);assert.match(shared,/ENTRY_THANK_YOU:\$\{date\}/)});
