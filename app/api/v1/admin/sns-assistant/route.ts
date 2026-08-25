@@ -25,11 +25,19 @@ export async function GET(request:NextRequest){
 }
 
 export async function POST(request:NextRequest){
- if(!(admin(request)??await requireAdminSession(request)))return NextResponse.json({error:"UNAUTHORIZED"},{status:401});
+ const actor=admin(request)??await requireAdminSession(request);
+ if(!actor)return NextResponse.json({error:"UNAUTHORIZED"},{status:401});
  const runtime=env as unknown as Record<string,string|undefined>,apiKey=runtime.OPENAI_API_KEY;
  if(!apiKey)return NextResponse.json({error:"OPENAI_NOT_CONFIGURED",message:"OpenAI APIキーを設定するとSNS相談AIを利用できます。"},{status:503});
- const body=await request.json().catch(()=>null) as {messages?:ChatMessage[]}|null;
- const messages=(body?.messages??[]).filter(item=>(item.role==="user"||item.role==="assistant")&&typeof item.content==="string").slice(-12).map(item=>({role:item.role,content:item.content.trim().slice(0,4000)})).filter(item=>item.content);
+ const body=await request.json().catch(()=>null) as {messages?:ChatMessage[];daily?:boolean}|null;
+ const day=new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+ const dailyName=`AI毎日投稿案 ${day}`;
+ if(body?.daily){
+  const existing=await env.DB.prepare("SELECT id,content_json,updated_at FROM message_campaigns WHERE name=? LIMIT 1").bind(dailyName).first<{id:string;content_json:string;updated_at:number}>();
+  if(existing){const content=JSON.parse(existing.content_json||"{}") as {body?:string};return NextResponse.json({message:content.body??"",saved:true,existing:true,id:existing.id,day})}
+ }
+ const dailyPrompt=`本日（${day}）のCOMPASSION WORLD向けSNS投稿案を1件作成してください。店舗の日常、商品、サービス、地域とのつながりのいずれかをテーマにし、事実が不足する場合は断定せず、スタッフが差し替える箇所を【確認：○○】と明記してください。Instagram・X・Threads・LINEの4媒体分を、そのまま編集できる完成稿として提示してください。`;
+ const messages=(body?.daily?[{role:"user" as const,content:dailyPrompt}]:(body?.messages??[])).filter(item=>(item.role==="user"||item.role==="assistant")&&typeof item.content==="string").slice(-12).map(item=>({role:item.role,content:item.content.trim().slice(0,4000)})).filter(item=>item.content);
  if(!messages.length)return NextResponse.json({error:"MESSAGE_REQUIRED"},{status:400});
  try{
   const response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json"},body:JSON.stringify({model:runtime.OPENAI_SNS_MODEL??"gpt-5.4-mini",instructions,input:messages,max_output_tokens:1800,store:false})});
@@ -37,6 +45,11 @@ export async function POST(request:NextRequest){
   if(!response.ok){console.error("sns assistant failed",response.status,result.error?.message);return NextResponse.json({error:"OPENAI_REQUEST_FAILED",message:"投稿案を生成できませんでした。少し時間をおいて再試行してください。"},{status:502})}
   const text=result.output_text??result.output?.flatMap(item=>item.content??[]).filter(item=>item.type==="output_text").map(item=>item.text??"").join("\n")??"";
   if(!text)return NextResponse.json({error:"EMPTY_RESPONSE"},{status:502});
+  if(body?.daily){
+   const id=crypto.randomUUID(),now=Date.now();
+   await env.DB.prepare("INSERT INTO message_campaigns (id,name,status,channel,audience_json,content_json,scheduled_at,sent_at,created_by,created_at,updated_at) VALUES (?,?,'DRAFT','MULTI','{}',?,NULL,NULL,?,?,?)").bind(id,dailyName,JSON.stringify({title:`本日のSNS投稿案 ${day}`,body:text,generatedBy:"SNS_ASSISTANT"}),actor,now,now).run();
+   return NextResponse.json({message:text,saved:true,existing:false,id,day});
+  }
   return NextResponse.json({message:text});
  }catch(error){console.error("sns assistant connection failed",error);return NextResponse.json({error:"OPENAI_CONNECTION_FAILED",message:"SNS相談AIへ接続できませんでした。"},{status:502})}
 }
