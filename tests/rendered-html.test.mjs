@@ -904,3 +904,13 @@ test("商品マスタ管理は既存GAS経由でスマレジの商品書き込�
   assert.match(route,/product\.update/);
   assert.match(route,/product\.status/);
 });
+
+test("商品マスタ同期は在庫権限エラーと分離し0件成功を表示しない",async()=>{
+  const [route,panel]=await Promise.all([
+    readFile(new URL("app/api/v1/admin/inventory/route.ts",root),"utf8"),
+    readFile(new URL("app/menu-admin/MasterCatalogPanel.tsx",root),"utf8"),
+  ]);
+  assert.match(route,/SMAREGI_MASTER_SYNC_FAILED/);
+  assert.match(panel,/スマレジAPIから商品を取得できませんでした/);
+  assert.match(panel,/商品は0件でした/);
+});
