@@ -20,10 +20,10 @@ export async function POST(request: NextRequest) {
   if (!request.headers.get("authorization")?.startsWith("Bearer ")) return NextResponse.json({ error: "LINE_AUTH_REQUIRED" }, { status: 401 });
   const member = await authenticatedMember(request);
   if (!member) return NextResponse.json({ error: "MEMBER_LOGIN_REQUIRED" }, { status: 401 });
-  const body = await request.json().catch(() => null) as { date?: string; startHour?: number; durationHours?: number; requestId?: string } | null;
-  const date=body?.date??"",startHour=Number(body?.startHour),duration=Number(body?.durationHours);
-  if(!isBookableDate(date)||!Number.isInteger(startHour)||startHour<8||startHour>25||!Number.isInteger(duration)||duration<1||duration>10||startHour+duration>26)return NextResponse.json({error:"INVALID_RESERVATION_WINDOW",...bookingDateRange()},{status:400});
-  const base=new Date(`${date}T12:00:00+09:00`);if(startHour>=24)base.setDate(base.getDate()+1);const localDate=new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Tokyo"}).format(base);const actualHour=startHour>=24?startHour-24:startHour;const startAt=`${localDate}T${String(actualHour).padStart(2,"0")}:00:00+09:00`;
+  const body = await request.json().catch(() => null) as { startAt?: string; durationHours?: number; requestId?: string } | null;
+  const parsedStart=Date.parse(body?.startAt??""),duration=Number(body?.durationHours),date=Number.isFinite(parsedStart)?new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Tokyo"}).format(parsedStart):"",minute=Number.isFinite(parsedStart)?Number(new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Tokyo",minute:"2-digit",hour12:false}).format(parsedStart)):NaN;
+  if(!isBookableDate(date)||!Number.isInteger(minute)||minute%15!==0||!Number.isInteger(duration)||duration<1||duration>10)return NextResponse.json({error:"INVALID_RESERVATION_WINDOW",...bookingDateRange()},{status:400});
+  const startAt=new Date(parsedStart).toISOString();
   try {
     const row=await facilityPost<FacilityReservation>("reservation.create",{facilityId:"FEBBRAIO",memberCode:member.memberCode,startAt,hours:duration},body?.requestId||crypto.randomUUID());
     if(!isOwnedFacilityRow(row,member.memberCode))throw new Error("RESERVATION_OWNERSHIP_MISMATCH");

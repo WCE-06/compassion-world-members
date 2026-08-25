@@ -26,7 +26,7 @@ test("LIFF・移行・共通セッションの接続点を保持する", async (
   ]);
   assert.match(page, /api\/v1\/client-config/);
   assert.match(page, /api\/v1\/me\/membership/);
-  assert.match(page, /fetch\("\/api\/v1\/febbraio\/launch"/);
+  assert.match(page, /window\.location\.href="\/availability"/);
   assert.match(page, /モバイルオーダー/);
   assert.match(page, /A7K4P9X2M6/);
   assert.match(page, /ポイント履歴/);
@@ -70,9 +70,9 @@ test("予約ページは代表会員へフォールバックせずLINE本人の�
     readFile(new URL("app/api/v1/reservations/[id]/route.ts", root), "utf8"),
   ]);
   assert.doesNotMatch(page, /X-Compass-Preview/);
-  assert.match(page, /FEBBRAIO予約画面を開いています/);
+  assert.match(page, /スタジオ予約/);
   assert.match(page, /開始時刻は15分単位で選択できます/);
-  assert.match(page, /fetch\("\/api\/v1\/febbraio\/launch"/);
+  assert.match(page, /fetch\("\/api\/v1\/reservations"/);
   assert.match(reservationsApi, /LINE_AUTH_REQUIRED/);
   assert.match(cancellationApi, /LINE_AUTH_REQUIRED/);
 });
@@ -91,19 +91,16 @@ test("読み込み中の仮通知を表示せず無料会員を住民登録へ�
   assert.match(upgradeApi, /client_reference_id/);
 });
 
-test("LINE本人を5分有効の署名トークンでFEBBRAIO予約サイトへ引き継ぐ", async () => {
-  const [page, launchApi] = await Promise.all([
+test("予約導線は外部サイトへ移動せず会員証と同一サイト内で完結する", async () => {
+  const [page, bookingPage] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
-    readFile(new URL("app/api/v1/febbraio/launch/route.ts", root), "utf8"),
+    readFile(new URL("app/availability/page.tsx", root), "utf8"),
   ]);
-  assert.match(launchApi, /FEBBRAIO_RESERVATION_SIGNING_SECRET/);
-  assert.match(launchApi, /FEBBRAIO_RESERVATION_EXCHANGE_URL/);
-  assert.match(launchApi, /HMAC/);
-  assert.match(launchApi, /TOKEN_LIFETIME_MS=5\*60\*1000/);
-  assert.match(launchApi, /purpose:PURPOSE,memberId:member\.id,memberCode/);
-  assert.match(page, /form\.method="POST"/);
-  assert.match(page, /input\.name="token"/);
-  assert.doesNotMatch(page, /memberCode=/);
+  assert.match(page, /window\.location\.href="\/availability"/);
+  assert.doesNotMatch(page, /exchangeUrl|form\.method="POST"/);
+  assert.doesNotMatch(bookingPage, /chatgpt\.site|febbraio\/launch|exchangeUrl/);
+  assert.match(bookingPage, /15分単位/);
+  assert.match(bookingPage, /startAt:new Date\(selected\.startAt\)\.toISOString\(\)/);
 });
 
 test("モバイル注文の商品画像を切り抜かず、飲料を段階選択する", async () => {
