@@ -123,3 +123,41 @@
 .point-copy strong,
 .wallet-balances strong,
 .point-history-balance strong{font-weight:700}
+
+/* Premium ranks gain progressively richer metallic depth without covering the scannable code. */
+.rank-card:not(.rank-card-standard) .wallet-card-head{
+  isolation:isolate;
+  background:
+    linear-gradient(112deg,transparent 0 27%,#ffffff38 38%,transparent 49% 100%),
+    radial-gradient(circle at 82% -40%,#fff9 0,transparent 48%);
+  background-size:240% 100%,100% 100%;
+}
+.rank-card:not(.rank-card-standard) .wallet-card-head:after{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  inset:0;
+  background:linear-gradient(105deg,transparent 0 36%,#fff8 48%,transparent 60% 100%);
+  background-size:220% 100%;
+  animation:rank-metal-sweep 5.8s ease-in-out infinite;
+  pointer-events:none;
+}
+.rank-card:not(.rank-card-standard) .rank-emblem b{
+  color:#fff;
+  text-shadow:0 1px 2px #0008,0 0 14px #fff7;
+}
+.rank-card:not(.rank-card-standard) .wallet-balances{
+  background:
+    linear-gradient(118deg,var(--rank-pale),#fff 44%,color-mix(in srgb,var(--rank-pale) 72%,#fff));
+  box-shadow:inset 0 1px #fff,inset 0 -10px 24px color-mix(in srgb,var(--rank-accent) 9%,transparent);
+}
+.rank-card-bronze .wallet-card-head{filter:saturate(1.08)}
+.rank-card-silver .wallet-card-head{filter:contrast(1.05)}
+.rank-card-gold .wallet-card-head{filter:saturate(1.14);box-shadow:inset 0 0 22px #ffd97842}
+.rank-card-platinum .wallet-card-head{filter:saturate(1.12);box-shadow:inset 0 0 24px #bdfbf044}
+.rank-card-diamond .wallet-card-head{filter:saturate(1.18);box-shadow:inset 0 0 28px #bce4ff55}
+.rank-card-diamond .rank-emblem b{
+  text-shadow:0 1px 2px #001b4f,0 0 8px #fff,0 0 20px #9bd8ff;
+}
+@keyframes rank-metal-sweep{0%,22%{background-position:170% 0}58%,100%{background-position:-90% 0}}
+@media(prefers-reduced-motion:reduce){.rank-card:not(.rank-card-standard) .wallet-card-head:after{animation:none;background-position:45% 0}}
