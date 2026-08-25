@@ -143,8 +143,8 @@ function MemberQr({ value, large = false }: { value: string; large?: boolean }) 
   }, [large, value]);
 
   return (
-    <div className={`qr-panel${large ? " qr-panel-large" : ""}`} aria-label={`会員番号 ${value} のQRコード`}>
-      {failed ? <div className="qr-fallback">QR<br />読み込み中</div> : <canvas ref={canvasRef} width={large ? 360 : 196} height={large ? 360 : 196} />}
+    <div className={`qr-panel${large ? " qr-panel-large" : ""}`} aria-label={`会員番号 ${value} の2次元コード`}>
+      {failed ? <div className="qr-fallback">コード<br />読み込み中</div> : <canvas ref={canvasRef} width={large ? 360 : 196} height={large ? 360 : 196} />}
       <div><small>MEMBER No.</small><strong>{value}</strong></div>
     </div>
   );
@@ -271,7 +271,7 @@ export default function Home() {
             {member.qualifyingSpendSource!=="SMAREGI"&&<p className="sync-status">過去1年のお買い上げ金額をスマレジと同期しています</p>}
           </section>
 
-          {qrExpanded&&<div className="qr-zoom-backdrop" onClick={()=>setQrExpanded(false)}><section className="qr-zoom" role="dialog" aria-modal="true" aria-label="会員証QRコードを拡大表示" onClick={event=>event.stopPropagation()}><header><div><small>COMPASSION WORLD</small><strong>会員証</strong></div><button onClick={()=>setQrExpanded(false)} aria-label="拡大表示を閉じる">×</button></header><MemberQr value={member.memberCode} large/><p>受付端末へこのQRコードをご提示ください</p><button className="qr-zoom-close" onClick={()=>setQrExpanded(false)}>元のサイズへ戻す</button></section></div>}
+          {qrExpanded&&<div className="qr-zoom-backdrop" onClick={()=>setQrExpanded(false)}><section className="qr-zoom" role="dialog" aria-modal="true" aria-label="会員証の2次元コードを拡大表示" onClick={event=>event.stopPropagation()}><header><div><small>COMPASSION WORLD</small><strong>会員証</strong></div><button onClick={()=>setQrExpanded(false)} aria-label="拡大表示を閉じる">×</button></header><MemberQr value={member.memberCode} large/><p>受付端末へこの2次元コードをご提示ください</p><button className="qr-zoom-close" onClick={()=>setQrExpanded(false)}>閉じる</button></section></div>}
 
           {member.membershipType!=="RESIDENT"&&<button className="resident-upgrade-banner" onClick={()=>{window.location.href="/resident"}}><span>RESIDENT MEMBERSHIP</span><strong>住民登録へアップグレード</strong><small>住民限定特典とゴールドランク保証を確認する　›</small></button>}
 

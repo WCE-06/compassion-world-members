@@ -1,25 +1,106 @@
 "use client";
 import { ArrowLeft, CalendarDays, CheckCircle2, Clock3 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-
-declare global { interface Window { liff?: {init(c:{liffId:string}):Promise<void>;isLoggedIn():boolean;login(c?:{redirectUri?:string}):void;getAccessToken():string|null} } }
-type Slot={startAt:number;label:string;available:boolean};
-type Day={date:string;opensAt:number;closesAt:number;slots:Slot[];minDate:string;maxDate:string};
-type Reservation={id:string;startsAt:number;endsAt:number;status:string};
-function slotHour(value:number){return Number(new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Tokyo",hour:"2-digit",hourCycle:"h23"}).format(value))}
-function hourLabel(hour:number){return hour<8?`翌${hour}時`:`${hour}時`}
-function minuteLabel(value:number){return `${new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Tokyo",minute:"2-digit"}).format(value)}分`}
-
-function loadLiff(){return new Promise<void>((resolve,reject)=>{if(window.liff)return resolve();const script=document.createElement("script");script.src="https://static.line-scdn.net/liff/edge/2/sdk.js";script.onload=()=>resolve();script.onerror=()=>reject(new Error("LINE認証を読み込めませんでした"));document.head.appendChild(script)})}
-function localDate(value:number){return new Intl.DateTimeFormat("ja-JP",{timeZone:"Asia/Tokyo",month:"numeric",day:"numeric",weekday:"short",hour:"2-digit",minute:"2-digit"}).format(value)}
-
-export default function AvailabilityPage(){
- const [token,setToken]=useState(""),[day,setDay]=useState<Day|null>(null),[date,setDate]=useState(""),[selectedHour,setSelectedHour]=useState<number|null>(null),[selected,setSelected]=useState<Slot|null>(null),[duration,setDuration]=useState(1),[reservations,setReservations]=useState<Reservation[]>([]),[message,setMessage]=useState("会員情報を確認しています…"),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false);
- const authHeaders=useMemo(()=>token?{Authorization:`Bearer ${token}`} as Record<string,string>:undefined,[token]);
- const hours=useMemo(()=>[...new Set(day?.slots.map(slot=>slotHour(slot.startAt))??[])].sort((a,b)=>(a<8?a+24:a)-(b<8?b+24:b)),[day]);
- const visibleSlots=useMemo(()=>selectedHour===null?[]:day?.slots.filter(slot=>slotHour(slot.startAt)===selectedHour)??[],[selectedHour,day]);
- const loadDay=useCallback(async(target:string)=>{if(!target)return;setLoading(true);setSelectedHour(null);setSelected(null);setMessage("空き状況を確認しています…");try{const response=await fetch(`/api/v1/availability?date=${encodeURIComponent(target)}`,{cache:"no-store"}),result=await response.json();if(!response.ok)throw new Error(result.message??"空き状況を取得できませんでした");setDay(result);setMessage("")}catch(error){setMessage(error instanceof Error?error.message:"空き状況を取得できませんでした")}finally{setLoading(false)}},[]);
- useEffect(()=>{void(async()=>{try{const config=await fetch("/api/v1/client-config").then(r=>r.json()),liffId=String(config.liffId??"");if(!liffId)throw new Error("LINE認証を準備できませんでした");await loadLiff();await window.liff!.init({liffId});if(!window.liff!.isLoggedIn()){window.liff!.login({redirectUri:location.href});return}const accessToken=window.liff!.getAccessToken();if(!accessToken)throw new Error("LINE認証を確認できませんでした");setToken(accessToken);const range=await fetch("/api/v1/availability/range").then(r=>r.json()).catch(()=>null);const today=range?.minDate??new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Tokyo"}).format(new Date());setDate(today);const history=await fetch("/api/v1/reservations",{headers:{Authorization:`Bearer ${accessToken}`}}).then(r=>r.ok?r.json():{reservations:[]});setReservations(history.reservations??[]);await loadDay(today)}catch(error){setLoading(false);setMessage(error instanceof Error?error.message:"予約画面を開けませんでした")}})()},[loadDay]);
- async function reserve(){if(!selected||!authHeaders||saving)return;setSaving(true);setMessage("予約内容を確認しています…");try{const response=await fetch("/api/v1/reservations",{method:"POST",headers:{...authHeaders,"Content-Type":"application/json"},body:JSON.stringify({startAt:new Date(selected.startAt).toISOString(),durationHours:duration,requestId:crypto.randomUUID()})}),result=await response.json();if(!response.ok)throw new Error(result.error==="TIME_NOT_AVAILABLE"?"選択した時間は直前に予約不可となりました。別の時間をお選びください。":"予約を確定できませんでした");setReservations(current=>[{id:result.reservationId,startsAt:result.startsAt,endsAt:result.endsAt,status:result.status},...current]);setSelected(null);setMessage("予約を確定しました");await loadDay(date)}catch(error){setMessage(error instanceof Error?error.message:"予約を確定できませんでした")}finally{setSaving(false)}}
- return <main className="booking-shell internal-booking"><header className="booking-head"><div><small>MUSIC STUDIO</small><h1>FEBBRAIO</h1></div><a href="/"><ArrowLeft size={15}/> 会員証トップへ戻る</a></header><section className="booking-intro"><p>STUDIO RESERVATION</p><h2>スタジオ予約</h2><span>利用日と開始する「時」を選んだあと、「分」を15分単位で選択できます。</span></section><section className="booking-date-card"><label><CalendarDays size={18}/><span>利用日</span><input type="date" value={date} min={day?.minDate} max={day?.maxDate} onChange={event=>{setDate(event.target.value);void loadDay(event.target.value)}}/></label></section><section className="booking-time-band booking-hour-step"><header><small>STEP 1 / HOUR</small><h2>何時から利用しますか？</h2></header><div>{hours.map(hour=>{const slots=day?.slots.filter(slot=>slotHour(slot.startAt)===hour)??[],available=slots.some(slot=>slot.available);return <button key={hour} disabled={loading||!available} className={selectedHour===hour?"selected":""} onClick={()=>{setSelectedHour(hour);setSelected(null)}}><strong>{hourLabel(hour)}</strong><small>{available?"選択":"予約不可"}</small></button>})}</div></section>{selectedHour!==null&&<section className="booking-slots booking-minute-step"><header><div><small>STEP 2 / MINUTE</small><h2>{hourLabel(selectedHour)}の何分からですか？</h2></div><span><i/>予約可能　<i/>予約不可</span></header>{visibleSlots.length?<div className="quarter-slot-grid minute-slot-grid">{visibleSlots.map(slot=><button key={slot.startAt} disabled={!slot.available} className={selected?.startAt===slot.startAt?"selected":""} onClick={()=>setSelected(slot)}><strong>{minuteLabel(slot.startAt)}</strong><small>{slot.available?"選択":"予約不可"}</small></button>)}</div>:<p className="booking-state">この時間に予約枠はありません</p>}</section>}{selectedHour===null&&!loading&&<p className="booking-band-guide">最初に、利用を開始したい「時」を選択してください。</p>}{selected&&<section className="booking-confirm"><div><Clock3 size={20}/><span><small>選択中</small><strong>{localDate(selected.startAt)}から</strong></span></div><label>利用時間<select value={duration} onChange={event=>setDuration(Number(event.target.value))}>{Array.from({length:10},(_,index)=><option key={index+1} value={index+1}>{index+1}時間</option>)}</select></label><button disabled={saving} onClick={reserve}>{saving?"予約を確定しています…":"この内容で予約する"}</button></section>}{message&&!loading&&<p className={`booking-message ${message.includes("確定しました")?"success":""}`}>{message.includes("確定しました")&&<CheckCircle2 size={16}/>} {message}</p>}<section className="booking-history"><header><small>MY RESERVATIONS</small><h2>予約履歴</h2></header>{reservations.length?reservations.map(item=><article key={item.id}><b>{item.status==="CONFIRMED"?"予約確定":item.status==="CANCELLED"?"キャンセル":"ご利用済み"}</b><span><strong>{localDate(item.startsAt)}</strong><small>〜 {new Intl.DateTimeFormat("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"}).format(item.endsAt)}</small></span></article>):<p className="booking-state">予約履歴はありません</p>}</section></main>
+declare global {
+    interface Window {
+        liff?: {
+            init(c: {
+                liffId: string;
+            }): Promise<void>;
+            isLoggedIn(): boolean;
+            login(c?: {
+                redirectUri?: string;
+            }): void;
+            getAccessToken(): string | null;
+        };
+    }
+}
+type Slot = {
+    startAt: number;
+    label: string;
+    available: boolean;
+};
+type Day = {
+    date: string;
+    opensAt: number;
+    closesAt: number;
+    slots: Slot[];
+    minDate: string;
+    maxDate: string;
+};
+type Reservation = {
+    id: string;
+    startsAt: number;
+    endsAt: number;
+    status: string;
+};
+function slotHour(value: number) { return Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "2-digit", hourCycle: "h23" }).format(value)); }
+function hourLabel(hour: number) { return hour < 8 ? `翌${hour}時` : `${hour}時`; }
+function minuteLabel(value: number) { return `${new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", minute: "2-digit" }).format(value)}分`; }
+function loadLiff() { return new Promise<void>((resolve, reject) => { if (window.liff)
+    return resolve(); const script = document.createElement("script"); script.src = "https://static.line-scdn.net/liff/edge/2/sdk.js"; script.onload = () => resolve(); script.onerror = () => reject(new Error("LINE認証を読み込めませんでした")); document.head.appendChild(script); }); }
+function localDate(value: number) { return new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" }).format(value); }
+export default function AvailabilityPage() {
+    const [token, setToken] = useState(""), [day, setDay] = useState<Day | null>(null), [date, setDate] = useState(""), [selectedHour, setSelectedHour] = useState<number | null>(null), [selected, setSelected] = useState<Slot | null>(null), [duration, setDuration] = useState(1), [reservations, setReservations] = useState<Reservation[]>([]), [message, setMessage] = useState("会員情報を確認しています…"), [loading, setLoading] = useState(true), [saving, setSaving] = useState(false);
+    const authHeaders = useMemo(() => token ? { Authorization: `Bearer ${token}` } as Record<string, string> : undefined, [token]);
+    const hours = useMemo(() => [...new Set(day?.slots.map(slot => slotHour(slot.startAt)) ?? [])].sort((a, b) => (a < 8 ? a + 24 : a) - (b < 8 ? b + 24 : b)), [day]);
+    const visibleSlots = useMemo(() => selectedHour === null ? [] : day?.slots.filter(slot => slotHour(slot.startAt) === selectedHour) ?? [], [selectedHour, day]);
+    const loadDay = useCallback(async (target: string) => { if (!target)
+        return; setLoading(true); setSelectedHour(null); setSelected(null); setMessage("空き状況を確認しています…"); try {
+        const response = await fetch(`/api/v1/availability?date=${encodeURIComponent(target)}`, { cache: "no-store" }), result = await response.json();
+        if (!response.ok)
+            throw new Error(result.message ?? "空き状況を取得できませんでした");
+        setDay(result);
+        setMessage("");
+    }
+    catch (error) {
+        setMessage(error instanceof Error ? error.message : "空き状況を取得できませんでした");
+    }
+    finally {
+        setLoading(false);
+    } }, []);
+    useEffect(() => { void (async () => { try {
+        const config = await fetch("/api/v1/client-config").then(r => r.json()), liffId = String(config.liffId ?? "");
+        if (!liffId)
+            throw new Error("LINE認証を準備できませんでした");
+        await loadLiff();
+        await window.liff!.init({ liffId });
+        if (!window.liff!.isLoggedIn()) {
+            window.liff!.login({ redirectUri: location.href });
+            return;
+        }
+        const accessToken = window.liff!.getAccessToken();
+        if (!accessToken)
+            throw new Error("LINE認証を確認できませんでした");
+        setToken(accessToken);
+        const range = await fetch("/api/v1/availability/range").then(r => r.json()).catch(() => null);
+        const today = range?.minDate ?? new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
+        setDate(today);
+        const history = await fetch("/api/v1/reservations", { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.ok ? r.json() : { reservations: [] });
+        setReservations(history.reservations ?? []);
+        await loadDay(today);
+    }
+    catch (error) {
+        setLoading(false);
+        setMessage(error instanceof Error ? error.message : "予約画面を開けませんでした");
+    } })(); }, [loadDay]);
+    async function reserve() { if (!selected || !authHeaders || saving)
+        return; setSaving(true); setMessage("予約内容を確認しています…"); try {
+        const response = await fetch("/api/v1/reservations", { method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" }, body: JSON.stringify({ startAt: new Date(selected.startAt).toISOString(), durationHours: duration, requestId: crypto.randomUUID() }) }), result = await response.json();
+        if (!response.ok)
+            throw new Error(result.error === "TIME_NOT_AVAILABLE" ? "選択した時間は直前に予約不可となりました。別の時間をお選びください。" : "予約を確定できませんでした");
+        setReservations(current => [{ id: result.reservationId, startsAt: result.startsAt, endsAt: result.endsAt, status: result.status }, ...current]);
+        setSelected(null);
+        setMessage("予約を確定しました");
+        await loadDay(date);
+    }
+    catch (error) {
+        setMessage(error instanceof Error ? error.message : "予約を確定できませんでした");
+    }
+    finally {
+        setSaving(false);
+    } }
+    if (loading)
+        return <main className="booking-shell internal-booking"><header className="booking-head"><div><small>MUSIC STUDIO</small><h1>FEBBRAIO</h1></div><a href="/"><ArrowLeft size={15}/> 会員証トップへ戻る</a></header><section className="booking-intro"><p>STUDIO RESERVATION</p><h2>スタジオ予約</h2><span>利用日と開始する「時」を選んだあと、「分」を15分単位で選択できます。</span></section><section className="booking-date-card"><label><CalendarDays size={18}/><span>利用日</span><input type="date" value={date} disabled/></label></section><section className="booking-time-band booking-hour-step" aria-busy="true"><header><small>STEP 1 / HOUR</small><h2>何時から利用しますか？</h2></header><p className="booking-slot-loading" role="status"><span className="booking-slot-spinner"/>データ読み込み中…</p></section></main>;
+    return <main className="booking-shell internal-booking"><header className="booking-head"><div><small>MUSIC STUDIO</small><h1>FEBBRAIO</h1></div><a href="/"><ArrowLeft size={15}/> 会員証トップへ戻る</a></header><section className="booking-intro"><p>STUDIO RESERVATION</p><h2>スタジオ予約</h2><span>利用日と開始する「時」を選んだあと、「分」を15分単位で選択できます。</span></section><section className="booking-date-card"><label><CalendarDays size={18}/><span>利用日</span><input type="date" value={date} min={day?.minDate} max={day?.maxDate} onChange={event => { setDate(event.target.value); void loadDay(event.target.value); }}/></label></section><section className="booking-time-band booking-hour-step"><header><small>STEP 1 / HOUR</small><h2>何時から利用しますか？</h2></header><div>{hours.map(hour => { const slots = day?.slots.filter(slot => slotHour(slot.startAt) === hour) ?? [], available = slots.some(slot => slot.available); return <button key={hour} disabled={loading || !available} className={selectedHour === hour ? "selected" : ""} onClick={() => { setSelectedHour(hour); setSelected(null); }}><strong>{hourLabel(hour)}</strong><small>{available ? "選択" : "予約不可"}</small></button>; })}</div></section>{selectedHour !== null && <section className="booking-slots booking-minute-step"><header><div><small>STEP 2 / MINUTE</small><h2>{hourLabel(selectedHour)}の何分からですか？</h2></div><span><i />予約可能　<i />予約不可</span></header>{visibleSlots.length ? <div className="quarter-slot-grid minute-slot-grid">{visibleSlots.map(slot => <button key={slot.startAt} disabled={!slot.available} className={selected?.startAt === slot.startAt ? "selected" : ""} onClick={() => setSelected(slot)}><strong>{minuteLabel(slot.startAt)}</strong><small>{slot.available ? "選択" : "予約不可"}</small></button>)}</div> : <p className="booking-state">この時間に予約枠はありません</p>}</section>}{selectedHour === null && !loading && <p className="booking-band-guide">最初に、利用を開始したい「時」を選択してください。</p>}{selected && <section className="booking-confirm"><div><Clock3 size={20}/><span><small>選択中</small><strong>{localDate(selected.startAt)}から</strong></span></div><label>利用時間<select value={duration} onChange={event => setDuration(Number(event.target.value))}>{Array.from({ length: 10 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}時間</option>)}</select></label><button disabled={saving} onClick={reserve}>{saving ? "予約を確定しています…" : "この内容で予約する"}</button></section>}{message && !loading && <p className={`booking-message ${message.includes("確定しました") ? "success" : ""}`}>{message.includes("確定しました") && <CheckCircle2 size={16}/>} {message}</p>}<section className="booking-history"><header><small>MY RESERVATIONS</small><h2>予約履歴</h2></header>{reservations.length ? reservations.map(item => <article key={item.id}><b>{item.status === "CONFIRMED" ? "予約確定" : item.status === "CANCELLED" ? "キャンセル" : "ご利用済み"}</b><span><strong>{localDate(item.startsAt)}</strong><small>〜 {new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" }).format(item.endsAt)}</small></span></article>) : <p className="booking-state">予約履歴はありません</p>}</section></main>;
 }

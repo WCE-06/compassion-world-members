@@ -41,6 +41,10 @@ function normalizedPointResult(body: EntryThankYou): EntryThankYou {
   return { ...body, grantedPoint, pointGranted: body.pointGranted ?? body.visitPointGranted ?? grantedPoint > 0 };
 }
 
+function japanDateKey(timestamp: number) {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(timestamp);
+}
+
 export async function POST(request: NextRequest) {
   if (!await requireCheckinNotificationToken(request)) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   const body = await request.json().catch(() => null) as EntryThankYou | null;
@@ -58,6 +62,11 @@ export async function POST(request: NextRequest) {
   if (body.memberId && body.memberId !== member.id) return NextResponse.json({ ok: false, error: "MEMBER_MISMATCH" }, { status: 409 });
   const now = Date.now();
   const id = crypto.randomUUID();
+  const storeCode = body.storeCode ?? "MAIN_BUILDING";
+  const visitDate = japanDateKey(occurredAt);
+  const canonicalEventId = `ENTRY_THANK_YOU:${storeCode}:${visitDate}:${member.id}`;
+  const dayStartedAt = Date.parse(`${visitDate}T00:00:00+09:00`);
+  const dayEndedAt = dayStartedAt + 86_400_000;
   const metadata = {
     rank: String(body.rank ?? "STANDARD").toUpperCase(),
     pointGranted: Boolean(result.pointGranted),
@@ -65,16 +74,25 @@ export async function POST(request: NextRequest) {
     grantedPoint: result.grantedPoint,
     pointReason: body.pointReason ?? "DAILY_CHECKIN",
     pointError: body.pointError ?? null,
-    storeCode: body.storeCode ?? "MAIN_BUILDING",
+    storeCode,
     storeName: body.storeName ?? "COMPASSION WORLD 本館",
   };
+  const existingForDay = await env.DB.prepare(`SELECT id FROM member_notifications
+    WHERE member_id=? AND event_type='ENTRY_THANK_YOU' AND occurred_at>=? AND occurred_at<?
+      AND COALESCE(json_extract(metadata_json,'$.storeCode'),'MAIN_BUILDING')=?
+    ORDER BY created_at DESC LIMIT 1`).bind(member.id, dayStartedAt, dayEndedAt, storeCode).first<{ id: string }>();
+  const confirmed = (result.pointGranted && Number(result.grantedPoint)>0) || result.alreadyGranted;
+  if (existingForDay) {
+    if (confirmed) await env.DB.prepare("UPDATE member_notifications SET body=?,metadata_json=?,read_at=NULL,updated_at=? WHERE id=?")
+      .bind(messageFor(result, member.displayName), JSON.stringify(metadata), now, existingForDay.id).run();
+    return NextResponse.json({ ok: true, duplicate: true, updated: Boolean(confirmed), notificationId: existingForDay.id });
+  }
   const inserted = await env.DB.prepare(`INSERT OR IGNORE INTO member_notifications
     (id,event_id,member_id,event_type,category,title,body,sender,channel,delivery_status,metadata_json,occurred_at,created_at,updated_at)
     VALUES (?,?,?,'ENTRY_THANK_YOU','POINT',?,?,'COMPASSION WORLD','CARD','SAVED',?,?,?,?)`)
-    .bind(id, eventId, member.id, "COMPASSION WORLDへご来店ありがとうございます", messageFor(result, member.displayName), JSON.stringify(metadata), occurredAt, now, now).run();
+    .bind(id, canonicalEventId, member.id, "COMPASSION WORLDへご来店ありがとうございます", messageFor(result, member.displayName), JSON.stringify(metadata), occurredAt, now, now).run();
   if (!inserted.meta.changes) {
-    const existing = await env.DB.prepare("SELECT id FROM member_notifications WHERE event_id=? LIMIT 1").bind(eventId).first<{ id: string }>();
-    const confirmed = (result.pointGranted && Number(result.grantedPoint)>0) || result.alreadyGranted;
+    const existing = await env.DB.prepare("SELECT id FROM member_notifications WHERE event_id=? LIMIT 1").bind(canonicalEventId).first<{ id: string }>();
     if (existing && confirmed) await env.DB.prepare("UPDATE member_notifications SET body=?,metadata_json=?,read_at=NULL,updated_at=? WHERE id=?")
       .bind(messageFor(result, member.displayName), JSON.stringify(metadata), now, existing.id).run();
     return NextResponse.json({ ok: true, duplicate: true, updated: Boolean(existing&&confirmed), notificationId: existing?.id ?? null });

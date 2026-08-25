@@ -5,7 +5,7 @@ import { facilityPost, filterOwnedFacilityRows, isOwnedFacilityRow } from "@/lib
 import { expireStaleLocks,expireStaleOrder,reconcileCompletedOrders } from "@/lib/order-pos";
 import { getOrderSchedule } from "@/lib/kitchen-schedule";
 import { memberPresentation, MEMBER_RANK_TERMS_VERSION, rankPeriodFor } from "@/lib/member-rank";
-import { storedNotice, StoredNoticeRow, welcomeNotice } from "@/lib/member-notices";
+import { dedupeStoredNotices, storedNotice, StoredNoticeRow, welcomeNotice } from "@/lib/member-notices";
 
 export async function GET(request: NextRequest) {
   const identity = await authenticatedMember(request);
@@ -29,6 +29,6 @@ export async function GET(request: NextRequest) {
   const runtime=env as unknown as Record<string,string|undefined>;
   const legacyResident=member.residentStatus==="UNKNOWN"&&(runtime.LEGACY_RESIDENT_MEMBER_CODES??"").split(",").map(value=>value.trim().toUpperCase()).includes(member.memberCode);
   const rankPeriod=rankState??rankPeriodFor(member.cardStartedAt??member.createdAt),presentation=memberPresentation(rankState?.currentRank??member.memberRank,qualifyingSpend,member.residentStatus,legacyResident);
-  const storedNotices=notificationRows.results.map(storedNotice);
+  const storedNotices=dedupeStoredNotices(notificationRows.results).map(storedNotice);
   return NextResponse.json({memberId:member.id,memberCode:member.memberCode,displayName:member.displayName,points:member.pointsBalance,smaregiSyncStatus:registrationSync?.status??null,...presentation,rank:rankState?.currentRank??presentation.rank,rankLabel:presentation.rankLabel,pointRatePercent:rankState?.currentRatePercent??presentation.pointRatePercent,rankPeriodMonths:12,rankPeriodStartedAt:rankPeriod.rankPeriodStartedAt,rankPeriodEndsAt:rankPeriod.rankPeriodEndsAt,nextReviewAt:rankPeriod.nextReviewAt,residentPlanActive:Boolean(rankState?.residentPlanActive)||presentation.membershipType==="RESIDENT",rankTermsVersion:MEMBER_RANK_TERMS_VERSION,rankTermsConsentRequired:!rankConsent,qualifyingSpendSource:smaregiSpend?"SMAREGI":"NOT_SYNCED",qualifyingSpendUpdatedAt:smaregiSpend?.syncedAt?new Date(smaregiSpend.syncedAt).toISOString():null,reservations:activeReservations.map(row=>({reservationId:row.reservationId,facilityName:"Music Studio FEBBRAIO",startsAt:row.startAt,endsAt:row.endAt,status:row.status})),reservationHistory:reservationHistory.map(row=>({reservationId:row.reservationId,facilityName:"Music Studio FEBBRAIO",startsAt:row.startAt,endsAt:row.endAt,status:row.status})),nextReservation:activeReservations[0]?{facilityName:"Music Studio FEBBRAIO",startsAt:activeReservations[0].startAt,endsAt:activeReservations[0].endAt}:null,session:session?{facilityName:"Music Studio FEBBRAIO",status:session.status==="ACTIVE"?"IN_USE":session.status,paymentStatus:session.paymentStatus,startedAt:session.checkedInAt?new Date(session.checkedInAt).toISOString():undefined,scheduledEndsAt:session.scheduledEndAt||undefined,unpaidAmount:session.billingAmount}:null,orders:activeOrders,orderHistory,activeOrder:activeOrders[0]??null,notices:[...storedNotices,welcomeNotice(member)]});
 }
