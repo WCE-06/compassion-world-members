@@ -496,10 +496,10 @@ test("提供予定はキッチン計算を正本としセルフレジへ部門�
     readFile(new URL("app/api/v1/stripe/webhook/route.ts", root), "utf8"),
   ]);
   assert.doesNotMatch(mobile, /Date\.now\(\)\+30\*60_000/);
-  assert.match(mobile, /提供予定：できあがり次第/);
+  assert.match(mobile, /提供予定時間を確認しています。しばらくお待ちください。/);
   assert.match(orders, /estimateOrderSchedule/);
   assert.match(schedule, /WITH_FOOD/);
-  assert.match(schedule, /AbortSignal\.timeout\(2_500\)/);
+  assert.match(schedule, /AbortSignal\.timeout\(7_000\)/);
   assert.match(pos, /foodCallNumber/);
   assert.match(pos, /drinkCallNumber/);
   assert.match(confirmation, /confirmOrderSchedule\(orderId/);

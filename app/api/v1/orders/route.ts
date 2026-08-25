@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     if(!order)return NextResponse.json({error:"ORDER_NOT_FOUND"},{status:404});
     const fulfillments=await env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(orderId).all<{department:Department;callNumber:number;status:string}>();
     const schedule=await getOrderSchedule(orderId);
-    return NextResponse.json({...order,pointEligible:Boolean(order.pointEligible),paymentLabel:order.paymentMethod==="STRIPE"?"スマート決済":"現地決済",fulfillments:fulfillments.results.map(item=>({...item,label:departmentLabel[item.department]})),schedule,scheduleLabel:schedule?null:"提供予定：できあがり次第"},{headers:{"Cache-Control":"no-store"}});
+    return NextResponse.json({...order,pointEligible:Boolean(order.pointEligible),paymentLabel:order.paymentMethod==="STRIPE"?"スマート決済":"現地決済",fulfillments:fulfillments.results.map(item=>({...item,label:departmentLabel[item.department]})),schedule,scheduleLabel:schedule?null:"提供予定時間を確認しています。しばらくお待ちください。"},{headers:{"Cache-Control":"no-store"}});
   }
   const result = await env.DB.prepare(
     `SELECT id, order_number AS orderNumber, status, payment_method AS paymentMethod, total_including_tax AS totalIncludingTax,
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
   const requestId = body?.requestId?.match(/^[a-zA-Z0-9-]{10,80}$/) ? body.requestId : crypto.randomUUID();
   const id = `ord_${requestId}`;
   const existing = await env.DB.prepare(`SELECT order_number AS orderNumber, status, payment_method AS paymentMethod, total_including_tax AS totalIncludingTax FROM orders WHERE id = ? AND member_id = ?`).bind(id, member.id).first();
-  if (existing) {const [result,schedule]=await Promise.all([env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(id).all(),getOrderSchedule(id)]);return NextResponse.json({ orderId:id,...existing,fulfillments:result.results,schedule,scheduleLabel:schedule?null:"提供予定：できあがり次第" });}
+  if (existing) {const [result,schedule]=await Promise.all([env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(id).all(),getOrderSchedule(id)]);return NextResponse.json({ orderId:id,...existing,fulfillments:result.results,schedule,scheduleLabel:schedule?null:"提供予定時間を確認しています。しばらくお待ちください。" });}
   const now = Date.now(); const orderNumber = `ORD-${String(now).slice(-8)}`; const expiresAt = now + 15 * 60_000;const callDate=businessDate(now);
   const departments=[...new Set(items.map(item=>item.product.category))] as Department[];
   const fulfillments=await Promise.all(departments.map(async department=>({department,callNumber:await allocateCallNumber(callDate,department,now),status:"WAITING_PAYMENT" as const,label:departmentLabel[department]})));
@@ -75,5 +75,5 @@ export async function POST(request: NextRequest) {
   ...items.map(item=>env.DB.prepare(`INSERT INTO order_items (id,order_id,product_id,product_code,product_name,department,quantity,unit_price_excluding_tax,unit_price_including_tax,tax_rate,tax_division,tax_rounding,preparation_minutes,selected_options_json,line_total_including_tax) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(crypto.randomUUID(),id,item.product.id,item.product.code,item.product.name,item.product.category,item.quantity,excludingTax(item.product),item.product.price,item.product.taxRate||10,normalizedTaxDivision(item.product.taxDivision),normalizedTaxRounding(item.product.taxRounding),item.product.preparationMinutes,"[]",item.product.price*item.quantity)),
   ...fulfillments.map(item=>env.DB.prepare(`INSERT INTO order_fulfillments (id,order_id,department,call_date,call_number,status,updated_at) VALUES (?,?,?,?,?,'WAITING_PAYMENT',?)`).bind(crypto.randomUUID(),id,item.department,callDate,item.callNumber,now))];
   await env.DB.batch(statements);
-  return NextResponse.json({ orderId: id, orderNumber, fulfillments, status: paymentMethod === "STRIPE" ? "PENDING_PAYMENT" : "WAITING_STORE_PAYMENT", paymentMethod, paymentLabel:paymentMethod === "STRIPE" ? "スマート決済" : "現地決済", pointEligible:pointRule.eligible, pointStatus:"PENDING", totalIncludingTax: total, expiresAt, schedule, scheduleLabel:schedule?null:"提供予定：できあがり次第" }, { status: 201 });
+  return NextResponse.json({ orderId: id, orderNumber, fulfillments, status: paymentMethod === "STRIPE" ? "PENDING_PAYMENT" : "WAITING_STORE_PAYMENT", paymentMethod, paymentLabel:paymentMethod === "STRIPE" ? "スマート決済" : "現地決済", pointEligible:pointRule.eligible, pointStatus:"PENDING", totalIncludingTax: total, expiresAt, schedule, scheduleLabel:schedule?null:"提供予定時間を確認しています。しばらくお待ちください。" }, { status: 201 });
 }
