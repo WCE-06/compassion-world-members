@@ -827,7 +827,25 @@ test("管理画面の外部同期は待ち続けずLINE名を並列取得する"
   assert.match(page,/memberRequest=useRef/);assert.match(page,/AbortSignal\.timeout\(8000\)/);assert.match(page,/AbortSignal\.timeout\(10000\)/);
   assert.match(studio,/requestId=useRef/);assert.match(studio,/AbortSignal\.timeout\(8000\)/);
   assert.match(members,/private, max-age=10, stale-while-revalidate=30/);
-  assert.match(operations,/private, max-age=30, stale-while-revalidate=60/);
+  assert.match(operations,/Cache-Control":"no-store/);
+});
+
+test("管理ダッシュボードは完了済みタスクと期限切れ決済を障害扱いしない",async()=>{
+  const [operations,tasks,taskPanel,webhook,migration]=await Promise.all([
+    readFile(new URL("app/api/v1/admin/operations/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/tasks/route.ts",root),"utf8"),
+    readFile(new URL("app/member-admin/TaskPanel.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/stripe/webhook/route.ts",root),"utf8"),
+    readFile(new URL("drizzle/0026_cleanup_cancelled_orders.sql",root),"utf8"),
+  ]);
+  assert.match(operations,/stripe_webhook_events WHERE status='FAILED'/);
+  assert.doesNotMatch(operations,/orders WHERE status='PAYMENT_FAILED'/);
+  assert.match(tasks,/get\("status"\)\?\?"ACTIVE"/);
+  assert.match(tasks,/status NOT IN \('DONE','CANCELLED'\)/);
+  assert.match(taskPanel,/useState\("ACTIVE"\)/);
+  assert.match(taskPanel,/対応が必要/);
+  assert.match(webhook,/UPDATE orders SET status='CANCELLED'/);
+  assert.match(migration,/SET `status`='CANCELLED'/);
 });
 test("スタッフ管理の全主要APIはパスワードログインを共通認証として受け入れる",async()=>{
   for(const file of ["operations/route.ts","engagement/route.ts","tasks/route.ts","members/route.ts","studio/route.ts","catalog/route.ts","store-hours/route.ts"]){
