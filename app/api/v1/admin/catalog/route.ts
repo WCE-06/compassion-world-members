@@ -32,26 +32,31 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({saved:true,count:order.length});
   }
   const productCode = typeof body?.productCode === "string" ? body.productCode.trim() : "";
-  const menuCategory = typeof body?.menuCategory === "string" ? body.menuCategory.trim() : "";
-  const imageUrl = typeof body?.imageUrl === "string" ? body.imageUrl.trim() : "";
+  const [existing] = productCode ? await getDb().select().from(catalogOverrides).where(eq(catalogOverrides.productCode, productCode)) : [];
+  const sourceProduct = productCode ? (await getOrderProducts({includeOverrides:true,includeClosedProducts:true,allowSnapshotFallback:true})).products.find(product=>product.code===productCode) : null;
+  const menuCategory = typeof body?.menuCategory === "string" ? body.menuCategory.trim() : existing?.menuCategory??sourceProduct?.menuCategory??"";
+  const imageUrl = typeof body?.imageUrl === "string" ? body.imageUrl.trim() : existing?.imageUrl??sourceProduct?.imageUrl??"";
   if (!productCode || !menuCategory || (imageUrl && !/^https:\/\//i.test(imageUrl))) {
     return NextResponse.json({ error: "INVALID_INPUT" }, { status: 400 });
   }
   const values = {
     productCode,
-    description: typeof body?.description === "string" ? body.description.trim().slice(0, 500) : "",
+    description: typeof body?.description === "string" ? body.description.trim().slice(0, 500) : existing?.description??sourceProduct?.description??"",
     imageUrl,
     menuCategory,
-    displaySequence: Math.max(0, Math.min(99999, Number(body?.displaySequence) || 0)),
-    showOnSelfRegister: body?.showOnSelfRegister !== false,
-    showOnMobileOrder: body?.showOnMobileOrder !== false,
-    soldOut: body?.soldOut === true,
-    scheduleEnabled: body?.scheduleEnabled === true,
-    scheduleStart: typeof body?.scheduleStart === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(body.scheduleStart) ? body.scheduleStart : "11:00",
-    scheduleEnd: typeof body?.scheduleEnd === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(body.scheduleEnd) ? body.scheduleEnd : "20:00",
-    scheduleDays: Array.isArray(body?.scheduleDays) ? [...new Set(body.scheduleDays.map(Number).filter(day => day >= 1 && day <= 7))].sort().join(",") || "1,2,3,4,5,6,7" : "1,2,3,4,5,6,7",
-    saleStartsAt: typeof body?.saleStartsAt === "number" && Number.isFinite(body.saleStartsAt) ? new Date(body.saleStartsAt) : null,
-    saleEndsAt: typeof body?.saleEndsAt === "number" && Number.isFinite(body.saleEndsAt) ? new Date(body.saleEndsAt) : null,
+    displaySequence: body?.displaySequence==null?(existing?.displaySequence??sourceProduct?.displaySequence??9999):Math.max(0, Math.min(99999, Number(body.displaySequence) || 0)),
+    showOnSelfRegister: typeof body?.showOnSelfRegister==="boolean"?body.showOnSelfRegister:(existing?.showOnSelfRegister??sourceProduct?.showOnSelfRegister??true),
+    showOnMobileOrder: typeof body?.showOnMobileOrder==="boolean"?body.showOnMobileOrder:(existing?.showOnMobileOrder??sourceProduct?.showOnMobileOrder??true),
+    soldOut: typeof body?.soldOut==="boolean"?body.soldOut:(existing?.soldOut??sourceProduct?.soldOut??false),
+    scheduleEnabled: typeof body?.scheduleEnabled==="boolean"?body.scheduleEnabled:(existing?.scheduleEnabled??sourceProduct?.scheduleEnabled??false),
+    scheduleStart: typeof body?.scheduleStart === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(body.scheduleStart) ? body.scheduleStart : existing?.scheduleStart??sourceProduct?.scheduleStart??"11:00",
+    scheduleEnd: typeof body?.scheduleEnd === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(body.scheduleEnd) ? body.scheduleEnd : existing?.scheduleEnd??sourceProduct?.scheduleEnd??"20:00",
+    scheduleDays: Array.isArray(body?.scheduleDays) ? [...new Set(body.scheduleDays.map(Number).filter(day => day >= 1 && day <= 7))].sort().join(",") || "1,2,3,4,5,6,7" : existing?.scheduleDays??sourceProduct?.scheduleDays?.join(",")??"1,2,3,4,5,6,7",
+    saleStartsAt: typeof body?.saleStartsAt === "number" && Number.isFinite(body.saleStartsAt) ? new Date(body.saleStartsAt) : existing?.saleStartsAt??null,
+    saleEndsAt: typeof body?.saleEndsAt === "number" && Number.isFinite(body.saleEndsAt) ? new Date(body.saleEndsAt) : existing?.saleEndsAt??null,
+    limitedPrice: Object.prototype.hasOwnProperty.call(body,"limitedPrice")?(body?.limitedPrice==null?null:Math.max(0,Math.round(Number(body.limitedPrice)||0))):existing?.limitedPrice??null,
+    limitedPriceStartsAt: Object.prototype.hasOwnProperty.call(body,"limitedPriceStartsAt")?(typeof body?.limitedPriceStartsAt === "number" && Number.isFinite(body.limitedPriceStartsAt) ? new Date(body.limitedPriceStartsAt) : null):existing?.limitedPriceStartsAt??null,
+    limitedPriceEndsAt: Object.prototype.hasOwnProperty.call(body,"limitedPriceEndsAt")?(typeof body?.limitedPriceEndsAt === "number" && Number.isFinite(body.limitedPriceEndsAt) ? new Date(body.limitedPriceEndsAt) : null):existing?.limitedPriceEndsAt??null,
     updatedBy: email,
     updatedAt: new Date(),
   };
@@ -62,5 +67,3 @@ export async function PUT(request: NextRequest) {
   const [saved] = await getDb().select().from(catalogOverrides).where(eq(catalogOverrides.productCode, productCode));
   return NextResponse.json({ saved });
 }
-
-

@@ -341,6 +341,9 @@ export const catalogOverrides = sqliteTable("catalog_overrides", {
   scheduleDays: text("schedule_days").notNull().default("1,2,3,4,5,6,7"),
   saleStartsAt: integer("sale_starts_at", { mode: "timestamp_ms" }),
   saleEndsAt: integer("sale_ends_at", { mode: "timestamp_ms" }),
+  limitedPrice: integer("limited_price"),
+  limitedPriceStartsAt: integer("limited_price_starts_at", { mode: "timestamp_ms" }),
+  limitedPriceEndsAt: integer("limited_price_ends_at", { mode: "timestamp_ms" }),
   updatedBy: text("updated_by").notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 }, (table) => [index("catalog_overrides_category_sequence_idx").on(table.menuCategory, table.displaySequence)]);

@@ -920,10 +920,28 @@ test("商品マスタ一覧から商品を選択して確認後にスマレジ�
     readFile(new URL("app/menu-admin/MasterCatalogPanel.tsx",root),"utf8"),
     readFile(new URL("app/api/v1/admin/product-master/route.ts",root),"utf8"),
   ]);
-  assert.match(panel,/商品を選択すると、商品名・価格・原価・販売状態を編集できます/);
+  assert.match(panel,/商品を選択すると、商品情報・画像・期間売価を編集できます/);
   assert.match(panel,/商品を編集/);
   assert.match(panel,/変更内容を確認/);
   assert.match(panel,/この内容で更新する/);
   assert.match(panel,/method:"PUT"/);
   assert.match(route,/typeof body\.pointEligible==="boolean"\?body\.pointEligible:null/);
+});
+
+test("商品マスタで画像・期間売価・スマレジ部門名を共通管理する",async()=>{
+  const [panel,catalog,inventoryMaster,orderCatalog,migration]=await Promise.all([
+    readFile(new URL("app/menu-admin/MasterCatalogPanel.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/catalog/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/inventory/master/route.ts",root),"utf8"),
+    readFile(new URL("lib/order-catalog.ts",root),"utf8"),
+    readFile(new URL("drizzle/0027_product_media_limited_price.sql",root),"utf8"),
+  ]);
+  assert.match(panel,/商品画像URL/);
+  assert.match(panel,/期間売価（税抜）/);
+  assert.match(panel,/categoryName/);
+  assert.match(catalog,/limitedPriceStartsAt/);
+  assert.match(inventoryMaster,/category_name AS categoryName/);
+  assert.match(orderCatalog,/limitedPriceActive/);
+  assert.match(orderCatalog,/taxIncluded\(limitedPrice/);
+  assert.match(migration,/limited_price/);
 });
