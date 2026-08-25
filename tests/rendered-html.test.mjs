@@ -914,3 +914,16 @@ test("商品マスタ同期は在庫権限エラーと分離し0件成功を表�
   assert.match(panel,/スマレジAPIから商品を取得できませんでした/);
   assert.match(panel,/商品は0件でした/);
 });
+
+test("商品マスタ一覧から商品を選択して確認後にスマレジへ反映できる",async()=>{
+  const [panel,route]=await Promise.all([
+    readFile(new URL("app/menu-admin/MasterCatalogPanel.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/product-master/route.ts",root),"utf8"),
+  ]);
+  assert.match(panel,/商品を選択すると、商品名・価格・原価・販売状態を編集できます/);
+  assert.match(panel,/商品を編集/);
+  assert.match(panel,/変更内容を確認/);
+  assert.match(panel,/この内容で更新する/);
+  assert.match(panel,/method:"PUT"/);
+  assert.match(route,/typeof body\.pointEligible==="boolean"\?body\.pointEligible:null/);
+});
