@@ -1,0 +1,2 @@
+CREATE TABLE `inventory_product_settings` (`product_code` text PRIMARY KEY NOT NULL,`product_name` text NOT NULL,`inventory_managed` integer DEFAULT 1 NOT NULL,`management_note` text DEFAULT '' NOT NULL,`source_updated_at` text,`updated_by` text NOT NULL,`updated_at` integer NOT NULL);
+CREATE INDEX `inventory_product_settings_managed_idx` ON `inventory_product_settings` (`inventory_managed`,`product_name`);

@@ -845,3 +845,19 @@ test("スタッフ管理の全主要APIはパスワードログインを共通�
   assert.match(engagement,/AbortSignal\.timeout\(8000\)/);
   assert.match(tasks,/AbortSignal\.timeout\(8000\)/);
 });
+
+test("スマレジ商品マスタ全件を同期し商品別に在庫管理対象外を設定できる",async()=>{
+  const [route,panel,migration]=await Promise.all([
+    readFile(new URL("app/api/v1/admin/inventory/route.ts",root),"utf8"),
+    readFile(new URL("app/member-admin/InventoryPanel.tsx",root),"utf8"),
+    readFile(new URL("drizzle/0024_inventory_product_settings.sql",root),"utf8"),
+  ]);
+  assert.match(route,/result\.products/);
+  assert.match(route,/SET_TRACKING/);
+  assert.match(route,/WHERE p\.inventory_managed=1/);
+  assert.match(route,/INVENTORY_NOT_MANAGED/);
+  assert.match(panel,/商品マスタ・実在庫を更新/);
+  assert.match(panel,/在庫を管理する/);
+  assert.match(panel,/在庫管理対象外/);
+  assert.match(migration,/inventory_product_settings/);
+});

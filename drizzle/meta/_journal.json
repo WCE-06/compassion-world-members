@@ -169,6 +169,13 @@
       "when": 1787711400000,
       "tag": "0023_inventory_control",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1787715000000,
+      "tag": "0024_inventory_product_settings",
+      "breakpoints": true
     }
   ]
 }
