@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
+import {requireAdminSession} from "@/lib/admin-session";
 import { getDb } from "@/db";
 import { catalogOverrides } from "@/db/schema";
 import { getOrderProducts } from "@/lib/order-catalog";
@@ -14,14 +15,14 @@ function adminEmail(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  if (!adminEmail(request)) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  if (!(adminEmail(request) ?? await requireAdminSession(request))) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const catalog = await getOrderProducts({ includeOverrides: true });
   return NextResponse.json(catalog, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function PUT(request: NextRequest) {
-  const email = adminEmail(request);
-  if (!email) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  const email = adminEmail(request) ?? await requireAdminSession(request);
+  if (!email) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const body = await request.json().catch(() => null) as null | Record<string, unknown>;
   if (Array.isArray(body?.order)) {
     const order = body.order.filter((code): code is string => typeof code === "string").slice(0, 500);
@@ -61,3 +62,5 @@ export async function PUT(request: NextRequest) {
   const [saved] = await getDb().select().from(catalogOverrides).where(eq(catalogOverrides.productCode, productCode));
   return NextResponse.json({ saved });
 }
+
+

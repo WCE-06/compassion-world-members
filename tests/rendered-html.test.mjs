@@ -825,3 +825,19 @@ test("管理画面の外部同期は待ち続けずLINE名を並列取得する"
   assert.match(members,/private, max-age=10, stale-while-revalidate=30/);
   assert.match(operations,/private, max-age=30, stale-while-revalidate=60/);
 });
+test("スタッフ管理の全主要APIはパスワードログインを共通認証として受け入れる",async()=>{
+  for(const file of ["operations/route.ts","engagement/route.ts","tasks/route.ts","members/route.ts","studio/route.ts","catalog/route.ts","store-hours/route.ts"]){
+    const source=await readFile(new URL(`app/api/v1/admin/${file}`,root),"utf8");
+    assert.match(source,/requireAdminSession/);
+    assert.match(source,/await requireAdminSession\(request\)/);
+  }
+  const [operations,engagement,tasks]=await Promise.all([
+    readFile(new URL("app/member-admin/OperationsPanels.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/EngagementPanel.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/TaskPanel.tsx",root),"utf8"),
+  ]);
+  assert.match(operations,/AbortSignal\.timeout\(8000\)/);
+  assert.match(operations,/もう一度読み込む/);
+  assert.match(engagement,/AbortSignal\.timeout\(8000\)/);
+  assert.match(tasks,/AbortSignal\.timeout\(8000\)/);
+});

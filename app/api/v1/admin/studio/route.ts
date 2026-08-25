@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { NextRequest,NextResponse } from "next/server";
+import {requireAdminSession} from "@/lib/admin-session";
 import { facilityPost,filterOwnedFacilityRows,isOwnedFacilityRow } from "@/lib/facility-api";
 
 type Reservation={reservationId:string;memberCode:string;facilityId:string;startAt:string;endAt:string;status:string};
@@ -10,7 +11,7 @@ function adminEmail(request:NextRequest){const email=request.headers.get("oai-au
 function codeOf(value:unknown){return String(value??"").trim().toUpperCase()}
 
 export async function GET(request:NextRequest){
- if(!adminEmail(request))return NextResponse.json({error:"FORBIDDEN"},{status:403});
+ if(!(adminEmail(request)??await requireAdminSession(request)))return NextResponse.json({error:"UNAUTHORIZED"},{status:401});
  const memberCode=codeOf(request.nextUrl.searchParams.get("memberCode"));
  if(!/^[A-Z0-9]{10}$/.test(memberCode))return NextResponse.json({error:"INVALID_MEMBER_CODE"},{status:400});
  const member=await env.DB.prepare(`SELECT id,member_code AS memberCode,display_name AS displayName,phone,status,member_rank AS memberRank,resident_status AS residentStatus FROM members WHERE member_code=? LIMIT 1`).bind(memberCode).first<{id:string;memberCode:string;displayName:string;phone:string|null;status:string;memberRank:string|null;residentStatus:string}>();
@@ -26,7 +27,7 @@ export async function GET(request:NextRequest){
 }
 
 export async function POST(request:NextRequest){
- const actor=adminEmail(request);if(!actor)return NextResponse.json({error:"FORBIDDEN"},{status:403});
+ const actor=adminEmail(request)??await requireAdminSession(request);if(!actor)return NextResponse.json({error:"UNAUTHORIZED"},{status:401});
  const body=await request.json().catch(()=>null) as {action?:"CREATE_RESERVATION"|"CANCEL_RESERVATION"|"START_SESSION";memberCode?:string;reservationId?:string;startAt?:string;hours?:number;requestId?:string}|null,memberCode=codeOf(body?.memberCode),hours=Number(body?.hours),requestId=String(body?.requestId??"");
  if(!body?.action||!/^[A-Z0-9]{10}$/.test(memberCode)||!requestId)return NextResponse.json({error:"INVALID_REQUEST"},{status:400});
  const member=await env.DB.prepare("SELECT id,status FROM members WHERE member_code=? LIMIT 1").bind(memberCode).first<{id:string;status:string}>();
@@ -50,3 +51,6 @@ export async function POST(request:NextRequest){
   return NextResponse.json({ok:true,result});
  }catch(error){const code=error instanceof Error?error.message:"FACILITY_API_ERROR",status=["FACILITY_IN_USE","ACTIVE_USAGE_EXISTS","TIME_NOT_AVAILABLE","NEXT_RESERVATION_CONFLICT"].includes(code)?409:code==="OUTSIDE_CHECKIN_WINDOW"?422:502;return NextResponse.json({error:code},{status})}
 }
+
+
+

@@ -1,8 +1,9 @@
 import { env } from "cloudflare:workers";
 import { NextRequest,NextResponse } from "next/server";
+import {requireAdminSession} from "@/lib/admin-session";
 
 function admin(request:NextRequest){const email=request.headers.get("oai-authenticated-user-email")?.trim().toLowerCase(),allowed=((env as unknown as Record<string,string|undefined>).ADMIN_EMAILS??"").split(",").map(v=>v.trim().toLowerCase()).filter(Boolean);return email&&allowed.includes(email)?email:null}
-export async function GET(request:NextRequest){if(!admin(request))return NextResponse.json({error:"FORBIDDEN"},{status:403});const now=Date.now(),since30=now-30*86400000,since365=now-365*86400000,runtime=env as unknown as Record<string,string|undefined>;const [members,residents,ranks,orders,sessions,unpaid,stripe,failures,tasks,communications]=await Promise.all([
+export async function GET(request:NextRequest){if(!(admin(request)??await requireAdminSession(request)))return NextResponse.json({error:"UNAUTHORIZED"},{status:401});const now=Date.now(),since30=now-30*86400000,since365=now-365*86400000,runtime=env as unknown as Record<string,string|undefined>;const [members,residents,ranks,orders,sessions,unpaid,stripe,failures,tasks,communications]=await Promise.all([
  env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN created_at>=? THEN 1 ELSE 0 END) AS new30,SUM(CASE WHEN status='INACTIVE' THEN 1 ELSE 0 END) AS inactive FROM members").bind(since30).first(),
  env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN resident_plan_active=1 THEN 1 ELSE 0 END) AS active FROM member_rank_states").first(),
  env.DB.prepare("SELECT current_rank AS rank,COUNT(*) AS count FROM member_rank_states GROUP BY current_rank ORDER BY count DESC").all(),
@@ -14,3 +15,4 @@ export async function GET(request:NextRequest){if(!admin(request))return NextRes
  env.DB.prepare("SELECT status,COUNT(*) AS count FROM operations_tasks GROUP BY status").all(),
  env.DB.prepare("SELECT (SELECT COUNT(*) FROM coupons WHERE status='ACTIVE') AS activeCoupons,(SELECT COUNT(*) FROM surveys WHERE status='ACTIVE') AS activeSurveys,(SELECT COUNT(*) FROM message_campaigns WHERE status IN ('DRAFT','SCHEDULED','SENDING')) AS pendingCampaigns,(SELECT COUNT(*) FROM automation_rules WHERE enabled=1) AS activeAutomations").first()
  ]);return NextResponse.json({members,residents,ranks:ranks.results,finance:{orders,sessions,unpaid,stripe,failures},tasks:tasks.results,communications,integrations:{snsUrl:runtime.SNS_CONTROL_URL??"https://wce-06.github.io/compassion-world-sns-control/",snsApiConfigured:Boolean(runtime.SNS_CONTROL_API_URL&&runtime.SNS_CONTROL_API_KEY),inventoryConfigured:Boolean(runtime.SMAREGI_INVENTORY_URL&&runtime.SMAREGI_INVENTORY_KEY),salesConfigured:Boolean(runtime.SMAREGI_SALES_SUMMARY_URL&&runtime.SMAREGI_SALES_SUMMARY_KEY),facilityStaffReservationsConfigured:Boolean(runtime.COMMON_FACILITY_GAS_URL&&(runtime.FACILITY_STAFF_API_TOKEN||runtime.FACILITY_API_TOKEN))}},{headers:{"Cache-Control":"private, max-age=30, stale-while-revalidate=60"}})}
+
