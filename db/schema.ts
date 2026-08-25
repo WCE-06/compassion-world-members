@@ -326,6 +326,40 @@ export const orderFulfillments = sqliteTable("order_fulfillments", {
   index("order_fulfillments_status_idx").on(table.department, table.status, table.updatedAt),
 ]);
 
+export const kitchenUnitCounters = sqliteTable("kitchen_unit_counters", {
+  callDate: text("call_date").notNull(),
+  department: text("department", { enum: ["FOOD", "DRINK"] }).notNull(),
+  lastNumber: integer("last_number").notNull().default(0),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [uniqueIndex("kitchen_unit_counters_date_department_unique").on(table.callDate, table.department)]);
+
+export const kitchenUnits = sqliteTable("kitchen_units", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id").notNull().references(() => orders.id),
+  orderItemId: text("order_item_id").notNull().references(() => orderItems.id),
+  unitIndex: integer("unit_index").notNull(),
+  department: text("department", { enum: ["FOOD", "DRINK"] }).notNull(),
+  callDate: text("call_date").notNull(),
+  callNumber: integer("call_number").notNull(),
+  status: text("status", { enum: ["ACCEPTED", "COOKING", "READY", "CALLED", "PICKED_UP", "CANCELLED"] }).notNull().default("ACCEPTED"),
+  currentStep: integer("current_step").notNull().default(0),
+  totalSteps: integer("total_steps").notNull().default(1),
+  isTest: integer("is_test", { mode: "boolean" }).notNull().default(false),
+  readyAt: integer("ready_at", { mode: "timestamp_ms" }),
+  calledAt: integer("called_at", { mode: "timestamp_ms" }),
+  pickedUpAt: integer("picked_up_at", { mode: "timestamp_ms" }),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [
+  uniqueIndex("kitchen_units_item_index_unique").on(table.orderItemId, table.unitIndex),
+  uniqueIndex("kitchen_units_call_unique").on(table.callDate, table.department, table.callNumber),
+  index("kitchen_units_status_idx").on(table.department, table.status, table.updatedAt),
+]);
+
+export const kitchenTestOrders = sqliteTable("kitchen_test_orders", {
+  orderId: text("order_id").primaryKey().references(() => orders.id),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 export const catalogOverrides = sqliteTable("catalog_overrides", {
   productCode: text("product_code").primaryKey(),
   description: text("description").notNull().default(""),
