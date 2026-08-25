@@ -882,7 +882,7 @@ test("スマレジ商品マスタ全件を同期し商品別に在庫管理対�
 
 test("スマレジ型の商品マスタ一覧で700件超をページ分割して扱える",async()=>{
   const [panel,page,route,migration]=await Promise.all([
-    readFile(new URL("app/menu-admin/MasterCatalogPanel.tsx",root),"utf8"),
+    readFile(new URL("app/menu-admin/ProductMasterWorkspace.tsx",root),"utf8"),
     readFile(new URL("app/menu-admin/page.tsx",root),"utf8"),
     readFile(new URL("app/api/v1/admin/inventory/master/route.ts",root),"utf8"),
     readFile(new URL("drizzle/0025_inventory_master_fields.sql",root),"utf8"),
@@ -890,7 +890,7 @@ test("スマレジ型の商品マスタ一覧で700件超をページ分割し�
   assert.match(panel,/pageSize=50/);
   assert.match(panel,/スマレジから全件更新/);
   assert.match(panel,/非表示・サービス商品/);
-  assert.match(page,/MasterCatalogPanel/);
+  assert.match(page,/ProductMasterWorkspace/);
   assert.match(route,/LIMIT 10000/);
   assert.match(migration,/category_id/);
 });
@@ -953,4 +953,20 @@ test("商品マスタで画像・期間売価・スマレジ部門名を共通�
   assert.match(orderCatalog,/limitedPriceActive/);
   assert.match(orderCatalog,/taxIncluded\(limitedPrice/);
   assert.match(migration,/limited_price/);
+});
+
+test("統合会員管理から商品マスタを部門絞り込み・並び替え付きで扱う",async()=>{
+  const [page,sidebar,panel]=await Promise.all([
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
+    readFile(new URL("app/menu-admin/ProductMasterWorkspace.tsx",root),"utf8"),
+  ]);
+  assert.match(sidebar,/key:"products",label:"商品マスタ"/);
+  assert.match(page,/tab==="products"/);
+  assert.match(page,/<ProductMasterWorkspace\/>/);
+  assert.match(panel,/部門で絞り込み/);
+  assert.match(panel,/すべての部門/);
+  assert.match(panel,/商品の並び順/);
+  assert.match(panel,/売価が高い順/);
+  assert.match(panel,/スマレジ更新が新しい順/);
 });

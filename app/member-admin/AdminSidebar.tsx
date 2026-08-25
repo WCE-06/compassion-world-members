@@ -1,8 +1,8 @@
 "use client";
 
-import { BarChart3, CalendarDays, ClipboardCheck, Gift, LayoutDashboard, Megaphone, PackageSearch, Radio, Settings, Users, WalletCards } from "lucide-react";
+import { BarChart3, CalendarDays, ClipboardCheck, Database, Gift, LayoutDashboard, Megaphone, PackageSearch, Radio, Settings, Users, WalletCards } from "lucide-react";
 
-export type AdminSection = "dashboard" | "members" | "studio" | "tasks" | "sns" | "benefits" | "communication" | "residents" | "finance" | "inventory" | "analytics" | "settings";
+export type AdminSection = "dashboard" | "members" | "studio" | "tasks" | "sns" | "benefits" | "communication" | "residents" | "finance" | "products" | "inventory" | "analytics" | "settings";
 
 const items: Array<{key: AdminSection; label: string; icon: typeof Users; ready: boolean}> = [
   {key:"dashboard",label:"ダッシュボード",icon:LayoutDashboard,ready:true},
@@ -14,6 +14,7 @@ const items: Array<{key: AdminSection; label: string; icon: typeof Users; ready:
   {key:"communication",label:"配信・アンケート",icon:Megaphone,ready:true},
   {key:"residents",label:"住民登録",icon:Users,ready:true},
   {key:"finance",label:"取引・精算・売上",icon:WalletCards,ready:true},
+  {key:"products",label:"商品マスタ",icon:Database,ready:true},
   {key:"inventory",label:"商品・在庫確認",icon:PackageSearch,ready:true},
   {key:"analytics",label:"分析",icon:BarChart3,ready:true},
   {key:"settings",label:"設定・同期",icon:Settings,ready:true},
