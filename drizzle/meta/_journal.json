@@ -176,6 +176,13 @@
       "when": 1787715000000,
       "tag": "0024_inventory_product_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1787720400000,
+      "tag": "0025_inventory_master_fields",
+      "breakpoints": true
     }
   ]
 }

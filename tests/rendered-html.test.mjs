@@ -861,3 +861,18 @@ test("スマレジ商品マスタ全件を同期し商品別に在庫管理対�
   assert.match(panel,/在庫管理対象外/);
   assert.match(migration,/inventory_product_settings/);
 });
+
+test("スマレジ型の商品マスタ一覧で700件超をページ分割して扱える",async()=>{
+  const [panel,page,route,migration]=await Promise.all([
+    readFile(new URL("app/menu-admin/MasterCatalogPanel.tsx",root),"utf8"),
+    readFile(new URL("app/menu-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/inventory/master/route.ts",root),"utf8"),
+    readFile(new URL("drizzle/0025_inventory_master_fields.sql",root),"utf8"),
+  ]);
+  assert.match(panel,/pageSize=50/);
+  assert.match(panel,/スマレジから全件更新/);
+  assert.match(panel,/非表示・サービス商品/);
+  assert.match(page,/MasterCatalogPanel/);
+  assert.match(route,/LIMIT 10000/);
+  assert.match(migration,/category_id/);
+});
