@@ -13,8 +13,8 @@ const items: Array<{key: AdminSection; label: string; icon: typeof Users; ready:
   {key:"benefits",label:"特典・ポイント",icon:Gift,ready:true},
   {key:"communication",label:"配信・アンケート",icon:Megaphone,ready:true},
   {key:"residents",label:"住民登録",icon:Users,ready:true},
-  {key:"finance",label:"精算・売上",icon:WalletCards,ready:true},
-  {key:"inventory",label:"在庫確認",icon:PackageSearch,ready:true},
+  {key:"finance",label:"取引・精算・売上",icon:WalletCards,ready:true},
+  {key:"inventory",label:"商品・在庫確認",icon:PackageSearch,ready:true},
   {key:"analytics",label:"分析",icon:BarChart3,ready:true},
   {key:"settings",label:"設定・同期",icon:Settings,ready:true},
 ];
