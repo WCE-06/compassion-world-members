@@ -71,11 +71,10 @@ test("予約ページは代表会員へフォールバックせずLINE本人の�
   ]);
   assert.doesNotMatch(page, /X-Compass-Preview/);
   assert.match(page, /スタジオ予約/);
-  assert.match(page, /開始時刻を15分単位で選択できます/);
-  assert.match(page, /時間帯を選ぶ/);
-  assert.match(page, /午前/);
-  assert.match(page, /午後/);
-  assert.match(page, /夜間/);
+  assert.match(page, /「分」を15分単位で選択できます/);
+  assert.match(page, /何時から利用しますか/);
+  assert.match(page, /何分からですか/);
+  assert.match(page, /minuteLabel/);
   assert.match(page, /fetch\("\/api\/v1\/reservations"/);
   assert.match(reservationsApi, /LINE_AUTH_REQUIRED/);
   assert.match(cancellationApi, /LINE_AUTH_REQUIRED/);
