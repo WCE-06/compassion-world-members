@@ -970,3 +970,19 @@ test("統合会員管理から商品マスタを部門絞り込み・並び替�
   assert.match(panel,/売価が高い順/);
   assert.match(panel,/スマレジ更新が新しい順/);
 });
+
+test("スタッフサイトでSNS投稿をAIと相談し承認前の台帳へ保存する",async()=>{
+  const [page,panel,route]=await Promise.all([
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/SnsAssistantPanel.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/sns-assistant/route.ts",root),"utf8"),
+  ]);
+  assert.match(page,/SnsAssistantPanel/);
+  assert.match(panel,/投稿相談AI/);
+  assert.match(panel,/この案を投稿台帳へ保存/);
+  assert.match(panel,/resource:"campaigns"/);
+  assert.match(route,/https:\/\/api\.openai\.com\/v1\/responses/);
+  assert.match(route,/OPENAI_API_KEY/);
+  assert.match(route,/store:false/);
+  assert.match(route,/requireAdminSession/);
+});
