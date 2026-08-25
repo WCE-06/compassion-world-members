@@ -810,3 +810,19 @@ test("スタッフ予約一覧は共通施設APIの専用認証を使用する",
   assert.match(facility,/FACILITY_STAFF_API_TOKEN/);
   assert.match(operations,/COMMON_FACILITY_GAS_URL&&\(runtime\.FACILITY_STAFF_API_TOKEN\|\|runtime\.FACILITY_API_TOKEN\)/);
 });
+
+test("管理画面の外部同期は待ち続けずLINE名を並列取得する",async()=>{
+  const [sync,page,studio,members,operations]=await Promise.all([
+    readFile(new URL("app/api/v1/admin/sync-center/route.ts",root),"utf8"),
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/StudioReservationOverview.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/members/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/operations/route.ts",root),"utf8"),
+  ]);
+  assert.match(sync,/Promise\.all\(rows\.results\.map/);assert.match(sync,/AbortSignal\.timeout\(4000\)/);assert.match(sync,/env\.DB\.batch/);
+  assert.match(sync,/AbortSignal\.timeout\(3000\)/);assert.match(sync,/AbortSignal\.timeout\(5000\)/);
+  assert.match(page,/memberRequest=useRef/);assert.match(page,/AbortSignal\.timeout\(8000\)/);assert.match(page,/AbortSignal\.timeout\(10000\)/);
+  assert.match(studio,/requestId=useRef/);assert.match(studio,/AbortSignal\.timeout\(8000\)/);
+  assert.match(members,/private, max-age=10, stale-while-revalidate=30/);
+  assert.match(operations,/private, max-age=30, stale-while-revalidate=60/);
+});
