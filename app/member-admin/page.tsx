@@ -39,7 +39,7 @@ export default function MemberAdmin(){
   <AdminSidebar active={tab} onSelect={section=>{setTab(section);if(section==="settings")void loadSyncStatus()}}/>
   <div className="admin-main-content">
   <header className="admin-main-header"><div><small>COMPASSION WORLD STAFF</small><h1>統合会員管理・運営</h1><p>会員、スタジオ予約・受付、注文、精算、商品、在庫、業務を一元管理します。</p></div><button onClick={()=>void logout()}>ログアウト</button></header>
-  <nav className="admin-mobile-tabs"><button className={tab==="dashboard"?"active":""} onClick={()=>setTab("dashboard")}>概要</button><button className={tab==="members"?"active":""} onClick={()=>setTab("members")}>会員</button><button className={tab==="studio"?"active":""} onClick={()=>setTab("studio")}>スタジオ</button><button className={tab==="products"?"active":""} onClick={()=>setTab("products")}>商品</button><button className={tab==="settings"?"active":""} onClick={()=>{setTab("settings");void loadSyncStatus()}}>設定</button></nav>
+  <nav className="admin-mobile-tabs"><button className={tab==="dashboard"?"active":""} onClick={()=>setTab("dashboard")}>概要</button><button className={tab==="members"?"active":""} onClick={()=>setTab("members")}>会員</button><button className={tab==="studio"?"active":""} onClick={()=>setTab("studio")}>スタジオ</button><button className={tab==="products"?"active":""} onClick={()=>setTab("products")}>商品</button><button className={tab==="sns"?"active":""} onClick={()=>setTab("sns")}>SNS</button><button className={tab==="settings"?"active":""} onClick={()=>{setTab("settings");void loadSyncStatus()}}>設定</button></nav>
   {tab==="tasks"&&<TaskPanel/>}
   {(tab==="benefits"||tab==="communication")&&<EngagementPanel mode={tab}/>} 
   {tab==="finance"&&<SettlementPanel/>}

@@ -978,11 +978,14 @@ test("スタッフサイトでSNS投稿をAIと相談し承認前の台帳へ保
     readFile(new URL("app/api/v1/admin/sns-assistant/route.ts",root),"utf8"),
   ]);
   assert.match(page,/SnsAssistantPanel/);
+  assert.match(page,/>SNS<\/button>/);
   assert.match(panel,/投稿相談AI/);
+  assert.match(panel,/daily:true/);
   assert.match(panel,/この案を投稿台帳へ保存/);
   assert.match(panel,/resource:"campaigns"/);
   assert.match(route,/https:\/\/api\.openai\.com\/v1\/responses/);
   assert.match(route,/OPENAI_API_KEY/);
   assert.match(route,/store:false/);
+  assert.match(route,/AI毎日投稿案/);
   assert.match(route,/requireAdminSession/);
 });
