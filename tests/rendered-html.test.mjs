@@ -980,6 +980,9 @@ test("スタッフサイトでSNS投稿をAIと相談し承認前の台帳へ保
   assert.match(page,/SnsAssistantPanel/);
   assert.match(page,/>SNS<\/button>/);
   assert.match(panel,/投稿相談AI/);
+  assert.match(panel,/投稿台帳/);
+  assert.match(panel,/content_json/);
+  assert.match(panel,/resource=campaigns/);
   assert.match(panel,/daily:true/);
   assert.match(panel,/この案を投稿台帳へ保存/);
   assert.match(panel,/resource:"campaigns"/);
