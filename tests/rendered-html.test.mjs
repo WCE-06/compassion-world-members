@@ -661,7 +661,7 @@ test("未完了の予約と注文をすべて表示し完了分を履歴へ分�
   assert.doesNotMatch(page,/予約・Aozora Kitchen注文/);
   assert.match(membership,/reservationHistory/);
   assert.match(membership,/orderHistory/);
-  assert.match(membership,/welcomeNotice\(member\)/);
+  assert.match(membership,/memberNotices\(notificationRows\.results,member\)/);
   assert.match(notices,/新しいポイントカードのご利用ありがとうございます/);
   assert.match(membership,/cardStartedAt/);
 });
@@ -893,4 +893,14 @@ test("スマレジ型の商品マスタ一覧で700件超をページ分割し�
   assert.match(page,/MasterCatalogPanel/);
   assert.match(route,/LIMIT 10000/);
   assert.match(migration,/category_id/);
+});
+
+test("商品マスタ管理は既存GAS経由でスマレジの商品書き込みAPIへ接続する",async()=>{
+  const route=await readFile(new URL("app/api/v1/admin/product-master/route.ts",root),"utf8");
+  assert.match(route,/SMAREGI_SPEND_RECALC_URL/);
+  assert.match(route,/SMAREGI_SPEND_SYNC_KEY/);
+  assert.match(route,/apiToken:connection\.token/);
+  assert.match(route,/product\.create/);
+  assert.match(route,/product\.update/);
+  assert.match(route,/product\.status/);
 });
