@@ -649,9 +649,10 @@ test("受渡済みの部門注文を会員証へ残さず注文全体も自動�
 });
 
 test("未完了の予約と注文をすべて表示し完了分を履歴へ分離する", async () => {
-  const [page,membership]=await Promise.all([
+  const [page,membership,notices]=await Promise.all([
     readFile(new URL("app/page.tsx",root),"utf8"),
     readFile(new URL("app/api/v1/me/membership/route.ts",root),"utf8"),
+    readFile(new URL("lib/member-notices.ts",root),"utf8"),
   ]);
   assert.match(page,/ご利用予定・受付状況/);
   assert.match(page,/activeReservations\.map/);
@@ -660,7 +661,8 @@ test("未完了の予約と注文をすべて表示し完了分を履歴へ分�
   assert.doesNotMatch(page,/予約・Aozora Kitchen注文/);
   assert.match(membership,/reservationHistory/);
   assert.match(membership,/orderHistory/);
-  assert.match(membership,/新しいポイントカードのご利用ありがとうございます/);
+  assert.match(membership,/welcomeNotice\(member\)/);
+  assert.match(notices,/新しいポイントカードのご利用ありがとうございます/);
   assert.match(membership,/cardStartedAt/);
 });
 

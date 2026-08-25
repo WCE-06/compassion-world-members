@@ -1,16 +1,14 @@
 import { env } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
 import { authenticatedMember } from "@/lib/member-auth";
+import { storedNotice, StoredNoticeRow, welcomeNotice } from "@/lib/member-notices";
 
 export async function GET(request: NextRequest) {
   const member = await authenticatedMember(request);
   if (!member) return NextResponse.json({ error: "LINE_AUTH_REQUIRED" }, { status: 401 });
-  const rows = await env.DB.prepare(`SELECT id,category,title,body,sender,read_at AS readAt,created_at AS createdAt
+  const [rows,profile]=await Promise.all([env.DB.prepare(`SELECT id,category,title,body,sender,read_at AS readAt,created_at AS createdAt
     FROM member_notifications WHERE member_id=? ORDER BY created_at DESC LIMIT 50`)
-    .bind(member.id).all<{ id:string;category:"PAYMENT"|"POINT"|"RESERVATION"|"ORDER"|"NEWS";title:string;body:string;sender:string;readAt:number|null;createdAt:number }>();
-  return NextResponse.json({ notices: rows.results.map(item=>({
-    id:item.id,category:item.category,title:item.title,body:item.body,sender:item.sender,
-    createdAt:new Date(item.createdAt).toLocaleString("ja-JP",{timeZone:"Asia/Tokyo",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}),
-    unread:!item.readAt,
-  })) }, { headers: { "Cache-Control": "no-store" } });
+    .bind(member.id).all<StoredNoticeRow>(),env.DB.prepare(`SELECT m.id,m.created_at AS createdAt,(SELECT linked_at FROM identity_links WHERE member_id=m.id AND provider='LINE' AND revoked_at IS NULL ORDER BY linked_at DESC LIMIT 1) AS cardStartedAt FROM members m WHERE m.id=?`).bind(member.id).first<{id:string;createdAt:number;cardStartedAt:number|null}>()]);
+  if(!profile)return NextResponse.json({error:"MEMBERSHIP_NOT_FOUND"},{status:404});
+  return NextResponse.json({ notices: [...rows.results.map(storedNotice),welcomeNotice(profile)] }, { headers: { "Cache-Control": "no-store" } });
 }
