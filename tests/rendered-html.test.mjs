@@ -922,7 +922,7 @@ test("商品マスタ登録と販売期間を共通商品管理へ追加する",
   assert.match(component,/5分ごとに自動更新/);assert.match(component,/販売開始/);assert.match(component,/販売終了/);
   assert.match(catalog,/saleWindowOpen/);assert.match(migration,/sale_starts_at/);assert.match(migration,/sale_ends_at/);
   assert.match(menu,/ProductMasterRegistration/);
-  assert.match(admin,/ProductMasterWorkspace allowCreate/);assert.match(workspace,/allowCreate&&<ProductMasterRegistration/);
+  assert.match(admin,/ProductMasterWorkspace allowCreate/);assert.match(workspace,/allowCreate\s*&&\s*\(\s*<ProductMasterRegistration/);
   assert.match(guide,/予約/);assert.match(guide,/確定/);assert.match(guide,/値引き用JAN/);
 });
 
@@ -1011,7 +1011,7 @@ test("スマレジ型の商品マスタ一覧で700件超をページ分割し�
     readFile(new URL("app/api/v1/admin/inventory/master/route.ts",root),"utf8"),
     readFile(new URL("drizzle/0025_inventory_master_fields.sql",root),"utf8"),
   ]);
-  assert.match(panel,/pageSize=50/);
+  assert.match(panel,/pageSize\s*=\s*50/);
   assert.match(panel,/スマレジから全件更新/);
   assert.match(panel,/非表示・サービス商品/);
   assert.match(page,/ProductMasterWorkspace/);
