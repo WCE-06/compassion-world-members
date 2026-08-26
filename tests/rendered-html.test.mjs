@@ -99,7 +99,7 @@ test("予約・利用情報は認証会員本人の会員番号で再検証す�
   assert.match(facilityApi, /filterOwnedFacilityRows/);
   assert.match(facilityApi, /normalizeFacilityMemberCode\(row\.memberCode\) === expected/);
   assert.match(membershipApi, /filterOwnedFacilityRows\(reservationResult\.rows\?\?\[\],member\.memberCode\)/);
-  assert.match(membershipApi, /isOwnedFacilityRow\(sessionResult\.session,member\.memberCode\)/);
+  assert.match(membershipApi, /isOwnedFacilityRow\(sessionResult\.data\.session,member\.memberCode\)/);
   assert.match(reservationsApi, /filterOwnedFacilityRows\(rows, member\.memberCode\)/);
   assert.match(cancellationApi, /memberCode:member\.memberCode/);
   assert.match(cancellationApi, /facilityId:"FEBBRAIO"/);
@@ -448,6 +448,9 @@ test("商品単位の呼出番号を注文・決済・会員証・セルフレ�
   assert.match(pos, /units/);
   assert.match(membership, /units:await orderUnits/);
   assert.match(mobile, /displayUnits\(complete\)/);
+  assert.match(memberPage, /function orderHeadline/);
+  assert.match(memberPage, /unit\.callNumberLabel/);
+  assert.match(memberPage, /一部の商品ができあがりました/);
   assert.match(mobile, /できあがった商品から個別に呼び出します/);
   assert.match(memberPage, /orderCallSummary/);
   assert.match(migration, /MOBILE_ORDER_ITEM_UNIT_MIGRATION/);
@@ -512,14 +515,14 @@ test("磯辺揚げを調理目安3分として注文・キッチンへ引き継�
   assert.match(migration, /preparation_minutes/);
 });
 
-test("会員証は施設連携を並列取得し1.5秒で本体表示を優先する", async () => {
+test("会員証は施設連携を並列取得し受付状態を安全に確認する", async () => {
   const [membership, facility, home] = await Promise.all([
     readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
     readFile(new URL("lib/facility-api.ts", root), "utf8"),
     readFile(new URL("app/page.tsx", root), "utf8"),
   ]);
   assert.match(membership, /Promise\.all/);
-  assert.match(membership, /1_500/);
+  assert.match(membership, /6_000/);
   assert.match(facility, /AbortSignal\.timeout/);
   assert.match(home, /会員情報を確認しています/);
 });
@@ -751,6 +754,9 @@ test("未完了の予約と注文をすべて表示し完了分を履歴へ分�
   assert.match(page,/activity-create-actions-bottom/);
   assert.doesNotMatch(page,/予約・Aozora Kitchen注文/);
   assert.match(membership,/reservationHistory/);
+  assert.match(membership,/no-show:/);
+  assert.match(membership,/Date\.parse\(row\.startAt\)<=noShowCutoff/);
+  assert.match(membership,/sessionResult\.error===null/);
   assert.match(membership,/orderHistory/);
   assert.match(membership,/totalIncludingTax/);
   assert.match(membership,/paymentLabel/);
