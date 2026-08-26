@@ -189,6 +189,7 @@ test("モバイル注文は直前メニューを即表示し商品取得を背�
   assert.match(page, /localStorage\.getItem\(catalogCacheKey\)/);
   assert.match(page, /setLoading\(false\);cached=true/);
   assert.match(route, /X-Catalog-Revision":"174/);
+  assert.match(page, /\/api\/v1\/catalog\/live\?revision=175/);
   assert.match(route, /CATALOG_TEMPORARILY_UNAVAILABLE/);
   assert.match(route, /private, no-store/);
   assert.match(catalog, /cacheEverything:true,cacheTtl:300/);
@@ -1226,7 +1227,7 @@ test("LIFFは登録済みの正式ドメインへ移動してからログイン�
 test("商品マスターURL未設定時も許可された画面はスナップショットへ退避する",async()=>{
   const catalog=await readFile(new URL("lib/order-catalog.ts",root),"utf8");
   assert.doesNotMatch(catalog,/if\(!url\)throw new Error\("CATALOG_URL_NOT_CONFIGURED"\);\s*let body/);
-  assert.match(catalog,/try\{if\(!url\)throw new Error\("CATALOG_URL_NOT_CONFIGURED"\)/);
+  assert.match(catalog,/try\{\s*if\(!url\)throw new Error\("CATALOG_URL_NOT_CONFIGURED"\)/);
   assert.match(catalog,/if\(!options\.allowSnapshotFallback\)throw error/);
 });
 
