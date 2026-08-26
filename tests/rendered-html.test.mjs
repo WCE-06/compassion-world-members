@@ -1014,3 +1014,26 @@ test("スタッフサイトでSNS投稿をAIと相談し承認前の台帳へ保
   assert.match(route,/AI毎日投稿案/);
   assert.match(route,/requireAdminSession/);
 });
+
+test("共通会員認証は会員DBだけを参照し用途別トークン・監査・冪等性を備える", async () => {
+  const [route, auth, schema, migration, docs] = await Promise.all([
+    readFile(new URL("app/api/v1/member-verification/route.ts", root), "utf8"),
+    readFile(new URL("lib/member-verification.ts", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("drizzle/0030_member_verification.sql", root), "utf8"),
+    readFile(new URL("docs/MEMBER_VERIFICATION_API.md", root), "utf8"),
+  ]);
+  assert.match(route, /FROM members WHERE member_code=\?/);
+  assert.doesNotMatch(route, /fetch\(|スマレジ|GAS|reservation/i);
+  assert.match(route, /UNREGISTERED/);
+  assert.match(route, /SUSPENDED/);
+  assert.match(route, /WITHDRAWN/);
+  assert.match(route, /REQUEST_ID_CONFLICT/);
+  assert.match(route, /memberCodeHash=await sha256\(memberCode\)/);
+  assert.match(route, /X-Idempotent-Replay/);
+  assert.match(auth, /MEMBER_VERIFICATION_SELF_REGISTER_TOKEN/);
+  assert.match(auth, /difference\|=/);
+  assert.match(schema, /memberVerificationAudits/);
+  assert.match(migration, /verification_status`='SUSPENDED'/);
+  assert.match(docs, /503 `VERIFICATION_SERVICE_UNAVAILABLE`/);
+});

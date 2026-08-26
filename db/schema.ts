@@ -18,6 +18,7 @@ export const members = sqliteTable("members", {
   residentStatus: text("resident_status", { enum: ["UNKNOWN", "ACTIVE", "INACTIVE"] }).notNull().default("UNKNOWN"),
   residentCheckedAt: integer("resident_checked_at", { mode: "timestamp_ms" }),
   status: text("status", { enum: ["ACTIVE", "INACTIVE"] }).notNull().default("ACTIVE"),
+  verificationStatus: text("verification_status", { enum: ["ACTIVE", "SUSPENDED", "WITHDRAWN"] }).notNull().default("ACTIVE"),
   sourceSystem: text("source_system").notNull().default("LEGACY"),
   sourceCustomerId: text("source_customer_id"),
   acquisitionSource: text("acquisition_source"),
@@ -25,6 +26,20 @@ export const members = sqliteTable("members", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 }, (table) => [uniqueIndex("members_member_code_unique").on(table.memberCode)]);
+
+export const memberVerificationAudits = sqliteTable("member_verification_audits", {
+  requestId: text("request_id").primaryKey(),
+  requestFingerprint: text("request_fingerprint").notNull(),
+  system: text("system").notNull(),
+  deviceId: text("device_id").notNull(),
+  tokenScope: text("token_scope").notNull(),
+  memberCodeHash: text("member_code_hash").notNull(),
+  result: text("result", { enum: ["ACTIVE", "SUSPENDED", "WITHDRAWN", "UNREGISTERED", "REQUEST_ID_CONFLICT"] }).notNull(),
+  httpStatus: integer("http_status").notNull(),
+  durationMs: integer("duration_ms").notNull(),
+  responseJson: text("response_json").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("member_verification_audits_system_created_idx").on(table.system, table.createdAt)]);
 
 export const adminAccounts = sqliteTable("admin_accounts", {
   email: text("email").primaryKey(),
