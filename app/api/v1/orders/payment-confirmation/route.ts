@@ -4,10 +4,12 @@ import { requirePosToken } from "@/lib/pos-api";
 import { expireStaleLocks } from "@/lib/order-pos";
 import { confirmOrderSchedule } from "@/lib/kitchen-schedule";
 import { orderUnits } from "@/lib/kitchen-units";
+import { ensureOrderAcceptedNotice } from "@/lib/order-notifications";
 
 type Body={orderId?:string;paymentId?:string;requestId?:string;lockId?:string;deviceId?:string;paidAt?:string|number};
 
 async function success(orderId:string,paymentId:string,idempotentReplay:boolean){
+ await ensureOrderAcceptedNotice(orderId);
  const fulfillments=await env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(orderId).all<{department:"FOOD"|"DRINK";callNumber:number;status:string}>();const food=fulfillments.results.find(item=>item.department==="FOOD"),drink=fulfillments.results.find(item=>item.department==="DRINK");
  const units=await orderUnits(orderId);const schedule=await confirmOrderSchedule(orderId,idempotentReplay?"決済完了予定の再同期":"セルフレジ決済完了時の確定計算").catch(()=>null);
  if(!schedule)return NextResponse.json({ok:false,error:"KITCHEN_SCHEDULE_PENDING",message:"決済は完了しました。提供予定の同期を再試行してください",paymentConfirmed:true,orderId,paymentId,retryable:true},{status:503});

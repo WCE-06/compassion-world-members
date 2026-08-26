@@ -613,6 +613,11 @@ export const memberNotifications = sqliteTable("member_notifications", {
   uniqueIndex("member_notifications_event_unique").on(table.eventId),
   index("member_notifications_member_created_idx").on(table.memberId, table.createdAt),
 ]);
+export const notificationPopupDeliveries = sqliteTable("notification_popup_deliveries", {
+  notificationId: text("notification_id").primaryKey().references(() => memberNotifications.id, { onDelete: "cascade" }),
+  memberId: text("member_id").notNull().references(() => members.id, { onDelete: "cascade" }),
+  deliveredAt: integer("delivered_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("notification_popup_member_idx").on(table.memberId, table.deliveredAt)]);
 export const automationRules = sqliteTable("automation_rules", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),

@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
 import { stripeRequest, verifyStripeWebhook } from "@/lib/stripe";
 import { confirmOrderSchedule } from "@/lib/kitchen-schedule";
+import { ensureOrderAcceptedNotice } from "@/lib/order-notifications";
 
 type StripeEvent={id:string;type:string;data:{object:Record<string,unknown>}};
 type PaymentIntent={id:string;payment_method?:string|Record<string,unknown>;setup_future_usage?:"on_session"|"off_session"|null};
@@ -14,6 +15,7 @@ async function completeCheckout(object:Record<string,unknown>,eventId:string){
  await env.DB.prepare(`UPDATE kitchen_units SET status='ACCEPTED',updated_at=? WHERE order_id=? AND status='WAITING_PAYMENT' AND EXISTS (SELECT 1 FROM orders WHERE id=? AND member_id=? AND status='PAID' AND stripe_payment_intent_id=?)`).bind(now,metadata.order_id,metadata.order_id,metadata.member_id,paymentIntent).run();
  const confirmed=await env.DB.prepare(`SELECT status,stripe_payment_intent_id AS paymentIntent FROM orders WHERE id=? AND member_id=?`).bind(metadata.order_id,metadata.member_id).first<{status:string;paymentIntent:string|null}>();
  if(confirmed?.status!=="PAID"||confirmed.paymentIntent!==paymentIntent)throw new Error("ORDER_PAYMENT_CONFLICT");
+ await ensureOrderAcceptedNotice(metadata.order_id,now);
  await confirmOrderSchedule(metadata.order_id,"スマート決済完了時の確定計算");
  const intent=await stripeRequest<PaymentIntent>(`/payment_intents/${encodeURIComponent(paymentIntent)}`);const paymentMethodId=typeof intent.payment_method==="string"?intent.payment_method:"";if(paymentMethodId){const method=await stripeRequest<PaymentMethod>(`/payment_methods/${encodeURIComponent(paymentMethodId)}`);const savedForReuse=intent.setup_future_usage==="off_session"||method.customer===customer;if(savedForReuse)await env.DB.prepare(`INSERT INTO stripe_customers (member_id,stripe_customer_id,default_payment_method_id,card_brand,card_last4,card_exp_month,card_exp_year,reusable_consent_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(member_id) DO UPDATE SET stripe_customer_id=excluded.stripe_customer_id,default_payment_method_id=excluded.default_payment_method_id,card_brand=excluded.card_brand,card_last4=excluded.card_last4,card_exp_month=excluded.card_exp_month,card_exp_year=excluded.card_exp_year,reusable_consent_at=excluded.reusable_consent_at,updated_at=excluded.updated_at`).bind(metadata.member_id,customer,paymentMethodId,method.card?.brand??null,method.card?.last4??null,method.card?.exp_month??null,method.card?.exp_year??null,now,now).run();}
  return true;
