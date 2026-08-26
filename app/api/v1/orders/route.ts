@@ -6,6 +6,7 @@ import { pointRuleFor } from "@/lib/point-policy";
 import { expireStaleLocks,expireStaleOrder } from "@/lib/order-pos";
 import { estimateOrderSchedule,getOrderSchedule,scheduleReadyAt } from "@/lib/kitchen-schedule";
 import { allocateKitchenUnitNumber,kitchenBusinessDate,orderUnits } from "@/lib/kitchen-units";
+import { calculateOrderTotal } from "@/lib/order-pricing";
 
 type Department="FOOD"|"DRINK";
 const departmentLabel:Record<Department,string>={FOOD:"フード",DRINK:"ドリンク"};
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
   const resolvedItems=await resolveOrderProducts(products,requested);
   const items = resolvedItems.filter((item): item is NonNullable<typeof item> => Boolean(item)&&!item.product.soldOut).map(item=>({product:item.product,quantity:item.quantity}));
   if (!items.length || items.length !== requested.length) return NextResponse.json({ error: "ORDER_ITEMS_REFRESH_REQUIRED",message:"商品情報が更新されました。最新の内容を読み込んでいます。もう一度ご確認ください。",refreshCatalog:true }, { status: 409 });
-  const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const total = calculateOrderTotal(items);
   const paymentMethod = body?.paymentMethod === "STRIPE" ? "STRIPE" : "STORE";
   const runtime = env as unknown as Record<string,string|undefined>;
   if (paymentMethod === "STRIPE" && runtime.SMART_PAYMENT_ENABLED !== "true") return NextResponse.json({ error:"SMART_PAYMENT_NOT_READY", message:"スマート決済は現在準備中です" }, { status:503 });

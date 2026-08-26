@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Coffee, CreditCard, GlassWater, Minus, Plus, ShoppingBasket, Store, UtensilsCrossed, Wine } from "lucide-react";
 import catalogSnapshot from "../../preview/generated/catalog.json";
+import { calculateOrderTotal } from "@/lib/order-pricing";
 
 declare global{interface Window{liff?:{init:(config:{liffId:string})=>Promise<void>;isLoggedIn:()=>boolean;login:(config?:{redirectUri?:string})=>void;getAccessToken:()=>string|null}}}
 function loadLiff(){return new Promise<void>((resolve,reject)=>{if(window.liff)return resolve();const script=document.createElement("script");script.src="https://static.line-scdn.net/liff/edge/2/sdk.js";script.onload=()=>resolve();script.onerror=()=>reject(new Error("LINE認証を読み込めませんでした"));document.head.appendChild(script)})}
@@ -29,7 +30,7 @@ export default function MobileOrderPage(){
  const bucket=(p:Product)=>p.menuCategory==="cocktail"?"alcohol-cocktail":p.menuCategory==="mocktail"?"soft-mocktail":p.menuCategory;
  const visible=products.filter(p=>bucket(p)===category);
  const combinations=products.filter(p=>bucket(p)===category&&p.cocktailBase&&p.cocktailMixer),cocktailBases=[...new Set(combinations.map(p=>p.cocktailBase))],mixers=combinations.filter(p=>p.cocktailBase===cocktailBase),cocktails=combinations;
- const count=Object.values(cart).reduce((a,b)=>a+b,0),total=useMemo(()=>products.reduce((sum,p)=>sum+p.price*(cart[p.id]??0),0),[products,cart]),subtotalExcludingTax=useMemo(()=>products.reduce((sum,p)=>sum+taxExcludedPrice(p)*(cart[p.id]??0),0),[products,cart]);
+ const count=Object.values(cart).reduce((a,b)=>a+b,0),total=useMemo(()=>calculateOrderTotal(products.map(product=>({product,quantity:cart[product.id]??0}))),[products,cart]),subtotalExcludingTax=useMemo(()=>products.reduce((sum,p)=>sum+taxExcludedPrice(p)*(cart[p.id]??0),0),[products,cart]);
  useEffect(()=>{if(!authHeaders)return;const items=Object.entries(cart).filter(([,quantity])=>quantity>0).map(([productId,quantity])=>({productId,quantity}));if(!items.length){setEstimate(null);setEstimateLoading(false);return}let active=true,retryTimer:ReturnType<typeof setTimeout>|undefined;const controller=new AbortController();setEstimate(null);setEstimateLoading(true);const request=async()=>{try{const response=await fetch("/api/v1/orders/estimate",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({requestId:crypto.randomUUID(),items}),signal:controller.signal}),result=await response.json().catch(()=>null);if(!active)return;if(response.ok&&result?.status!=="PENDING"&&result?.status!=="UNAVAILABLE"){setEstimate(result);setEstimateLoading(false);return}}catch{if(!active)return}retryTimer=setTimeout(request,1_500)};const initialTimer=setTimeout(request,350);return()=>{active=false;clearTimeout(initialTimer);if(retryTimer)clearTimeout(retryTimer);controller.abort()}},[authHeaders,cart]);
  function change(id:string,amount:number){if(availability?.open===false)return;setCart(current=>{const next=Math.max(0,(current[id]??0)+amount);return{...current,[id]:next}})}
  function chooseCategory(next:string){setCategory(next);setCocktailMode(false);setCocktailBase("")}
