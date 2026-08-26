@@ -8,8 +8,8 @@ export async function authenticatedLineProfile(request:NextRequest):Promise<Line
  const auth=request.headers.get("authorization")??"";
  if(!auth.startsWith("Bearer "))return null;
  const runtime=env as unknown as Record<string,string|undefined>;
- if(runtime.LINE_LOGIN_CHANNEL_ID){const token=auth.slice(7),verify=await fetch(`https://api.line.me/oauth2/v2.1/verify?access_token=${encodeURIComponent(token)}`,{cache:"no-store"});if(!verify.ok)return null;const details=await verify.json() as {client_id?:string;expires_in?:number};if(details.client_id!==runtime.LINE_LOGIN_CHANNEL_ID||Number(details.expires_in)<=0)return null}
- const response=await fetch("https://api.line.me/v2/profile",{headers:{Authorization:auth},cache:"no-store"});
+ const token=auth.slice(7),[verify,response]=await Promise.all([runtime.LINE_LOGIN_CHANNEL_ID?fetch(`https://api.line.me/oauth2/v2.1/verify?access_token=${encodeURIComponent(token)}`,{cache:"no-store"}):Promise.resolve(null),fetch("https://api.line.me/v2/profile",{headers:{Authorization:auth},cache:"no-store"})]);
+ if(verify){if(!verify.ok)return null;const details=await verify.json() as {client_id?:string;expires_in?:number};if(details.client_id!==runtime.LINE_LOGIN_CHANNEL_ID||Number(details.expires_in)<=0)return null}
  if(!response.ok)return null;
  const profile=await response.json() as LineProfile;
  return profile.userId?profile:null;

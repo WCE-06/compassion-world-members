@@ -527,6 +527,20 @@ test("会員証は施設連携を並列取得し受付状態を安全に確認�
   assert.match(home, /会員情報を確認しています/);
 });
 
+test("会員証コードを最優先表示し詳細情報を背後で読み込む",async()=>{
+  const [card,home,auth]=await Promise.all([
+    readFile(new URL("app/api/v1/me/card/route.ts",root),"utf8"),
+    readFile(new URL("app/page.tsx",root),"utf8"),
+    readFile(new URL("lib/member-auth.ts",root),"utf8"),
+  ]);
+  assert.match(card,/points_balance AS points/);
+  assert.doesNotMatch(card,/facilityPost|reservation\.get|order_items|member_notifications/);
+  assert.match(home,/fetch\("\/api\/v1\/me\/card"/);
+  assert.match(home,/setView\("member"\)[\s\S]*fetch\("\/api\/v1\/me\/membership"/);
+  assert.match(home,/予約・注文・お知らせを読み込んでいます/);
+  assert.match(auth,/Promise\.all/);
+});
+
 test("スマート決済後は呼出番号画面へ戻り現地決済は支払い後だけキッチン受付する", async () => {
   const [mobile, orders, kitchen, confirmation, stripe] = await Promise.all([
     readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),

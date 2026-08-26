@@ -199,6 +199,7 @@ export default function Home() {
   const [memberCode, setMemberCode] = useState("");
   const [selectedNotice,setSelectedNotice]=useState<MemberNotice|null>(null);
   const [pushNotice,setPushNotice]=useState<MemberNotice|null>(null);
+  const [detailsLoading,setDetailsLoading]=useState(false);
   const seenNoticeIds=useRef(new Set<string>());
   const [lineToken,setLineToken]=useState("");
   const [registering,setRegistering]=useState(false);
@@ -230,9 +231,11 @@ export default function Home() {
         setDemo(true);
         if (requested === "unlinked") return setView("unlinked");
         if (requested === "new") return setView("new");
-        const response = await fetch("/api/v1/me/membership", { headers: { "X-Compass-Preview": "representative" } });
-        if (response.ok) installMembership(await response.json());
+        const headers={"X-Compass-Preview":"representative"},cardResponse=await fetch("/api/v1/me/card",{headers});
+        if(cardResponse.ok)setMember(await cardResponse.json());
         setView("member");
+        setDetailsLoading(true);
+        void fetch("/api/v1/me/membership",{headers}).then(async response=>{if(response.ok)installMembership(await response.json())}).finally(()=>setDetailsLoading(false));
         return;
       }
 
@@ -245,12 +248,14 @@ export default function Home() {
         }
         const token = window.liff!.getAccessToken();
         setLineToken(token??"");
-        const response = await fetch("/api/v1/me/membership", { headers: { Authorization: `Bearer ${token}` } });
-        if (response.status === 404) return setView(entry === "join" ? "new" : "unlinked");
-        if (response.status === 422) {const staged=await fetch("/api/v1/me/registration",{headers:{Authorization:`Bearer ${token}`}}).then(result=>result.ok?result.json():null).catch(()=>null);if(staged?.registration)setRegistration(current=>({...current,...Object.fromEntries(Object.entries(staged.registration).filter(([,value])=>Boolean(value)))}));return setView("new")}
-        if (!response.ok) throw new Error("会員情報を取得できませんでした");
-        installMembership(await response.json());
+        const headers={Authorization:`Bearer ${token}`},cardResponse=await fetch("/api/v1/me/card",{headers});
+        if (cardResponse.status === 404) return setView(entry === "join" ? "new" : "unlinked");
+        if (cardResponse.status === 422) {const staged=await fetch("/api/v1/me/registration",{headers}).then(result=>result.ok?result.json():null).catch(()=>null);if(staged?.registration)setRegistration(current=>({...current,...Object.fromEntries(Object.entries(staged.registration).filter(([,value])=>Boolean(value)))}));return setView("new")}
+        if (!cardResponse.ok) throw new Error("会員証を取得できませんでした");
+        setMember(await cardResponse.json());
         setView("member");
+        setDetailsLoading(true);
+        void fetch("/api/v1/me/membership",{headers,cache:"no-store"}).then(async response=>{if(response.ok)installMembership(await response.json())}).catch(()=>undefined).finally(()=>setDetailsLoading(false));
       } catch (error) {
         setNotice(error instanceof Error ? error.message : "読み込みに失敗しました");
         setView("error");
@@ -322,10 +327,11 @@ export default function Home() {
               {member.session && (
                 <article className="activity-row active-session"><span className="status-dot" /><div><small>現在利用中</small><strong>{member.session.facilityName}</strong><p>{member.session.startedAt && `開始 ${dateLabel(member.session.startedAt)}`} {member.session.scheduledEndsAt && `／終了予定 ${dateLabel(member.session.scheduledEndsAt)}`}</p></div><b>{paymentLabel(member.session.paymentStatus)}</b></article>
               )}
-              {member.reservationsAvailable===false&&<p className="sync-status">一時的なエラーで予約情報を確認できませんでした。時間をおいて、もう一度会員証を開いてください。</p>}
+              {detailsLoading&&<p className="sync-status"><i className="admin-button-spinner"/> 予約・注文・お知らせを読み込んでいます</p>}
+              {!detailsLoading&&member.reservationsAvailable===false&&<p className="sync-status">一時的なエラーで予約情報を確認できませんでした。時間をおいて、もう一度会員証を開いてください。</p>}
               {activeReservations.map((reservation,index)=><article className="activity-row" key={reservation.reservationId}><span className="date-chip">{index===0?"NEXT":"BOOK"}</span><div><small>{index===0?"次回予約":"予約確定"}</small><strong>{reservation.facilityName}</strong><p>{dateLabel(reservation.startsAt)}〜</p></div><button onClick={() => openFutureFeature("予約の変更・キャンセル")}>詳細</button></article>)}
               {activeOrders.map(order=><article className="activity-row" key={order.orderNumber}><span className="date-chip">ORDER</span><div><small>{orderCallSummary(order)||"注文受付済み"}</small><strong>{orderHeadline(order)}</strong><p>{scheduleText(order.schedule,order.scheduleLabel)}</p></div><button onClick={() => openFutureFeature("注文状況")}>詳細</button></article>)}
-              {member.reservationsAvailable!==false&&!member.session&&activeReservations.length===0&&activeOrders.length===0&&<Empty text="現在のご利用予定・受付中の注文はありません"/>}
+              {!detailsLoading&&member.reservationsAvailable!==false&&!member.session&&activeReservations.length===0&&activeOrders.length===0&&<Empty text="現在のご利用予定・受付中の注文はありません"/>}
               <div className="activity-create-actions activity-create-actions-bottom">
                 <button onClick={launchReservation} disabled={openingReservation}><CalendarDays size={17} strokeWidth={1.7} /><span><small>STUDIO</small><strong>{openingReservation?"予約サイトへ接続中…":"新しく予約する"}</strong></span><b>›</b></button>
                 <button onClick={() => { window.location.href = "/mobile-order"; }}><UtensilsCrossed size={17} strokeWidth={1.7} /><span><small>AOZORA KITCHEN</small><strong>料理・ドリンクの商品を注文する</strong></span><b>›</b></button>
