@@ -791,19 +791,22 @@ test("管理画面は概要と詳細を分離し検索入力を待ってから�
 });
 
 test("商品マスタ登録と販売期間を共通商品管理へ追加する",async()=>{
-  const [route,component,catalog,migration,menu,guide]=await Promise.all([
+  const [route,component,catalog,migration,menu,guide,admin,workspace]=await Promise.all([
     readFile(new URL("app/api/v1/admin/product-master/route.ts",root),"utf8"),
     readFile(new URL("app/menu-admin/ProductMasterRegistration.tsx",root),"utf8"),
     readFile(new URL("lib/order-catalog.ts",root),"utf8"),
     readFile(new URL("drizzle/0022_catalog_sale_period.sql",root),"utf8"),
     readFile(new URL("app/menu-admin/page.tsx",root),"utf8"),
     readFile(new URL("docs/COUPON_AND_PRODUCT_MASTER_OPERATIONS.md",root),"utf8"),
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/menu-admin/ProductMasterWorkspace.tsx",root),"utf8"),
   ]);
   assert.match(route,/SMAREGI_PRODUCT_MASTER_URL/);assert.match(route,/product\.create/);assert.match(route,/product\.update/);assert.match(route,/product\.status/);assert.match(route,/Idempotency-Key/);
   assert.match(component,/スマレジ商品マスタ/);assert.match(component,/販売を停止/);assert.match(component,/ポイント付与対象/);assert.match(component,/JANコード/);
   assert.match(component,/5分ごとに自動更新/);assert.match(component,/販売開始/);assert.match(component,/販売終了/);
   assert.match(catalog,/saleWindowOpen/);assert.match(migration,/sale_starts_at/);assert.match(migration,/sale_ends_at/);
   assert.match(menu,/ProductMasterRegistration/);
+  assert.match(admin,/ProductMasterWorkspace allowCreate/);assert.match(workspace,/allowCreate&&<ProductMasterRegistration/);
   assert.match(guide,/予約/);assert.match(guide,/確定/);assert.match(guide,/値引き用JAN/);
 });
 
@@ -968,7 +971,7 @@ test("統合会員管理から商品マスタを部門絞り込み・並び替�
   ]);
   assert.match(sidebar,/key:"products",label:"商品マスタ"/);
   assert.match(page,/tab==="products"/);
-  assert.match(page,/<ProductMasterWorkspace\/>/);
+  assert.match(page,/<ProductMasterWorkspace allowCreate\/>/);
   assert.match(panel,/部門で絞り込み/);
   assert.match(panel,/すべての部門/);
   assert.match(panel,/商品の並び順/);
