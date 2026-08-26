@@ -509,7 +509,7 @@ test("磯辺揚げを調理目安3分として注文・キッチンへ引き継�
     readFile(new URL("app/api/v1/kitchen/fulfillments/route.ts", root), "utf8"),
     readFile(new URL("drizzle/0014_cute_vulture.sql", root), "utf8"),
   ]);
-  assert.match(catalog, /product\.code==="isobeage"\?3:0/);
+  assert.match(catalog, /product\.name==="磯辺揚げ"\?3:0/);
   assert.match(orders, /preparation_minutes/);
   assert.match(kitchen, /estimatedMinutes/);
   assert.match(migration, /preparation_minutes/);
