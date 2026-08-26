@@ -45,6 +45,7 @@ type Member = {
   rankTermsConsentRequired?: boolean;
   smaregiSyncStatus?: "PENDING"|"SYNCING"|"SYNCED"|"FAILED"|null;
   nextReservation?: { facilityName: string; startsAt: string; endsAt: string } | null;
+  reservationsAvailable?: boolean;
   reservations?: { reservationId:string;facilityName:string;startsAt:string;endsAt:string;status:string }[];
   reservationHistory?: { reservationId:string;facilityName:string;startsAt:string;endsAt:string;status:string }[];
   session?: {
@@ -196,7 +197,12 @@ export default function Home() {
       const params = new URLSearchParams(window.location.search);
       const requested = params.get("state");
       const entry = params.get("entry");
-      const liffId = await fetch("/api/v1/client-config").then(response=>response.ok?response.json():{liffId:""}).then(config=>String(config.liffId??"")).catch(()=>"");
+      const clientConfig = await fetch("/api/v1/client-config").then(response=>response.ok?response.json():{liffId:"",canonicalBaseUrl:""}).catch(()=>({liffId:"",canonicalBaseUrl:""}));
+      const liffId=String(clientConfig.liffId??""),canonicalBaseUrl=String(clientConfig.canonicalBaseUrl??"").replace(/\/$/,"");
+      if(liffId&&canonicalBaseUrl){
+        const canonical=new URL(canonicalBaseUrl);
+        if(window.location.origin!==canonical.origin){window.location.replace(canonicalBaseUrl+window.location.pathname+window.location.search+window.location.hash);return}
+      }
 
       if (!liffId) {
         setDemo(true);
@@ -294,9 +300,10 @@ export default function Home() {
               {member.session && (
                 <article className="activity-row active-session"><span className="status-dot" /><div><small>現在利用中</small><strong>{member.session.facilityName}</strong><p>{member.session.startedAt && `開始 ${dateLabel(member.session.startedAt)}`} {member.session.scheduledEndsAt && `／終了予定 ${dateLabel(member.session.scheduledEndsAt)}`}</p></div><b>{paymentLabel(member.session.paymentStatus)}</b></article>
               )}
+              {member.reservationsAvailable===false&&<p className="sync-status">一時的なエラーで予約情報を確認できませんでした。時間をおいて、もう一度会員証を開いてください。</p>}
               {activeReservations.map((reservation,index)=><article className="activity-row" key={reservation.reservationId}><span className="date-chip">{index===0?"NEXT":"BOOK"}</span><div><small>{index===0?"次回予約":"予約確定"}</small><strong>{reservation.facilityName}</strong><p>{dateLabel(reservation.startsAt)}〜</p></div><button onClick={() => openFutureFeature("予約の変更・キャンセル")}>詳細</button></article>)}
               {activeOrders.map(order=><article className="activity-row" key={order.orderNumber}><span className="date-chip">ORDER</span><div><small>{[order.foodCallNumber&&`フード ${String(order.foodCallNumber).padStart(3,"0")} ${fulfillmentLabel(order.foodStatus)}`,order.drinkCallNumber&&`ドリンク ${String(order.drinkCallNumber).padStart(3,"0")} ${fulfillmentLabel(order.drinkStatus)}`].filter(Boolean).join(" ／ ")||"注文受付済み"}</small><strong>{{ WAITING_PAYMENT: "お支払い待ち", ACCEPTED: "注文受付済み", COOKING: "ただいま調理中", READY: "商品ができあがりました" }[order.status]}</strong><p>{scheduleText(order.schedule,order.scheduleLabel)}</p></div><button onClick={() => openFutureFeature("注文状況")}>詳細</button></article>)}
-              {!member.session&&activeReservations.length===0&&activeOrders.length===0&&<Empty text="現在のご利用予定・受付中の注文はありません"/>}
+              {member.reservationsAvailable!==false&&!member.session&&activeReservations.length===0&&activeOrders.length===0&&<Empty text="現在のご利用予定・受付中の注文はありません"/>}
               <div className="activity-create-actions activity-create-actions-bottom">
                 <button onClick={launchReservation} disabled={openingReservation}><CalendarDays size={17} strokeWidth={1.7} /><span><small>STUDIO</small><strong>{openingReservation?"予約サイトへ接続中…":"新しく予約する"}</strong></span><b>›</b></button>
                 <button onClick={() => { window.location.href = "/mobile-order"; }}><UtensilsCrossed size={17} strokeWidth={1.7} /><span><small>AOZORA KITCHEN</small><strong>料理・ドリンクの商品を注文する</strong></span><b>›</b></button>
