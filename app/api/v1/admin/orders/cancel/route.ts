@@ -18,8 +18,8 @@ export async function POST(request:NextRequest){
  if(order.status==="REFUNDED"||order.status==="CANCELLED")return NextResponse.json({ok:true,orderId,status:order.status,idempotentReplay:true});
  let refundId:string|null=null,nextStatus="CANCELLED";
  if(order.paymentIntent){
-  const refund=await stripeRequest<Refund>("/refunds","POST",new URLSearchParams({payment_intent:order.paymentIntent,reason:"requested_by_customer","metadata[order_id]":order.id}),`admin-refund:${order.id}`);
-  refundId=refund.id;nextStatus=refund.status==="succeeded"?"REFUNDED":"REFUND_PENDING";
+  try{const refund=await stripeRequest<Refund>("/refunds","POST",new URLSearchParams({payment_intent:order.paymentIntent,reason:"requested_by_customer","metadata[order_id]":order.id}),`admin-refund:${order.id}`);refundId=refund.id;nextStatus=refund.status==="succeeded"?"REFUNDED":"REFUND_PENDING"}
+  catch(cause){const message=cause instanceof Error?cause.message:"";if(!/already been refunded|amount.*exceeds/i.test(message))throw cause;refundId="existing";nextStatus="REFUNDED"}
  }
  const now=Date.now(),details={requestId,orderId,orderNumber:order.orderNumber,before:order.status,after:nextStatus,reason,refundId};
  await env.DB.prepare("UPDATE orders SET status=?,point_eligible=0,point_status='CANCELLED',updated_at=? WHERE id=?").bind(nextStatus,now,order.id).run();
