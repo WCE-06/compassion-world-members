@@ -1,8 +1,50 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import {jstDateInput,jstMonthInput} from "../lib/jst-date.ts";
 
 const root = new URL("../", import.meta.url);
+
+test("日本時間の日付・月境界を管理画面で使用する", async () => {
+  const boundary=new Date("2026-08-31T15:30:00Z");
+  assert.equal(jstDateInput(boundary),"2026-09-01");
+  assert.equal(jstMonthInput(boundary),"2026-09");
+  const [menuAdmin,reservations,overview]=await Promise.all([
+    readFile(new URL("app/menu-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/studio/reservations/route.ts",root),"utf8"),
+    readFile(new URL("app/member-admin/StudioReservationOverview.tsx",root),"utf8"),
+  ]);
+  assert.match(menuAdmin,/useState\(jstMonthInput\)/);
+  assert.match(reservations,/jstDateInput\(\)/);
+  assert.match(overview,/useState\(jstDateInput\(today\)\)/);
+});
+
+test("同時決済通知は勝者の決済IDだけを記録する", async () => {
+  const route=await readFile(new URL("app/api/v1/orders/payment-confirmation/route.ts",root),"utf8");
+  assert.match(route,/INSERT INTO order_payment_events[\s\S]*SELECT[\s\S]*smaregi_transaction_id=\?/);
+  assert.match(route,/confirmed\.paymentId!==paymentId/);
+});
+
+test("Stripe決済画面の二重生成と遅延通知によるKitchen誤受付を防ぐ", async () => {
+  const [checkout,webhook,stripe]=await Promise.all([
+    readFile(new URL("app/api/v1/orders/[id]/smart-payment/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/stripe/webhook/route.ts",root),"utf8"),
+    readFile(new URL("lib/stripe.ts",root),"utf8"),
+  ]);
+  assert.match(stripe,/Idempotency-Key/);
+  assert.match(checkout,/`mobile-order:\$\{id\}`/);
+  assert.match(checkout,/`customer:\$\{member\.id\}`/);
+  assert.match(webhook,/stripe_payment_intent_id=\?/);
+  assert.match(webhook,/ORDER_PAYMENT_CONFLICT/);
+});
+
+test("同じ注文リクエストIDで内容を変えた再送を拒否する",async()=>{
+  const route=await readFile(new URL("app/api/v1/orders/route.ts",root),"utf8");
+  assert.match(route,/member_id AS memberId/);
+  assert.match(route,/existing\.memberId!==member\.id/);
+  assert.match(route,/existingKey!==requestedKey/);
+  assert.match(route,/ORDER_REQUEST_CONFLICT/);
+});
 
 test("会員証アプリを正常に配信する", async () => {
   const [layout, page] = await Promise.all([
@@ -56,11 +98,24 @@ test("予約・利用情報は認証会員本人の会員番号で再検証す�
   ]);
   assert.match(facilityApi, /filterOwnedFacilityRows/);
   assert.match(facilityApi, /normalizeFacilityMemberCode\(row\.memberCode\) === expected/);
-  assert.match(membershipApi, /filterOwnedFacilityRows\(reservationRows,member\.memberCode\)/);
+  assert.match(membershipApi, /filterOwnedFacilityRows\(reservationRows\?\?\[\],member\.memberCode\)/);
   assert.match(membershipApi, /isOwnedFacilityRow\(sessionResult\.session,member\.memberCode\)/);
   assert.match(reservationsApi, /filterOwnedFacilityRows\(rows, member\.memberCode\)/);
   assert.match(cancellationApi, /memberCode:member\.memberCode/);
   assert.match(cancellationApi, /facilityId:"FEBBRAIO"/);
+});
+
+test("予約台帳の一時障害を予約なしとして表示しない", async () => {
+  const [membershipApi, page] = await Promise.all([
+    readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
+    readFile(new URL("app/page.tsx", root), "utf8"),
+  ]);
+  assert.match(membershipApi, /reservation\.get[\s\S]*\.catch\(\(\)=>null\)/);
+  assert.match(membershipApi, /const reservationsAvailable=reservationRows!==null/);
+  assert.match(membershipApi, /Object\.assign\(presentation,\{reservationsAvailable\}\)/);
+  assert.match(page, /member\.reservationsAvailable===false/);
+  assert.match(page, /一時的なエラーで予約情報を確認できませんでした/);
+  assert.match(page, /member\.reservationsAvailable!==false&&!member\.session/);
 });
 
 test("予約ページは代表会員へフォールバックせずLINE本人の履歴だけを取得する", async () => {
@@ -991,4 +1046,28 @@ test("スタッフサイトでSNS投稿をAIと相談し承認前の台帳へ保
   assert.match(route,/store:false/);
   assert.match(route,/AI毎日投稿案/);
   assert.match(route,/requireAdminSession/);
+});
+
+test("テスト注文は本番の呼出番号を消費せず受渡後に完了する",async()=>{
+  const route=await readFile(new URL("app/api/v1/kitchen/units/route.ts",root),"utf8");
+  assert.match(route,/item\.isTest\?`TEST:\$\{date\}`:date/);
+  assert.match(route,/if\(values\.length===0\).*SELECT status FROM kitchen_units/s);
+});
+
+test("LIFFは登録済みの正式ドメインへ移動してからログインする",async()=>{
+  const [page,route]=await Promise.all([
+    readFile(new URL("app/page.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/client-config/route.ts",root),"utf8"),
+  ]);
+  assert.match(route,/canonicalBaseUrl/);
+  assert.match(route,/https:\/\/members\.wce-group-japan\.com/);
+  assert.match(page,/window\.location\.origin!==canonical\.origin/);
+  assert.match(page,/window\.location\.replace/);
+});
+
+test("商品マスターURL未設定時も許可された画面はスナップショットへ退避する",async()=>{
+  const catalog=await readFile(new URL("lib/order-catalog.ts",root),"utf8");
+  assert.doesNotMatch(catalog,/if\(!url\)throw new Error\("CATALOG_URL_NOT_CONFIGURED"\);\s*let body/);
+  assert.match(catalog,/try\{if\(!url\)throw new Error\("CATALOG_URL_NOT_CONFIGURED"\)/);
+  assert.match(catalog,/if\(!options\.allowSnapshotFallback\)throw error/);
 });

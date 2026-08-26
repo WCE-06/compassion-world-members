@@ -61,8 +61,13 @@ export async function POST(request: NextRequest) {
   const pointRule = pointRuleFor("MOBILE_ORDER");
   const requestId = body?.requestId?.match(/^[a-zA-Z0-9-]{10,80}$/) ? body.requestId : crypto.randomUUID();
   const id = `ord_${requestId}`;
-  const existing = await env.DB.prepare(`SELECT order_number AS orderNumber, status, payment_method AS paymentMethod, total_including_tax AS totalIncludingTax FROM orders WHERE id = ? AND member_id = ?`).bind(id, member.id).first();
-  if (existing) {const [result,schedule]=await Promise.all([env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(id).all(),getOrderSchedule(id)]);return NextResponse.json({ orderId:id,...existing,fulfillments:result.results,schedule,scheduleLabel:schedule?null:"提供予定時間を確認しています。しばらくお待ちください。" });}
+  const existing = await env.DB.prepare(`SELECT member_id AS memberId,order_number AS orderNumber,status,payment_method AS paymentMethod,total_including_tax AS totalIncludingTax FROM orders WHERE id=?`).bind(id).first<{memberId:string;orderNumber:string;status:string;paymentMethod:string;totalIncludingTax:number}>();
+  if(existing){
+    if(existing.memberId!==member.id)return NextResponse.json({error:"ORDER_REQUEST_CONFLICT"},{status:409});
+    const existingItems=await env.DB.prepare(`SELECT product_id AS productId,quantity FROM order_items WHERE order_id=? ORDER BY product_id,quantity`).bind(id).all<{productId:string;quantity:number}>(),requestedKey=items.map(item=>`${item.product.id}:${item.quantity}`).sort().join("|"),existingKey=existingItems.results.map(item=>`${item.productId}:${item.quantity}`).sort().join("|");
+    if(existing.paymentMethod!==paymentMethod||existing.totalIncludingTax!==total||existingKey!==requestedKey)return NextResponse.json({error:"ORDER_REQUEST_CONFLICT",message:"前回送信した注文内容と一致しません。注文状況を確認してから再操作してください。"},{status:409});
+    const [result,schedule]=await Promise.all([env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(id).all(),getOrderSchedule(id)]);return NextResponse.json({orderId:id,orderNumber:existing.orderNumber,status:existing.status,paymentMethod:existing.paymentMethod,totalIncludingTax:existing.totalIncludingTax,fulfillments:result.results,schedule,scheduleLabel:schedule?null:"提供予定時間を確認しています。しばらくお待ちください。"});
+  }
   const now = Date.now(); const orderNumber = `ORD-${String(now).slice(-8)}`; const expiresAt = now + 15 * 60_000;const callDate=businessDate(now);
   const departments=[...new Set(items.map(item=>item.product.category))] as Department[];
   const fulfillments=await Promise.all(departments.map(async department=>({department,callNumber:await allocateCallNumber(callDate,department,now),status:"WAITING_PAYMENT" as const,label:departmentLabel[department]})));
