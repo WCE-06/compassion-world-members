@@ -98,7 +98,7 @@ test("予約・利用情報は認証会員本人の会員番号で再検証す�
   ]);
   assert.match(facilityApi, /filterOwnedFacilityRows/);
   assert.match(facilityApi, /normalizeFacilityMemberCode\(row\.memberCode\) === expected/);
-  assert.match(membershipApi, /filterOwnedFacilityRows\(reservationRows\?\?\[\],member\.memberCode\)/);
+  assert.match(membershipApi, /filterOwnedFacilityRows\(reservationResult\.rows\?\?\[\],member\.memberCode\)/);
   assert.match(membershipApi, /isOwnedFacilityRow\(sessionResult\.session,member\.memberCode\)/);
   assert.match(reservationsApi, /filterOwnedFacilityRows\(rows, member\.memberCode\)/);
   assert.match(cancellationApi, /memberCode:member\.memberCode/);
@@ -110,8 +110,9 @@ test("予約台帳の一時障害を予約なしとして表示しない", async
     readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
     readFile(new URL("app/page.tsx", root), "utf8"),
   ]);
-  assert.match(membershipApi, /reservation\.get[\s\S]*\.catch\(\(\)=>null\)/);
-  assert.match(membershipApi, /const reservationsAvailable=reservationRows!==null/);
+  assert.match(membershipApi, /reservation\.get[\s\S]*8_000/);
+  assert.match(membershipApi, /membership reservation\.get failed/);
+  assert.match(membershipApi, /const reservationsAvailable=reservationResult\.rows!==null/);
   assert.match(membershipApi, /Object\.assign\(presentation,\{reservationsAvailable\}\)/);
   assert.match(page, /member\.reservationsAvailable===false/);
   assert.match(page, /一時的なエラーで予約情報を確認できませんでした/);
@@ -751,6 +752,11 @@ test("未完了の予約と注文をすべて表示し完了分を履歴へ分�
   assert.doesNotMatch(page,/予約・Aozora Kitchen注文/);
   assert.match(membership,/reservationHistory/);
   assert.match(membership,/orderHistory/);
+  assert.match(membership,/totalIncludingTax/);
+  assert.match(membership,/paymentLabel/);
+  assert.match(membership,/orderItemRows/);
+  assert.match(page,/function UsageHistory/);
+  assert.match(page,/獲得ポイント/);
   assert.match(membership,/memberNotices\(notificationRows\.results,member\)/);
   assert.match(notices,/新しいポイントカードのご利用ありがとうございます/);
   assert.match(membership,/cardStartedAt/);
