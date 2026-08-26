@@ -553,6 +553,10 @@ test("会員証コードを最優先表示し詳細情報を背後で読み込�
   assert.doesNotMatch(card,/facilityPost|reservation\.get|order_items|member_notifications/);
   assert.match(home,/fetch\("\/api\/v1\/me\/card"/);
   assert.match(home,/setView\("member"\)[\s\S]*fetch\("\/api\/v1\/me\/membership"/);
+  assert.match(home,/requestAnimationFrame\(\(\)=>window\.setTimeout\(sync,0\)\)/);
+  assert.match(home,/setInterval\(sync,30_000\)/);
+  assert.match(home,/setMember\(current=>\(\{\.\.\.next,points:current\?\.points\?\?next\.points\}\)\)/);
+  assert.match(home,/最新情報を確認中/);
   assert.match(home,/予約・注文・お知らせを読み込んでいます/);
   assert.match(auth,/Promise\.all/);
 });
@@ -698,7 +702,7 @@ test("会員ランクを利用実績で6段階化し住民のゴールド保証�
   for(const rate of [1,2,3,5,7,10])assert.match(ranks,new RegExp(`pointRatePercent:${rate}`));
   assert.match(page, /次の\{member.nextRankLabel\}まで/);
   assert.match(page, /ランク還元率/);
-  assert.match(page, /スマレジへのポイント反映は接続準備中です/);
+  assert.doesNotMatch(page, /スマレジへのポイント反映は接続準備中です/);
   assert.match(page, /rank-card-\$\{member\.rank\.toLowerCase\(\)\}/);
   assert.match(page, /rank-emblem/);
   assert.match(membership, /memberPresentation/);
