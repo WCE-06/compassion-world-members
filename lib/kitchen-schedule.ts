@@ -13,7 +13,7 @@ type ScheduleItem={productId:string;productCode:string;name:string;quantity:numb
 
 function config(){const runtime=env as unknown as Record<string,string|undefined>;return{base:(runtime.KITCHEN_SCHEDULE_API_BASE_URL??DEFAULT_BASE_URL).replace(/\/$/,""),token:runtime.KITCHEN_API_TOKEN??""};}
 
-async function requestSchedule<T>(path:string,init:RequestInit={}){const {base,token}=config();if(!token)throw new Error("KITCHEN_API_TOKEN_NOT_CONFIGURED");const response=await fetch(`${base}${path}`,{...init,signal:init.signal??AbortSignal.timeout(2_500),headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json",...(init.headers??{})}});if(!response.ok)throw new Error(`KITCHEN_SCHEDULE_HTTP_${response.status}`);return response.json() as Promise<T>;}
+async function requestSchedule<T>(path:string,init:RequestInit={}){const {base,token}=config();if(!token)throw new Error("KITCHEN_API_TOKEN_NOT_CONFIGURED");const response=await fetch(`${base}${path}`,{...init,signal:init.signal??AbortSignal.timeout(7_000),headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json",...(init.headers??{})}});if(!response.ok)throw new Error(`KITCHEN_SCHEDULE_HTTP_${response.status}`);return response.json() as Promise<T>;}
 
 export async function estimateOrderSchedule(requestId:string,items:ScheduleItem[]){return requestSchedule<OrderSchedule>("/api/v1/schedule/estimate",{method:"POST",body:JSON.stringify({requestId,orderedAt:new Date().toISOString(),items,servingMode:items.some(item=>item.department==="FOOD")&&items.some(item=>item.department==="DRINK")?"WITH_FOOD":"AS_SOON_AS_POSSIBLE"})});}
 

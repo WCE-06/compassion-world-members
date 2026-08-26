@@ -1,8 +1,50 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import {jstDateInput,jstMonthInput} from "../lib/jst-date.ts";
 
 const root = new URL("../", import.meta.url);
+
+test("日本時間の日付・月境界を管理画面で使用する", async () => {
+  const boundary=new Date("2026-08-31T15:30:00Z");
+  assert.equal(jstDateInput(boundary),"2026-09-01");
+  assert.equal(jstMonthInput(boundary),"2026-09");
+  const [menuAdmin,reservations,overview]=await Promise.all([
+    readFile(new URL("app/menu-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/studio/reservations/route.ts",root),"utf8"),
+    readFile(new URL("app/member-admin/StudioReservationOverview.tsx",root),"utf8"),
+  ]);
+  assert.match(menuAdmin,/useState\(jstMonthInput\)/);
+  assert.match(reservations,/jstDateInput\(\)/);
+  assert.match(overview,/useState\(jstDateInput\(today\)\)/);
+});
+
+test("同時決済通知は勝者の決済IDだけを記録する", async () => {
+  const route=await readFile(new URL("app/api/v1/orders/payment-confirmation/route.ts",root),"utf8");
+  assert.match(route,/INSERT INTO order_payment_events[\s\S]*SELECT[\s\S]*smaregi_transaction_id=\?/);
+  assert.match(route,/confirmed\.paymentId!==paymentId/);
+});
+
+test("Stripe決済画面の二重生成と遅延通知によるKitchen誤受付を防ぐ", async () => {
+  const [checkout,webhook,stripe]=await Promise.all([
+    readFile(new URL("app/api/v1/orders/[id]/smart-payment/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/stripe/webhook/route.ts",root),"utf8"),
+    readFile(new URL("lib/stripe.ts",root),"utf8"),
+  ]);
+  assert.match(stripe,/Idempotency-Key/);
+  assert.match(checkout,/`mobile-order:\$\{id\}`/);
+  assert.match(checkout,/`customer:\$\{member\.id\}`/);
+  assert.match(webhook,/stripe_payment_intent_id=\?/);
+  assert.match(webhook,/ORDER_PAYMENT_CONFLICT/);
+});
+
+test("同じ注文リクエストIDで内容を変えた再送を拒否する",async()=>{
+  const route=await readFile(new URL("app/api/v1/orders/route.ts",root),"utf8");
+  assert.match(route,/member_id AS memberId/);
+  assert.match(route,/existing\.memberId!==member\.id/);
+  assert.match(route,/existingKey!==requestedKey/);
+  assert.match(route,/ORDER_REQUEST_CONFLICT/);
+});
 
 test("会員証アプリを正常に配信する", async () => {
   const [layout, page] = await Promise.all([
@@ -56,11 +98,24 @@ test("予約・利用情報は認証会員本人の会員番号で再検証す�
   ]);
   assert.match(facilityApi, /filterOwnedFacilityRows/);
   assert.match(facilityApi, /normalizeFacilityMemberCode\(row\.memberCode\) === expected/);
-  assert.match(membershipApi, /filterOwnedFacilityRows\(reservationRows,member\.memberCode\)/);
+  assert.match(membershipApi, /filterOwnedFacilityRows\(reservationRows\?\?\[\],member\.memberCode\)/);
   assert.match(membershipApi, /isOwnedFacilityRow\(sessionResult\.session,member\.memberCode\)/);
   assert.match(reservationsApi, /filterOwnedFacilityRows\(rows, member\.memberCode\)/);
   assert.match(cancellationApi, /memberCode:member\.memberCode/);
   assert.match(cancellationApi, /facilityId:"FEBBRAIO"/);
+});
+
+test("予約台帳の一時障害を予約なしとして表示しない", async () => {
+  const [membershipApi, page] = await Promise.all([
+    readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
+    readFile(new URL("app/page.tsx", root), "utf8"),
+  ]);
+  assert.match(membershipApi, /reservation\.get[\s\S]*\.catch\(\(\)=>null\)/);
+  assert.match(membershipApi, /const reservationsAvailable=reservationRows!==null/);
+  assert.match(membershipApi, /Object\.assign\(presentation,\{reservationsAvailable\}\)/);
+  assert.match(page, /member\.reservationsAvailable===false/);
+  assert.match(page, /一時的なエラーで予約情報を確認できませんでした/);
+  assert.match(page, /member\.reservationsAvailable!==false&&!member\.session/);
 });
 
 test("予約ページは代表会員へフォールバックせずLINE本人の履歴だけを取得する", async () => {
@@ -353,12 +408,14 @@ test("レシート番号を使わずフードとドリンクを別々に呼び�
   ]);
   assert.match(schema, /orderFulfillments/);
   assert.match(schema, /orderCallCounters/);
-  assert.match(orders, /allocateCallNumber/);
+  assert.match(orders, /allocateKitchenUnitNumber/);
+  assert.match(orders, /unitRows/);
+  assert.match(orders, /'WAITING_PAYMENT'/);
   assert.match(orders, /item\.product\.category/);
   assert.match(kitchen, /START.*READY.*CALL.*PICKUP/s);
   assert.match(kitchen, /KITCHEN_API_TOKEN|requireKitchenToken/);
   assert.match(orders, /FOOD:"フード",DRINK:"ドリンク"/);
-  assert.match(mobileOrder, /item\.label} 呼出番号/);
+  assert.match(mobileOrder, /displayUnits\(complete\)/);
   assert.match(mobileOrder, /padStart\(3,"0"\)/);
   assert.match(css, /font:800 74px/);
   assert.match(migration, /order_fulfillments/);
@@ -366,6 +423,35 @@ test("レシート番号を使わずフードとドリンクを別々に呼び�
   assert.match(payment, /smaregi_transaction_id/);
   assert.match(indexes, /orders_smaregi_transaction_unique/);
   assert.match(guide, /レシート番号は顧客呼出しに使用しません/);
+});
+
+test("商品単位の呼出番号を注文・決済・会員証・セルフレジで共有する", async () => {
+  const [orders, units, payment, stripe, pos, membership, mobile, memberPage, migration] = await Promise.all([
+    readFile(new URL("app/api/v1/orders/route.ts", root), "utf8"),
+    readFile(new URL("lib/kitchen-units.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/payment-confirmation/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/stripe/webhook/route.ts", root), "utf8"),
+    readFile(new URL("lib/order-pos.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
+    readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("drizzle/0032_mobile_order_item_units.sql", root), "utf8"),
+  ]);
+  assert.match(orders, /unitIndex<=item\.quantity/);
+  assert.match(orders, /kitchen_units.*WAITING_PAYMENT/s);
+  assert.match(orders, /orderUnits\(id\)/);
+  assert.match(units, /kitchen_unit_counters/);
+  assert.doesNotMatch(orders, /INSERT INTO order_call_counters/);
+  assert.match(payment, /UPDATE kitchen_units SET status='ACCEPTED'/);
+  assert.match(stripe, /UPDATE kitchen_units SET status='ACCEPTED'/);
+  assert.match(pos, /units/);
+  assert.match(membership, /units:await orderUnits/);
+  assert.match(mobile, /displayUnits\(complete\)/);
+  assert.match(mobile, /できあがった商品から個別に呼び出します/);
+  assert.match(memberPage, /orderCallSummary/);
+  assert.match(migration, /MOBILE_ORDER_ITEM_UNIT_MIGRATION/);
+  assert.match(migration, /kitchen_test_orders/);
+  assert.match(migration, /smaregi_transaction_id IS NULL/);
 });
 
 test("Stripe Checkoutを署名検証・任意保存・冪等処理付きで接続する", async () => {
@@ -398,6 +484,10 @@ test("セルフレジ現地決済を未決済一覧・5分ロック・冪等通�
     readFile(new URL("docs/SELF_REGISTER_ORDER_PAYMENT_API.md", root), "utf8"),
   ]);
   assert.match(unpaid, /WAITING_STORE_PAYMENT.*PAYMENT_PROCESSING/);
+  assert.match(unpaid, /normalize\("NFKC"\)/);
+  assert.match(unpaid, /o\.expires_at>\?/);
+  assert.match(unpaid, /Cache-Control.*no-store/);
+  assert.match(unpaid, /memberCode,queriedAt/);
   assert.match(lock, /PAYMENT_LOCK_TTL_MS/);
   assert.match(lock, /PRICE_CHANGED/);
   assert.match(release, /LOCK_NOT_OWNED/);
@@ -496,10 +586,10 @@ test("提供予定はキッチン計算を正本としセルフレジへ部門�
     readFile(new URL("app/api/v1/stripe/webhook/route.ts", root), "utf8"),
   ]);
   assert.doesNotMatch(mobile, /Date\.now\(\)\+30\*60_000/);
-  assert.match(mobile, /提供予定：できあがり次第/);
+  assert.match(mobile, /提供予定時間を確認しています。しばらくお待ちください。/);
   assert.match(orders, /estimateOrderSchedule/);
   assert.match(schedule, /WITH_FOOD/);
-  assert.match(schedule, /AbortSignal\.timeout\(2_500\)/);
+  assert.match(schedule, /AbortSignal\.timeout\(7_000\)/);
   assert.match(pos, /foodCallNumber/);
   assert.match(pos, /drinkCallNumber/);
   assert.match(confirmation, /confirmOrderSchedule\(orderId/);
@@ -750,6 +840,8 @@ test("管理者パスワード変更と会員データ同期を安全に提供�
   assert.match(passwordApi,/Promise\.all/);assert.match(passwordApi,/Server-Timing/);
   assert.match(passwordApi,/\\x21-\\x7E/);assert.match(page,/10文字以上で英字と数字を両方含めてください。記号も使用できます/);
   assert.match(session,/pbkdf2_sha256_120000/);assert.match(session,/pbkdf2_sha256_210000/);
+  assert.match(session,/pbkdf2_sha256_30000_peppered/);assert.match(session,/peppered/);
+  assert.match(session,/upgradeLegacyPassword/);assert.match(session,/valid&&peppered/);
   assert.match(syncApi,/LINE_NAMES/);assert.match(syncApi,/SPEND_RECALC/);assert.match(syncApi,/LINE_CHANNEL_ACCESS_TOKEN/);assert.match(syncApi,/SMAREGI_SPEND_RECALC_URL/);
   assert.match(syncApi,/loyaltyAnnualSpendSync/);assert.match(syncApi,/ALL_ACTIVE_MEMBERS_ONCE/);
   assert.match(syncApi,/loyaltyAnnualSpendSyncStatus/);assert.match(page,/初回同期の状態/);assert.match(page,/対象額を集計中/);
@@ -770,6 +862,7 @@ test("統合管理でタスク・予約一覧・クーポン・配信・会員�
     readFile(new URL("drizzle/0020_operations_console.sql",root),"utf8"),
   ]);
   assert.match(sidebar,/SNSコントロール/);assert.match(sidebar,/精算・売上/);assert.match(sidebar,/在庫確認/);assert.match(sidebar,/作業タスク/);
+  assert.match(sidebar,/AdminMobileNav/);assert.match(sidebar,/スマートフォン用管理メニュー/);assert.match(page,/AdminMobileNav/);
   assert.match(page,/StudioReservationOverview/);assert.match(reservations,/staff\.reservations\.list/);
   assert.match(tasks,/operations_tasks/);assert.match(engagement,/message_campaigns/);assert.match(engagement,/automation_rules/);
   assert.match(page,/BulkMemberActions/);assert.match(bulk,/MEMBER_TAG_ADDED/);assert.match(bulk,/MEMBER_STATUS_CHANGED/);
@@ -788,19 +881,22 @@ test("管理画面は概要と詳細を分離し検索入力を待ってから�
 });
 
 test("商品マスタ登録と販売期間を共通商品管理へ追加する",async()=>{
-  const [route,component,catalog,migration,menu,guide]=await Promise.all([
+  const [route,component,catalog,migration,menu,guide,admin,workspace]=await Promise.all([
     readFile(new URL("app/api/v1/admin/product-master/route.ts",root),"utf8"),
     readFile(new URL("app/menu-admin/ProductMasterRegistration.tsx",root),"utf8"),
     readFile(new URL("lib/order-catalog.ts",root),"utf8"),
     readFile(new URL("drizzle/0022_catalog_sale_period.sql",root),"utf8"),
     readFile(new URL("app/menu-admin/page.tsx",root),"utf8"),
     readFile(new URL("docs/COUPON_AND_PRODUCT_MASTER_OPERATIONS.md",root),"utf8"),
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/menu-admin/ProductMasterWorkspace.tsx",root),"utf8"),
   ]);
   assert.match(route,/SMAREGI_PRODUCT_MASTER_URL/);assert.match(route,/product\.create/);assert.match(route,/product\.update/);assert.match(route,/product\.status/);assert.match(route,/Idempotency-Key/);
   assert.match(component,/スマレジ商品マスタ/);assert.match(component,/販売を停止/);assert.match(component,/ポイント付与対象/);assert.match(component,/JANコード/);
   assert.match(component,/5分ごとに自動更新/);assert.match(component,/販売開始/);assert.match(component,/販売終了/);
   assert.match(catalog,/saleWindowOpen/);assert.match(migration,/sale_starts_at/);assert.match(migration,/sale_ends_at/);
   assert.match(menu,/ProductMasterRegistration/);
+  assert.match(admin,/ProductMasterWorkspace allowCreate/);assert.match(workspace,/allowCreate&&<ProductMasterRegistration/);
   assert.match(guide,/予約/);assert.match(guide,/確定/);assert.match(guide,/値引き用JAN/);
 });
 
@@ -865,10 +961,11 @@ test("スタッフ管理の全主要APIはパスワードログインを共通�
 });
 
 test("スマレジ商品マスタ全件を同期し商品別に在庫管理対象外を設定できる",async()=>{
-  const [route,panel,migration]=await Promise.all([
+  const [route,panel,migration,styles]=await Promise.all([
     readFile(new URL("app/api/v1/admin/inventory/route.ts",root),"utf8"),
     readFile(new URL("app/member-admin/InventoryPanel.tsx",root),"utf8"),
     readFile(new URL("drizzle/0024_inventory_product_settings.sql",root),"utf8"),
+    readFile(new URL("app/member-admin/member-admin.css",root),"utf8"),
   ]);
   assert.match(route,/result\.products/);
   assert.match(route,/SET_TRACKING/);
@@ -877,6 +974,7 @@ test("スマレジ商品マスタ全件を同期し商品別に在庫管理対�
   assert.match(panel,/商品マスタ・実在庫を更新/);
   assert.match(panel,/在庫を管理する/);
   assert.match(panel,/在庫管理対象外/);
+  assert.match(panel,/inventory-product-name/);assert.match(styles,/Product and inventory management use one scannable list/);
   assert.match(migration,/inventory_product_settings/);
 });
 
@@ -963,10 +1061,124 @@ test("統合会員管理から商品マスタを部門絞り込み・並び替�
   ]);
   assert.match(sidebar,/key:"products",label:"商品マスタ"/);
   assert.match(page,/tab==="products"/);
-  assert.match(page,/<ProductMasterWorkspace\/>/);
+  assert.match(page,/<ProductMasterWorkspace allowCreate\/>/);
   assert.match(panel,/部門で絞り込み/);
   assert.match(panel,/すべての部門/);
   assert.match(panel,/商品の並び順/);
   assert.match(panel,/売価が高い順/);
   assert.match(panel,/スマレジ更新が新しい順/);
+});
+
+test("新規商品画像とおもひで商店専用レイアウトを管理する",async()=>{
+  const [registration,layout,catalog,master,schema]=await Promise.all([
+    readFile(new URL("app/menu-admin/ProductMasterRegistration.tsx",root),"utf8"),
+    readFile(new URL("app/menu-admin/OmohideLayoutManager.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/catalog/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/inventory/master/route.ts",root),"utf8"),
+    readFile(new URL("db/schema.ts",root),"utf8"),
+  ]);
+  assert.match(registration,/商品画像/);assert.match(registration,/image\/jpeg/);assert.match(registration,/バーコードのない商品/);
+  assert.match(layout,/おもひで商店 レイアウト管理/);assert.match(layout,/draggable/);assert.match(layout,/omohideOrder/);
+  assert.match(catalog,/omohideDisplay/);assert.match(catalog,/omohideSequence/);assert.match(master,/omohideDisplay/);assert.match(schema,/omohide_display/);
+});
+
+test("スタッフサイトでSNS投稿をAIと相談し承認前の台帳へ保存する",async()=>{
+  const [page,panel,route,sidebar]=await Promise.all([
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/SnsAssistantPanel.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/sns-assistant/route.ts",root),"utf8"),
+    readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
+  ]);
+  assert.match(page,/SnsAssistantPanel/);
+  assert.match(sidebar,/label:"SNSコントロール"/);
+  assert.match(panel,/投稿相談AI/);
+  assert.match(panel,/投稿台帳/);
+  assert.match(panel,/content_json/);
+  assert.match(panel,/resource=campaigns/);
+  assert.match(panel,/daily:true/);
+  assert.match(panel,/この案を投稿台帳へ保存/);
+  assert.match(panel,/resource:"campaigns"/);
+  assert.match(route,/https:\/\/api\.openai\.com\/v1\/responses/);
+  assert.match(route,/OPENAI_API_KEY/);
+  assert.match(route,/store:false/);
+  assert.match(route,/AI毎日投稿案/);
+  assert.match(route,/requireAdminSession/);
+});
+
+test("スタッフを期限付きメール招待し個別アカウントと権限を管理する",async()=>{
+  const [panel,invite,staffApi,acceptApi,session,schema,migration,sidebar,page]=await Promise.all([
+    readFile(new URL("app/member-admin/StaffAccountsPanel.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/invite/page.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/staff/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/staff/accept/route.ts",root),"utf8"),
+    readFile(new URL("lib/admin-session.ts",root),"utf8"),
+    readFile(new URL("db/schema.ts",root),"utf8"),
+    readFile(new URL("drizzle/0031_staff_accounts.sql",root),"utf8"),
+    readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+  ]);
+  assert.match(panel,/スタッフ・権限管理/);assert.match(panel,/招待メールを作成/);assert.match(panel,/最終ログイン/);
+  assert.match(invite,/スタッフアカウント登録/);assert.match(invite,/10文字以上/);
+  assert.match(staffApi,/72\*3600000/);assert.match(staffApi,/SHA-256/);assert.match(staffApi,/STAFF_INVITED/);
+  assert.match(acceptApi,/createAdminPasswordRecord/);assert.match(acceptApi,/STAFF_INVITE_ACCEPTED/);
+  assert.match(session,/staff_accounts/);assert.match(session,/status='ACTIVE'/);
+  assert.match(schema,/staffAccounts/);assert.match(migration,/staff_accounts/);
+  assert.match(sidebar,/スタッフ・権限/);assert.match(page,/StaffAccountsPanel/);
+});
+
+test("スタッフサイトの全ボタンは押下と受付完了を視覚表示する",async()=>{
+  const [feedback,sidebar,styles]=await Promise.all([
+    readFile(new URL("app/member-admin/ButtonFeedback.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/member-admin.css",root),"utf8"),
+  ]);
+  assert.match(feedback,/\.member-admin-page button/);assert.match(feedback,/staff-button-accepted/);assert.match(feedback,/addEventListener\("click"/);
+  assert.match(sidebar,/ButtonFeedback/);assert.match(styles,/button:not\(:disabled\):active/);assert.match(styles,/focus-visible/);assert.match(styles,/prefers-reduced-motion/);
+});
+
+test("テスト注文は本番の呼出番号を消費せず受渡後に完了する",async()=>{
+  const route=await readFile(new URL("app/api/v1/kitchen/units/route.ts",root),"utf8");
+  assert.match(route,/item\.isTest\?`TEST:\$\{date\}`:date/);
+  assert.match(route,/if\(values\.length===0\).*SELECT status FROM kitchen_units/s);
+});
+
+test("LIFFは登録済みの正式ドメインへ移動してからログインする",async()=>{
+  const [page,route]=await Promise.all([
+    readFile(new URL("app/page.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/client-config/route.ts",root),"utf8"),
+  ]);
+  assert.match(route,/canonicalBaseUrl/);
+  assert.match(route,/https:\/\/members\.wce-group-japan\.com/);
+  assert.match(page,/window\.location\.origin!==canonical\.origin/);
+  assert.match(page,/window\.location\.replace/);
+});
+
+test("商品マスターURL未設定時も許可された画面はスナップショットへ退避する",async()=>{
+  const catalog=await readFile(new URL("lib/order-catalog.ts",root),"utf8");
+  assert.doesNotMatch(catalog,/if\(!url\)throw new Error\("CATALOG_URL_NOT_CONFIGURED"\);\s*let body/);
+  assert.match(catalog,/try\{if\(!url\)throw new Error\("CATALOG_URL_NOT_CONFIGURED"\)/);
+  assert.match(catalog,/if\(!options\.allowSnapshotFallback\)throw error/);
+});
+
+test("共通会員認証は会員DBだけを参照し用途別トークン・監査・冪等性を備える", async () => {
+  const [route, auth, schema, migration, docs] = await Promise.all([
+    readFile(new URL("app/api/v1/member-verification/route.ts", root), "utf8"),
+    readFile(new URL("lib/member-verification.ts", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("drizzle/0030_member_verification.sql", root), "utf8"),
+    readFile(new URL("docs/MEMBER_VERIFICATION_API.md", root), "utf8"),
+  ]);
+  assert.match(route, /FROM members WHERE member_code=\?/);
+  assert.doesNotMatch(route, /fetch\(|スマレジ|GAS|reservation/i);
+  assert.match(route, /UNREGISTERED/);
+  assert.match(route, /SUSPENDED/);
+  assert.match(route, /WITHDRAWN/);
+  assert.match(route, /REQUEST_ID_CONFLICT/);
+  assert.match(route, /memberCodeHash=await sha256\(memberCode\)/);
+  assert.match(route, /X-Idempotent-Replay/);
+  assert.match(auth, /MEMBER_VERIFICATION_SELF_REGISTER_TOKEN/);
+  assert.match(auth, /difference\|=/);
+  assert.match(schema, /memberVerificationAudits/);
+  assert.match(migration, /verification_status`='SUSPENDED'/);
+  assert.match(docs, /503 `VERIFICATION_SERVICE_UNAVAILABLE`/);
 });

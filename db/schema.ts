@@ -18,6 +18,7 @@ export const members = sqliteTable("members", {
   residentStatus: text("resident_status", { enum: ["UNKNOWN", "ACTIVE", "INACTIVE"] }).notNull().default("UNKNOWN"),
   residentCheckedAt: integer("resident_checked_at", { mode: "timestamp_ms" }),
   status: text("status", { enum: ["ACTIVE", "INACTIVE"] }).notNull().default("ACTIVE"),
+  verificationStatus: text("verification_status", { enum: ["ACTIVE", "SUSPENDED", "WITHDRAWN"] }).notNull().default("ACTIVE"),
   sourceSystem: text("source_system").notNull().default("LEGACY"),
   sourceCustomerId: text("source_customer_id"),
   acquisitionSource: text("acquisition_source"),
@@ -25,6 +26,20 @@ export const members = sqliteTable("members", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 }, (table) => [uniqueIndex("members_member_code_unique").on(table.memberCode)]);
+
+export const memberVerificationAudits = sqliteTable("member_verification_audits", {
+  requestId: text("request_id").primaryKey(),
+  requestFingerprint: text("request_fingerprint").notNull(),
+  system: text("system").notNull(),
+  deviceId: text("device_id").notNull(),
+  tokenScope: text("token_scope").notNull(),
+  memberCodeHash: text("member_code_hash").notNull(),
+  result: text("result", { enum: ["ACTIVE", "SUSPENDED", "WITHDRAWN", "UNREGISTERED", "REQUEST_ID_CONFLICT"] }).notNull(),
+  httpStatus: integer("http_status").notNull(),
+  durationMs: integer("duration_ms").notNull(),
+  responseJson: text("response_json").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("member_verification_audits_system_created_idx").on(table.system, table.createdAt)]);
 
 export const adminAccounts = sqliteTable("admin_accounts", {
   email: text("email").primaryKey(),
@@ -34,6 +49,20 @@ export const adminAccounts = sqliteTable("admin_accounts", {
   passwordChangedAt: integer("password_changed_at", { mode: "timestamp_ms" }).notNull(),
   updatedBy: text("updated_by").notNull(),
 });
+
+export const staffAccounts = sqliteTable("staff_accounts", {
+  email: text("email").primaryKey(),
+  displayName: text("display_name").notNull(),
+  role: text("role", { enum: ["OWNER", "ADMIN", "STORE", "KITCHEN", "VIEWER"] }).notNull().default("STORE"),
+  status: text("status", { enum: ["INVITED", "ACTIVE", "SUSPENDED"] }).notNull().default("INVITED"),
+  inviteTokenHash: text("invite_token_hash"),
+  inviteExpiresAt: integer("invite_expires_at", { mode: "timestamp_ms" }),
+  invitedBy: text("invited_by").notNull(),
+  invitedAt: integer("invited_at", { mode: "timestamp_ms" }).notNull(),
+  acceptedAt: integer("accepted_at", { mode: "timestamp_ms" }),
+  lastLoginAt: integer("last_login_at", { mode: "timestamp_ms" }),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("staff_accounts_status_idx").on(table.status, table.role)]);
 
 export const memberSpendSnapshots = sqliteTable("member_spend_snapshots", {
   memberId: text("member_id").primaryKey().references(() => members.id),
@@ -341,7 +370,7 @@ export const kitchenUnits = sqliteTable("kitchen_units", {
   department: text("department", { enum: ["FOOD", "DRINK"] }).notNull(),
   callDate: text("call_date").notNull(),
   callNumber: integer("call_number").notNull(),
-  status: text("status", { enum: ["ACCEPTED", "COOKING", "READY", "CALLED", "PICKED_UP", "CANCELLED"] }).notNull().default("ACCEPTED"),
+  status: text("status", { enum: ["WAITING_PAYMENT", "ACCEPTED", "COOKING", "READY", "CALLED", "PICKED_UP", "CANCELLED"] }).notNull().default("WAITING_PAYMENT"),
   currentStep: integer("current_step").notNull().default(0),
   totalSteps: integer("total_steps").notNull().default(1),
   isTest: integer("is_test", { mode: "boolean" }).notNull().default(false),
@@ -360,6 +389,14 @@ export const kitchenTestOrders = sqliteTable("kitchen_test_orders", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 
+export const mobileOrderMigrationAudits = sqliteTable("mobile_order_migration_audits", {
+  id: text("id").primaryKey(),
+  reason: text("reason").notNull(),
+  targetCount: integer("target_count").notNull(),
+  orderNumbersJson: text("order_numbers_json").notNull(),
+  executedAt: integer("executed_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 export const catalogOverrides = sqliteTable("catalog_overrides", {
   productCode: text("product_code").primaryKey(),
   description: text("description").notNull().default(""),
@@ -368,6 +405,8 @@ export const catalogOverrides = sqliteTable("catalog_overrides", {
   displaySequence: integer("display_sequence").notNull().default(9999),
   showOnSelfRegister: integer("show_on_self_register", { mode: "boolean" }).notNull().default(true),
   showOnMobileOrder: integer("show_on_mobile_order", { mode: "boolean" }).notNull().default(true),
+  omohideDisplay: integer("omohide_display", { mode: "boolean" }),
+  omohideSequence: integer("omohide_sequence"),
   soldOut: integer("sold_out", { mode: "boolean" }).notNull().default(false),
   scheduleEnabled: integer("schedule_enabled", { mode: "boolean" }).notNull().default(false),
   scheduleStart: text("schedule_start").notNull().default("11:00"),

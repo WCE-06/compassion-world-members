@@ -4,9 +4,9 @@ function runtime(){return env as unknown as Record<string,string|undefined>}
 
 export function stripeConfigured(){const value=runtime();return Boolean(value.STRIPE_SECRET_KEY&&value.STRIPE_WEBHOOK_SECRET&&value.SMART_PAYMENT_ENABLED==="true")}
 
-export async function stripeRequest<T>(path:string,method:"GET"|"POST"="GET",body?:URLSearchParams):Promise<T>{
+export async function stripeRequest<T>(path:string,method:"GET"|"POST"="GET",body?:URLSearchParams,idempotencyKey?:string):Promise<T>{
  const key=runtime().STRIPE_SECRET_KEY;if(!key)throw new Error("STRIPE_NOT_CONFIGURED");
- const response=await fetch(`https://api.stripe.com/v1${path}`,{method,headers:{Authorization:`Bearer ${key}`,...(body?{"Content-Type":"application/x-www-form-urlencoded"}:{})},body,cache:"no-store"});
+ const response=await fetch(`https://api.stripe.com/v1${path}`,{method,headers:{Authorization:`Bearer ${key}`,...(body?{"Content-Type":"application/x-www-form-urlencoded"}:{}),...(idempotencyKey?{"Idempotency-Key":idempotencyKey}:{})},body,cache:"no-store"});
  const result=await response.json() as T&{error?:{message?:string}};if(!response.ok)throw new Error(result.error?.message??`STRIPE_API_${response.status}`);return result;
 }
 

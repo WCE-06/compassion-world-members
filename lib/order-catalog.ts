@@ -14,8 +14,7 @@ function taxIncluded(excluding:number,rate:number,rounding:string){const raw=exc
 
 export async function getOrderProducts(options:{includeOverrides?:boolean;includeClosedProducts?:boolean;channel?:"MOBILE_ORDER"|"SELF_REGISTER";timeoutMs?:number;allowSnapshotFallback?:boolean}={}){
  const runtime=env as unknown as Record<string,string|undefined>;const url=runtime.SELF_REGISTER_CATALOG_URL;
- if(!url)throw new Error("CATALOG_URL_NOT_CONFIGURED");
- let body:CatalogResponse;try{const response=await fetch(url,{redirect:"follow",cf:{cacheEverything:true,cacheTtl:300},signal:AbortSignal.timeout(options.timeoutMs??15_000)});if(!response.ok)throw new Error("CATALOG_UNAVAILABLE");body=await response.json() as CatalogResponse;if(!body.ok||!body.result)throw new Error("CATALOG_INVALID_RESPONSE")}catch(error){if(!options.allowSnapshotFallback)throw error;body={ok:true,result:{products:(catalogSnapshot.products as unknown as SourceProduct[]).map(product=>({...product,section:"kitchen"})),sync:{state:"SNAPSHOT_FALLBACK"}}}}
+ let body:CatalogResponse;try{if(!url)throw new Error("CATALOG_URL_NOT_CONFIGURED");const response=await fetch(url,{redirect:"follow",cf:{cacheEverything:true,cacheTtl:300},signal:AbortSignal.timeout(options.timeoutMs??15_000)});if(!response.ok)throw new Error("CATALOG_UNAVAILABLE");body=await response.json() as CatalogResponse;if(!body.ok||!body.result)throw new Error("CATALOG_INVALID_RESPONSE")}catch(error){if(!options.allowSnapshotFallback)throw error;body={ok:true,result:{products:(catalogSnapshot.products as unknown as SourceProduct[]).map(product=>({...product,section:"kitchen"})),sync:{state:"SNAPSHOT_FALLBACK"}}}}
  let overrides:Record<string,typeof catalogOverrides.$inferSelect>={};
  let hours:typeof storeHours.$inferSelect|undefined;
  let exceptions:typeof businessCalendar.$inferSelect[]=[];
