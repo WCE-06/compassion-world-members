@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { getDb } from "@/db";
 import { businessCalendar, catalogOverrides, categorySchedules, storeHours } from "@/db/schema";
 import { inferMocktailPair } from "@/lib/drink-pairing";
+import { isKitchenInStoreBarcode, normalizedKitchenMenuCategory } from "@/lib/kitchen-catalog-rules";
 import catalogSnapshot from "../preview/generated/catalog.json";
 
 export type OrderOptionChoice={id:string;name:string;priceDelta:number;productCode?:string};
@@ -33,8 +34,8 @@ export async function getOrderProducts(options:{includeOverrides?:boolean;includ
  let exceptions:typeof businessCalendar.$inferSelect[]=[];
  let categoryRules:Record<string,typeof categorySchedules.$inferSelect>={};
  const [overrideRows,hourRows,exceptionRows,ruleRows]=await Promise.all([getDb().select().from(catalogOverrides).catch(()=>[]),getDb().select().from(storeHours).limit(1).catch(()=>[]),getDb().select().from(businessCalendar).catch(()=>[]),getDb().select().from(categorySchedules).catch(()=>[])]);overrides=Object.fromEntries(overrideRows.map(row=>[row.productCode,row]));[hours]=hourRows;exceptions=exceptionRows;categoryRules=Object.fromEntries(ruleRows.map(row=>[row.category,row]));
- const products=(body.result.products??[]).filter(product=>product.section==="kitchen"&&Boolean(product.menuCategory)).map(product=>{
-  const override=overrides[product.code],menuCategory=override?.menuCategory??product.menuCategory,inferred=inferMocktailPair(product.name,menuCategory);
+ const products=(body.result.products??[]).filter(product=>product.section==="kitchen"&&Boolean(product.menuCategory)&&isKitchenInStoreBarcode(product.code)).map(product=>{
+  const override=overrides[product.code],menuCategory=normalizedKitchenMenuCategory(product.name,override?.menuCategory??product.menuCategory),inferred=inferMocktailPair(product.name,menuCategory);
   const regularPrice=Number(product.price),regularBasePrice=Number(product.basePrice??product.price),taxRate=Number(product.taxRate??0),taxRounding=String(product.taxRounding??"1");
   const limitedPrice=override?.limitedPrice??null,limitedPriceStartsAt=override?.limitedPriceStartsAt?.getTime()??null,limitedPriceEndsAt=override?.limitedPriceEndsAt?.getTime()??null;
   const limitedPriceActive=limitedPrice!=null&&limitedPrice>=0&&(!limitedPriceStartsAt||Date.now()>=limitedPriceStartsAt)&&(!limitedPriceEndsAt||Date.now()<limitedPriceEndsAt);
