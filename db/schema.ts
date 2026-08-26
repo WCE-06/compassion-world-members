@@ -368,6 +368,8 @@ export const catalogOverrides = sqliteTable("catalog_overrides", {
   displaySequence: integer("display_sequence").notNull().default(9999),
   showOnSelfRegister: integer("show_on_self_register", { mode: "boolean" }).notNull().default(true),
   showOnMobileOrder: integer("show_on_mobile_order", { mode: "boolean" }).notNull().default(true),
+  omohideDisplay: integer("omohide_display", { mode: "boolean" }),
+  omohideSequence: integer("omohide_sequence"),
   soldOut: integer("sold_out", { mode: "boolean" }).notNull().default(false),
   scheduleEnabled: integer("schedule_enabled", { mode: "boolean" }).notNull().default(false),
   scheduleStart: text("schedule_start").notNull().default("11:00"),

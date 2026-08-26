@@ -805,6 +805,8 @@ test("管理者パスワード変更と会員データ同期を安全に提供�
   assert.match(passwordApi,/Promise\.all/);assert.match(passwordApi,/Server-Timing/);
   assert.match(passwordApi,/\\x21-\\x7E/);assert.match(page,/10文字以上で英字と数字を両方含めてください。記号も使用できます/);
   assert.match(session,/pbkdf2_sha256_120000/);assert.match(session,/pbkdf2_sha256_210000/);
+  assert.match(session,/pbkdf2_sha256_30000_peppered/);assert.match(session,/peppered/);
+  assert.match(session,/upgradeLegacyPassword/);assert.match(session,/valid&&peppered/);
   assert.match(syncApi,/LINE_NAMES/);assert.match(syncApi,/SPEND_RECALC/);assert.match(syncApi,/LINE_CHANNEL_ACCESS_TOKEN/);assert.match(syncApi,/SMAREGI_SPEND_RECALC_URL/);
   assert.match(syncApi,/loyaltyAnnualSpendSync/);assert.match(syncApi,/ALL_ACTIVE_MEMBERS_ONCE/);
   assert.match(syncApi,/loyaltyAnnualSpendSyncStatus/);assert.match(page,/初回同期の状態/);assert.match(page,/対象額を集計中/);
@@ -825,6 +827,7 @@ test("統合管理でタスク・予約一覧・クーポン・配信・会員�
     readFile(new URL("drizzle/0020_operations_console.sql",root),"utf8"),
   ]);
   assert.match(sidebar,/SNSコントロール/);assert.match(sidebar,/精算・売上/);assert.match(sidebar,/在庫確認/);assert.match(sidebar,/作業タスク/);
+  assert.match(sidebar,/AdminMobileNav/);assert.match(sidebar,/スマートフォン用管理メニュー/);assert.match(page,/AdminMobileNav/);
   assert.match(page,/StudioReservationOverview/);assert.match(reservations,/staff\.reservations\.list/);
   assert.match(tasks,/operations_tasks/);assert.match(engagement,/message_campaigns/);assert.match(engagement,/automation_rules/);
   assert.match(page,/BulkMemberActions/);assert.match(bulk,/MEMBER_TAG_ADDED/);assert.match(bulk,/MEMBER_STATUS_CHANGED/);
@@ -843,19 +846,22 @@ test("管理画面は概要と詳細を分離し検索入力を待ってから�
 });
 
 test("商品マスタ登録と販売期間を共通商品管理へ追加する",async()=>{
-  const [route,component,catalog,migration,menu,guide]=await Promise.all([
+  const [route,component,catalog,migration,menu,guide,admin,workspace]=await Promise.all([
     readFile(new URL("app/api/v1/admin/product-master/route.ts",root),"utf8"),
     readFile(new URL("app/menu-admin/ProductMasterRegistration.tsx",root),"utf8"),
     readFile(new URL("lib/order-catalog.ts",root),"utf8"),
     readFile(new URL("drizzle/0022_catalog_sale_period.sql",root),"utf8"),
     readFile(new URL("app/menu-admin/page.tsx",root),"utf8"),
     readFile(new URL("docs/COUPON_AND_PRODUCT_MASTER_OPERATIONS.md",root),"utf8"),
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+    readFile(new URL("app/menu-admin/ProductMasterWorkspace.tsx",root),"utf8"),
   ]);
   assert.match(route,/SMAREGI_PRODUCT_MASTER_URL/);assert.match(route,/product\.create/);assert.match(route,/product\.update/);assert.match(route,/product\.status/);assert.match(route,/Idempotency-Key/);
   assert.match(component,/スマレジ商品マスタ/);assert.match(component,/販売を停止/);assert.match(component,/ポイント付与対象/);assert.match(component,/JANコード/);
   assert.match(component,/5分ごとに自動更新/);assert.match(component,/販売開始/);assert.match(component,/販売終了/);
   assert.match(catalog,/saleWindowOpen/);assert.match(migration,/sale_starts_at/);assert.match(migration,/sale_ends_at/);
   assert.match(menu,/ProductMasterRegistration/);
+  assert.match(admin,/ProductMasterWorkspace allowCreate/);assert.match(workspace,/allowCreate&&<ProductMasterRegistration/);
   assert.match(guide,/予約/);assert.match(guide,/確定/);assert.match(guide,/値引き用JAN/);
 });
 
@@ -920,10 +926,11 @@ test("スタッフ管理の全主要APIはパスワードログインを共通�
 });
 
 test("スマレジ商品マスタ全件を同期し商品別に在庫管理対象外を設定できる",async()=>{
-  const [route,panel,migration]=await Promise.all([
+  const [route,panel,migration,styles]=await Promise.all([
     readFile(new URL("app/api/v1/admin/inventory/route.ts",root),"utf8"),
     readFile(new URL("app/member-admin/InventoryPanel.tsx",root),"utf8"),
     readFile(new URL("drizzle/0024_inventory_product_settings.sql",root),"utf8"),
+    readFile(new URL("app/member-admin/member-admin.css",root),"utf8"),
   ]);
   assert.match(route,/result\.products/);
   assert.match(route,/SET_TRACKING/);
@@ -932,6 +939,7 @@ test("スマレジ商品マスタ全件を同期し商品別に在庫管理対�
   assert.match(panel,/商品マスタ・実在庫を更新/);
   assert.match(panel,/在庫を管理する/);
   assert.match(panel,/在庫管理対象外/);
+  assert.match(panel,/inventory-product-name/);assert.match(styles,/Product and inventory management use one scannable list/);
   assert.match(migration,/inventory_product_settings/);
 });
 
@@ -1018,7 +1026,7 @@ test("統合会員管理から商品マスタを部門絞り込み・並び替�
   ]);
   assert.match(sidebar,/key:"products",label:"商品マスタ"/);
   assert.match(page,/tab==="products"/);
-  assert.match(page,/<ProductMasterWorkspace\/>/);
+  assert.match(page,/<ProductMasterWorkspace allowCreate\/>/);
   assert.match(panel,/部門で絞り込み/);
   assert.match(panel,/すべての部門/);
   assert.match(panel,/商品の並び順/);
@@ -1026,14 +1034,28 @@ test("統合会員管理から商品マスタを部門絞り込み・並び替�
   assert.match(panel,/スマレジ更新が新しい順/);
 });
 
+test("新規商品画像とおもひで商店専用レイアウトを管理する",async()=>{
+  const [registration,layout,catalog,master,schema]=await Promise.all([
+    readFile(new URL("app/menu-admin/ProductMasterRegistration.tsx",root),"utf8"),
+    readFile(new URL("app/menu-admin/OmohideLayoutManager.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/catalog/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/inventory/master/route.ts",root),"utf8"),
+    readFile(new URL("db/schema.ts",root),"utf8"),
+  ]);
+  assert.match(registration,/商品画像/);assert.match(registration,/image\/jpeg/);assert.match(registration,/バーコードのない商品/);
+  assert.match(layout,/おもひで商店 レイアウト管理/);assert.match(layout,/draggable/);assert.match(layout,/omohideOrder/);
+  assert.match(catalog,/omohideDisplay/);assert.match(catalog,/omohideSequence/);assert.match(master,/omohideDisplay/);assert.match(schema,/omohide_display/);
+});
+
 test("スタッフサイトでSNS投稿をAIと相談し承認前の台帳へ保存する",async()=>{
-  const [page,panel,route]=await Promise.all([
+  const [page,panel,route,sidebar]=await Promise.all([
     readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
     readFile(new URL("app/member-admin/SnsAssistantPanel.tsx",root),"utf8"),
     readFile(new URL("app/api/v1/admin/sns-assistant/route.ts",root),"utf8"),
+    readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
   ]);
   assert.match(page,/SnsAssistantPanel/);
-  assert.match(page,/>SNS<\/button>/);
+  assert.match(sidebar,/label:"SNSコントロール"/);
   assert.match(panel,/投稿相談AI/);
   assert.match(panel,/投稿台帳/);
   assert.match(panel,/content_json/);

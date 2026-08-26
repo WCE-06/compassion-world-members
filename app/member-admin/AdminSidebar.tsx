@@ -30,3 +30,11 @@ export function AdminSidebar({active,onSelect}:{active:AdminSection;onSelect:(se
     </nav>
   </aside>;
 }
+
+export function AdminMobileNav({active,onSelect}:{active:AdminSection;onSelect:(section:AdminSection)=>void}){
+  return <nav className="admin-mobile-tabs" aria-label="スマートフォン用管理メニュー">
+    {items.map(({key,label,icon:Icon})=><button key={key} className={active===key?"active":""} onClick={()=>onSelect(key)}>
+      <Icon size={17}/><span>{label}</span>
+    </button>)}
+  </nav>;
+}

@@ -31,6 +31,12 @@ export async function PUT(request: NextRequest) {
     await getDb().batch(order.map((code, index) => {const product=catalog.find(item=>item.code===code);return getDb().insert(catalogOverrides).values({productCode:code,description:product?.description??"",imageUrl:product?.imageUrl??"",menuCategory:product?.menuCategory??"food-side",displaySequence:(index+1)*10,showOnSelfRegister:product?.showOnSelfRegister??true,showOnMobileOrder:product?.showOnMobileOrder??true,soldOut:product?.soldOut??false,scheduleEnabled:product?.scheduleEnabled??false,scheduleStart:product?.scheduleStart??"11:00",scheduleEnd:product?.scheduleEnd??"20:00",scheduleDays:(product?.scheduleDays??[1,2,3,4,5,6,7]).join(","),updatedBy:email,updatedAt:now}).onConflictDoUpdate({target:catalogOverrides.productCode,set:{displaySequence:(index+1)*10,updatedBy:email,updatedAt:now}})}));
     return NextResponse.json({saved:true,count:order.length});
   }
+  if (Array.isArray(body?.omohideOrder)) {
+    const order = body.omohideOrder.filter((code): code is string => typeof code === "string").slice(0, 1000);
+    const now = new Date();
+    await getDb().batch(order.map((code,index)=>getDb().insert(catalogOverrides).values({productCode:code,menuCategory:"retail",omohideDisplay:true,omohideSequence:(index+1)*10,updatedBy:email,updatedAt:now}).onConflictDoUpdate({target:catalogOverrides.productCode,set:{omohideDisplay:true,omohideSequence:(index+1)*10,updatedBy:email,updatedAt:now}})));
+    return NextResponse.json({saved:true,count:order.length});
+  }
   const productCode = typeof body?.productCode === "string" ? body.productCode.trim() : "";
   const [existing] = productCode ? await getDb().select().from(catalogOverrides).where(eq(catalogOverrides.productCode, productCode)) : [];
   const sourceProduct = productCode ? (await getOrderProducts({includeOverrides:true,includeClosedProducts:true,allowSnapshotFallback:true})).products.find(product=>product.code===productCode) : null;
@@ -47,6 +53,8 @@ export async function PUT(request: NextRequest) {
     displaySequence: body?.displaySequence==null?(existing?.displaySequence??sourceProduct?.displaySequence??9999):Math.max(0, Math.min(99999, Number(body.displaySequence) || 0)),
     showOnSelfRegister: typeof body?.showOnSelfRegister==="boolean"?body.showOnSelfRegister:(existing?.showOnSelfRegister??sourceProduct?.showOnSelfRegister??true),
     showOnMobileOrder: typeof body?.showOnMobileOrder==="boolean"?body.showOnMobileOrder:(existing?.showOnMobileOrder??sourceProduct?.showOnMobileOrder??true),
+    omohideDisplay: typeof body?.omohideDisplay==="boolean"?body.omohideDisplay:(existing?.omohideDisplay??null),
+    omohideSequence: body?.omohideSequence==null?(existing?.omohideSequence??null):Math.max(0,Math.min(999999,Number(body.omohideSequence)||0)),
     soldOut: typeof body?.soldOut==="boolean"?body.soldOut:(existing?.soldOut??sourceProduct?.soldOut??false),
     scheduleEnabled: typeof body?.scheduleEnabled==="boolean"?body.scheduleEnabled:(existing?.scheduleEnabled??sourceProduct?.scheduleEnabled??false),
     scheduleStart: typeof body?.scheduleStart === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(body.scheduleStart) ? body.scheduleStart : existing?.scheduleStart??sourceProduct?.scheduleStart??"11:00",
