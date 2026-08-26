@@ -22,3 +22,10 @@ test("注文・見積・スマート決済APIは本番会員認証のみを許�
     assert.doesNotMatch(source,/X-Compass-Preview|x-compass-preview/);
   }
 });
+
+test("スマート決済後は通常ブラウザではなくLIFFの注文画面へ戻す",async()=>{
+  const route=await readFile(new URL("app/api/v1/orders/[id]/smart-payment/route.ts",root),"utf8");
+  assert.match(route,/https:\/\/liff\.line\.me\//);
+  assert.match(route,/success_url:\`\$\{base\}\/mobile-order\?payment=success/);
+  assert.match(route,/cancel_url:\`\$\{base\}\/mobile-order\?payment=cancelled/);
+});
