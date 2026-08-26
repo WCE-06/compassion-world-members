@@ -2,13 +2,14 @@ import { env } from "cloudflare:workers";
 import { NextRequest,NextResponse } from "next/server";
 import { getOrderProducts } from "@/lib/order-catalog";
 import { requirePosToken } from "@/lib/pos-api";
+import { authorizedVerificationSystem } from "@/lib/member-verification";
 import { expireStaleLocks,expireStaleOrder,orderDetails,PAYMENT_LOCK_TTL_MS,PosOrderRow } from "@/lib/order-pos";
 
 type Body={requestId?:string;deviceId?:string};
 const valid=(value:string)=>/^[A-Za-z0-9._:-]{3,100}$/.test(value);
 
 export async function POST(request:NextRequest,{params}:{params:Promise<{id:string}>}){
- if(!await requirePosToken(request))return NextResponse.json({ok:false,error:"UNAUTHORIZED"},{status:401});
+ if(!await requirePosToken(request)&&!await authorizedVerificationSystem(request,"SELF_REGISTER"))return NextResponse.json({ok:false,error:"UNAUTHORIZED"},{status:401});
  const {id}=await params;const body=await request.json().catch(()=>null) as Body|null;const requestId=body?.requestId?.trim()??"",deviceId=body?.deviceId?.trim()??"";if(!valid(requestId)||!valid(deviceId))return NextResponse.json({ok:false,error:"INVALID_REQUEST"},{status:400});
  await expireStaleLocks(id);await expireStaleOrder(id);
  const replay=await env.DB.prepare(`SELECT id AS lockId,locked_at AS lockedAt,expires_at AS expiresAt,status,device_id AS deviceId FROM order_payment_locks WHERE request_id=?`).bind(requestId).first<{lockId:string;lockedAt:number;expiresAt:number;status:string;deviceId:string}>();if(replay){if(replay.deviceId!==deviceId)return NextResponse.json({ok:false,error:"LOCK_NOT_OWNED"},{status:409});const replayOrder=await env.DB.prepare(`SELECT o.id,o.order_number AS orderNumber,m.member_code AS memberCode,o.status,o.created_at AS createdAt,o.expires_at AS expiresAt,o.pickup_at AS pickupRequestedAt,o.total_including_tax AS totalIncludingTax,o.smaregi_transaction_id AS smaregiTransactionId FROM orders o JOIN members m ON m.id=o.member_id WHERE o.id=?`).bind(id).first<PosOrderRow>();if(!replayOrder)return NextResponse.json({ok:false,error:"ORDER_NOT_FOUND"},{status:404});return NextResponse.json({ok:true,lockId:replay.lockId,lockedAt:new Date(replay.lockedAt).toISOString(),expiresAt:new Date(replay.expiresAt).toISOString(),idempotentReplay:true,order:await orderDetails(replayOrder)});}

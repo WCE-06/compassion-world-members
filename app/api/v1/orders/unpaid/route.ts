@@ -1,10 +1,11 @@
 import { env } from "cloudflare:workers";
 import { NextRequest,NextResponse } from "next/server";
 import { requirePosToken } from "@/lib/pos-api";
+import { authorizedVerificationSystem } from "@/lib/member-verification";
 import { expireStaleLocks,expireStaleOrder,orderDetails,PosOrderRow } from "@/lib/order-pos";
 
 export async function GET(request:NextRequest){
- if(!await requirePosToken(request))return NextResponse.json({ok:false,error:"UNAUTHORIZED"},{status:401});
+ if(!await requirePosToken(request)&&!await authorizedVerificationSystem(request,"SELF_REGISTER"))return NextResponse.json({ok:false,error:"UNAUTHORIZED"},{status:401});
  const memberCode=(request.nextUrl.searchParams.get("memberCode")??"").normalize("NFKC").trim().toUpperCase();if(!/^[A-Z0-9]{10}$/.test(memberCode))return NextResponse.json({ok:false,error:"MEMBER_NOT_FOUND"},{status:404,headers:{"Cache-Control":"private, no-store, max-age=0"}});
  const member=await env.DB.prepare(`SELECT id FROM members WHERE member_code=? AND status='ACTIVE'`).bind(memberCode).first<{id:string}>();if(!member)return NextResponse.json({ok:false,error:"MEMBER_NOT_FOUND"},{status:404,headers:{"Cache-Control":"private, no-store, max-age=0"}});
  await expireStaleLocks();await expireStaleOrder();
