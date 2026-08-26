@@ -1,3 +1,4 @@
-import { NextRequest,NextResponse } from "next/server";
-import { adminCookie,createAdminSession,verifyAdminPassword } from "@/lib/admin-session";
-export async function POST(request:NextRequest){const body=await request.json().catch(()=>null) as {email?:string;password?:string}|null,email=String(body?.email??"").trim().toLowerCase(),password=String(body?.password??"");if(!await verifyAdminPassword(email,password))return NextResponse.json({error:"INVALID_CREDENTIALS"},{status:401});const response=NextResponse.json({ok:true,email});response.cookies.set(adminCookie.name,await createAdminSession(email),{...adminCookie.options,maxAge:adminCookie.maxAge});return response}
+import {env} from "cloudflare:workers";
+import {NextRequest,NextResponse} from "next/server";
+import {adminCookie,createAdminSession,verifyAdminPassword} from "@/lib/admin-session";
+export async function POST(request:NextRequest){const body=await request.json().catch(()=>null) as {email?:string;password?:string}|null,email=String(body?.email??"").trim().toLowerCase(),password=String(body?.password??"");if(!await verifyAdminPassword(email,password))return NextResponse.json({error:"INVALID_CREDENTIALS"},{status:401});await env.DB.prepare("UPDATE staff_accounts SET last_login_at=?,updated_at=? WHERE email=?").bind(Date.now(),Date.now(),email).run().catch(()=>null);const response=NextResponse.json({ok:true,email});response.cookies.set(adminCookie.name,await createAdminSession(email),{...adminCookie.options,maxAge:adminCookie.maxAge});return response}

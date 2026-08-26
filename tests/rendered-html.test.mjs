@@ -1015,6 +1015,27 @@ test("スタッフサイトでSNS投稿をAIと相談し承認前の台帳へ保
   assert.match(route,/requireAdminSession/);
 });
 
+test("スタッフを期限付きメール招待し個別アカウントと権限を管理する",async()=>{
+  const [panel,invite,staffApi,acceptApi,session,schema,migration,sidebar,page]=await Promise.all([
+    readFile(new URL("app/member-admin/StaffAccountsPanel.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/invite/page.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/staff/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/staff/accept/route.ts",root),"utf8"),
+    readFile(new URL("lib/admin-session.ts",root),"utf8"),
+    readFile(new URL("db/schema.ts",root),"utf8"),
+    readFile(new URL("drizzle/0031_staff_accounts.sql",root),"utf8"),
+    readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+  ]);
+  assert.match(panel,/スタッフ・権限管理/);assert.match(panel,/招待メールを作成/);assert.match(panel,/最終ログイン/);
+  assert.match(invite,/スタッフアカウント登録/);assert.match(invite,/10文字以上/);
+  assert.match(staffApi,/72\*3600000/);assert.match(staffApi,/SHA-256/);assert.match(staffApi,/STAFF_INVITED/);
+  assert.match(acceptApi,/createAdminPasswordRecord/);assert.match(acceptApi,/STAFF_INVITE_ACCEPTED/);
+  assert.match(session,/staff_accounts/);assert.match(session,/status='ACTIVE'/);
+  assert.match(schema,/staffAccounts/);assert.match(migration,/staff_accounts/);
+  assert.match(sidebar,/スタッフ・権限/);assert.match(page,/StaffAccountsPanel/);
+});
+
 test("共通会員認証は会員DBだけを参照し用途別トークン・監査・冪等性を備える", async () => {
   const [route, auth, schema, migration, docs] = await Promise.all([
     readFile(new URL("app/api/v1/member-verification/route.ts", root), "utf8"),

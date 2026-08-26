@@ -50,6 +50,20 @@ export const adminAccounts = sqliteTable("admin_accounts", {
   updatedBy: text("updated_by").notNull(),
 });
 
+export const staffAccounts = sqliteTable("staff_accounts", {
+  email: text("email").primaryKey(),
+  displayName: text("display_name").notNull(),
+  role: text("role", { enum: ["OWNER", "ADMIN", "STORE", "KITCHEN", "VIEWER"] }).notNull().default("STORE"),
+  status: text("status", { enum: ["INVITED", "ACTIVE", "SUSPENDED"] }).notNull().default("INVITED"),
+  inviteTokenHash: text("invite_token_hash"),
+  inviteExpiresAt: integer("invite_expires_at", { mode: "timestamp_ms" }),
+  invitedBy: text("invited_by").notNull(),
+  invitedAt: integer("invited_at", { mode: "timestamp_ms" }).notNull(),
+  acceptedAt: integer("accepted_at", { mode: "timestamp_ms" }),
+  lastLoginAt: integer("last_login_at", { mode: "timestamp_ms" }),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("staff_accounts_status_idx").on(table.status, table.role)]);
+
 export const memberSpendSnapshots = sqliteTable("member_spend_snapshots", {
   memberId: text("member_id").primaryKey().references(() => members.id),
   source: text("source", { enum: ["SMAREGI"] }).notNull().default("SMAREGI"),

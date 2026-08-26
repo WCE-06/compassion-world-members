@@ -218,6 +218,13 @@
       "when": 1787769000000,
       "tag": "0030_member_verification",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1787770800000,
+      "tag": "0031_staff_accounts",
+      "breakpoints": true
     }
   ]
 }
