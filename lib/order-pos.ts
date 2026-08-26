@@ -3,7 +3,7 @@ import { orderUnits } from "@/lib/kitchen-units";
 
 export const PAYMENT_LOCK_TTL_MS=5*60_000;
 
-export type PosOrderRow={id:string;orderNumber:string;memberCode:string;status:string;createdAt:number;expiresAt:number|null;pickupRequestedAt:number|null;totalIncludingTax:number;smaregiTransactionId:string|null};
+export type PosOrderRow={id:string;orderNumber:string;memberCode:string;status:string;paymentMethod?:string;createdAt:number;expiresAt:number|null;pickupRequestedAt:number|null;totalIncludingTax:number;smaregiTransactionId:string|null};
 export type PosOrderItem={productId:string;productCode:string;productName:string;quantity:number;priceExcludingTax:number;priceIncludingTax:number;taxRate:number;taxDivision:string;taxRounding:string;kitchenType:"FOOD"|"DRINK";preparationMinutes:number;selectedOptionsJson:string};
 
 export async function expireStaleOrder(orderId?:string){
@@ -30,7 +30,7 @@ export async function orderDetails(order:PosOrderRow){
  const normalized=items.results.map(item=>({...item,selectedOptions:safeOptions(item.selectedOptionsJson)}));
  const subtotalExcludingTax=normalized.reduce((sum,item)=>sum+item.priceExcludingTax*item.quantity+item.selectedOptions.reduce((optionSum,option)=>optionSum+(option.priceExcludingTax??0)*item.quantity,0),0);
  const [calls,units]=await Promise.all([env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(order.id).all<{department:"FOOD"|"DRINK";callNumber:number;status:string}>(),orderUnits(order.id)]);const food=calls.results.find(item=>item.department==="FOOD"),drink=calls.results.find(item=>item.department==="DRINK");
- return{orderId:order.id,orderNumber:order.orderNumber,memberCode:order.memberCode,status:order.status==="WAITING_STORE_PAYMENT"?"UNPAID":order.status,createdAt:new Date(order.createdAt).toISOString(),expiresAt:order.expiresAt?new Date(order.expiresAt).toISOString():null,pickupRequestedAt:order.pickupRequestedAt?new Date(order.pickupRequestedAt).toISOString():null,foodCallNumber:food?`F${String(food.callNumber).padStart(3,"0")}`:null,drinkCallNumber:drink?`D${String(drink.callNumber).padStart(3,"0")}`:null,fulfillments:calls.results,units,items:normalized.map(({selectedOptionsJson,...item})=>item),subtotalExcludingTax,taxAmount:order.totalIncludingTax-subtotalExcludingTax,totalIncludingTax:order.totalIncludingTax};
+ return{orderId:order.id,orderNumber:order.orderNumber,memberCode:order.memberCode,status:order.status,legacyStatus:order.status==="WAITING_STORE_PAYMENT"?"UNPAID":order.status,paymentMethod:order.paymentMethod??"STORE",createdAt:new Date(order.createdAt).toISOString(),expiresAt:order.expiresAt?new Date(order.expiresAt).toISOString():null,pickupRequestedAt:order.pickupRequestedAt?new Date(order.pickupRequestedAt).toISOString():null,foodCallNumber:food?`F${String(food.callNumber).padStart(3,"0")}`:null,drinkCallNumber:drink?`D${String(drink.callNumber).padStart(3,"0")}`:null,fulfillments:calls.results,units,items:normalized.map(({selectedOptionsJson,...item})=>item),subtotalExcludingTax,taxAmount:order.totalIncludingTax-subtotalExcludingTax,totalIncludingTax:order.totalIncludingTax};
 }
 
 function safeOptions(value:string){try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed:[]}catch{return[]}}

@@ -484,6 +484,10 @@ test("セルフレジ現地決済を未決済一覧・5分ロック・冪等通�
     readFile(new URL("docs/SELF_REGISTER_ORDER_PAYMENT_API.md", root), "utf8"),
   ]);
   assert.match(unpaid, /WAITING_STORE_PAYMENT.*PAYMENT_PROCESSING/);
+  assert.match(unpaid, /normalize\("NFKC"\)/);
+  assert.match(unpaid, /o\.expires_at>\?/);
+  assert.match(unpaid, /Cache-Control.*no-store/);
+  assert.match(unpaid, /memberCode,queriedAt/);
   assert.match(lock, /PAYMENT_LOCK_TTL_MS/);
   assert.match(lock, /PRICE_CHANGED/);
   assert.match(release, /LOCK_NOT_OWNED/);
