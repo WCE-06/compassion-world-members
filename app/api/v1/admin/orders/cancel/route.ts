@@ -22,13 +22,13 @@ export async function POST(request:NextRequest){
   refundId=refund.id;nextStatus=refund.status==="succeeded"?"REFUNDED":"REFUND_PENDING";
  }
  const now=Date.now(),details={requestId,orderId,orderNumber:order.orderNumber,before:order.status,after:nextStatus,reason,refundId};
- await env.DB.batch([
-  env.DB.prepare("UPDATE orders SET status=?,updated_at=? WHERE id=?").bind(nextStatus,now,order.id),
-  env.DB.prepare("UPDATE order_fulfillments SET status='CANCELLED',updated_at=? WHERE order_id=? AND status<>'PICKED_UP'").bind(now,order.id),
-  env.DB.prepare("UPDATE kitchen_units SET status='CANCELLED',updated_at=? WHERE order_id=? AND status<>'PICKED_UP'").bind(now,order.id),
-  env.DB.prepare("UPDATE order_payment_locks SET status='RELEASED',released_at=?,release_reason='ADMIN_CANCELLED' WHERE order_id=? AND status='ACTIVE'").bind(now,order.id),
-  env.DB.prepare("UPDATE payment_point_events SET eligible=0,status='REFUNDED',updated_at=? WHERE purpose='MOBILE_ORDER' AND source_id=?").bind(now,order.id),
-  env.DB.prepare("INSERT INTO member_registration_events (id,member_id,event_type,actor,details_json,created_at) VALUES (?,?,?,?,?,?)").bind(crypto.randomUUID(),order.memberId,"ORDER_ADMIN_CANCELLED",actor,JSON.stringify(details),now)
+ await env.DB.prepare("UPDATE orders SET status=?,point_eligible=0,point_status='CANCELLED',updated_at=? WHERE id=?").bind(nextStatus,now,order.id).run();
+ await Promise.allSettled([
+  env.DB.prepare("UPDATE order_fulfillments SET status='CANCELLED',updated_at=? WHERE order_id=? AND status<>'PICKED_UP'").bind(now,order.id).run(),
+  env.DB.prepare("UPDATE kitchen_units SET status='CANCELLED',updated_at=? WHERE order_id=? AND status<>'PICKED_UP'").bind(now,order.id).run(),
+  env.DB.prepare("UPDATE order_payment_locks SET status='RELEASED',released_at=?,release_reason='ADMIN_CANCELLED' WHERE order_id=? AND status='ACTIVE'").bind(now,order.id).run(),
+  env.DB.prepare("UPDATE payment_point_events SET eligible=0,updated_at=? WHERE purpose='MOBILE_ORDER' AND source_id=?").bind(now,order.id).run(),
+  env.DB.prepare("INSERT INTO member_registration_events (id,member_id,event_type,actor,details_json,created_at) VALUES (?,?,?,?,?,?)").bind(crypto.randomUUID(),order.memberId,"ORDER_ADMIN_CANCELLED",actor,JSON.stringify(details),now).run()
  ]);
  return NextResponse.json({ok:true,...details});
 }
