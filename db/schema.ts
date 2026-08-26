@@ -1,5 +1,14 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
+export const catalogSnapshots = sqliteTable("catalog_snapshots", {
+  id: text("id").primaryKey(),
+  productsJson: text("products_json").notNull(),
+  syncJson: text("sync_json").notNull().default("{}"),
+  productCount: integer("product_count").notNull(),
+  sourceUpdatedAt: integer("source_updated_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
 export const members = sqliteTable("members", {
   id: text("id").primaryKey(),
   memberCode: text("member_code").notNull(),

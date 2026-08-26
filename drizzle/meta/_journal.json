@@ -253,6 +253,13 @@
       "when": 1787799600000,
       "tag": "0035_product_master_deletions",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1787803200000,
+      "tag": "0036_catalog_snapshots",
+      "breakpoints": true
     }
   ]
 }

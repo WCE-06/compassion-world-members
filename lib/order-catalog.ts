@@ -27,8 +27,35 @@ export async function resolveOrderProducts(products:OrderProduct[],inputs:{produ
 }
 
 export async function getOrderProducts(options:{includeOverrides?:boolean;includeClosedProducts?:boolean;channel?:"MOBILE_ORDER"|"SELF_REGISTER";timeoutMs?:number;allowSnapshotFallback?:boolean}={}){
- const runtime=env as unknown as Record<string,string|undefined>;const url=runtime.SELF_REGISTER_CATALOG_URL;
- let body:CatalogResponse;try{if(!url)throw new Error("CATALOG_URL_NOT_CONFIGURED");const response=await fetch(url,{redirect:"follow",cf:{cacheEverything:true,cacheTtl:300},signal:AbortSignal.timeout(options.timeoutMs??15_000)});if(!response.ok)throw new Error("CATALOG_UNAVAILABLE");body=await response.json() as CatalogResponse;if(!body.ok||!body.result)throw new Error("CATALOG_INVALID_RESPONSE")}catch(error){if(!options.allowSnapshotFallback)throw error;body={ok:true,result:{products:(catalogSnapshot.products as unknown as SourceProduct[]).map(product=>({...product,section:"kitchen"})),sync:{state:"SNAPSHOT_FALLBACK"}}}}
+ const runtime=env as unknown as Record<string,string|undefined>;
+ const url=runtime.SELF_REGISTER_CATALOG_URL;
+ let body:CatalogResponse;
+ try{
+  if(!url)throw new Error("CATALOG_URL_NOT_CONFIGURED");
+  const response=await fetch(url,{redirect:"follow",cf:{cacheEverything:true,cacheTtl:300},signal:AbortSignal.timeout(options.timeoutMs??15_000)});
+  if(!response.ok)throw new Error("CATALOG_UNAVAILABLE");
+  body=await response.json() as CatalogResponse;
+  if(!body.ok||!body.result||(body.result.products??[]).length===0)throw new Error("CATALOG_INVALID_RESPONSE");
+  const now=Date.now();
+  await env.DB.prepare(`INSERT INTO catalog_snapshots(id,products_json,sync_json,product_count,source_updated_at,updated_at) VALUES('LATEST',?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET products_json=excluded.products_json,sync_json=excluded.sync_json,product_count=excluded.product_count,source_updated_at=excluded.source_updated_at,updated_at=excluded.updated_at WHERE catalog_snapshots.updated_at<?`)
+   .bind(JSON.stringify(body.result.products),JSON.stringify(body.result.sync??{}),body.result.products.length,body.result.sync?.completedAt?Date.parse(body.result.sync.completedAt):now,now,now-5*60_000)
+   .run().catch(()=>undefined);
+ }catch(error){
+  if(!options.allowSnapshotFallback)throw error;
+  const saved=await env.DB.prepare("SELECT products_json AS productsJson,sync_json AS syncJson,updated_at AS updatedAt FROM catalog_snapshots WHERE id='LATEST'")
+   .first<{productsJson:string;syncJson:string;updatedAt:number}>().catch(()=>null);
+  if(saved){
+   try{
+    const products=JSON.parse(saved.productsJson) as SourceProduct[];
+    const savedSync=JSON.parse(saved.syncJson||"{}") as CatalogResponse["result"] extends {sync?:infer T}?T:never;
+    body={ok:true,result:{products,sync:{...savedSync,state:"D1_SNAPSHOT_FALLBACK",completedAt:new Date(saved.updatedAt).toISOString()}}};
+   }catch{
+    body={ok:true,result:{products:(catalogSnapshot.products as unknown as SourceProduct[]).map(product=>({...product,section:"kitchen"})),sync:{state:"BUNDLED_SNAPSHOT_FALLBACK"}}};
+   }
+  }else{
+   body={ok:true,result:{products:(catalogSnapshot.products as unknown as SourceProduct[]).map(product=>({...product,section:"kitchen"})),sync:{state:"BUNDLED_SNAPSHOT_FALLBACK"}}};
+  }
+ }
  let overrides:Record<string,typeof catalogOverrides.$inferSelect>={};
  let hours:typeof storeHours.$inferSelect|undefined;
  let exceptions:typeof businessCalendar.$inferSelect[]=[];

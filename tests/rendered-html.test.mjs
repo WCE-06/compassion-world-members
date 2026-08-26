@@ -188,7 +188,9 @@ test("モバイル注文は直前メニューを即表示し商品取得を背�
   assert.match(page, /useState<Product\[\]>\(initialProducts\)/);
   assert.match(page, /localStorage\.getItem\(catalogCacheKey\)/);
   assert.match(page, /setLoading\(false\);cached=true/);
-  assert.match(route, /s-maxage=60, stale-while-revalidate=120/);
+  assert.match(route, /X-Catalog-Revision":"174/);
+  assert.match(route, /CATALOG_TEMPORARILY_UNAVAILABLE/);
+  assert.match(route, /private, no-store/);
   assert.match(catalog, /cacheEverything:true,cacheTtl:300/);
   assert.match(catalog, /Promise\.all/);
 });
@@ -203,6 +205,10 @@ test("商品コード完全移行中も旧端末の注文を新商品へ安全�
   assert.match(catalog,/canonicalCodes=new Map\(aliasRows\.map/);
   assert.match(catalog,/sourceProducts=.*canonicalCodes\.has\(product\.code\)/);
   assert.match(catalog,/sourceProducts\.filter\(product=>product\.section==="kitchen"/);
+  assert.match(catalog,/INSERT INTO catalog_snapshots/);
+  assert.match(catalog,/FROM catalog_snapshots WHERE id='LATEST'/);
+  assert.match(catalog,/D1_SNAPSHOT_FALLBACK/);
+  assert.match(catalog,/now-5\*60_000/);
   assert.match(orders,/resolveOrderProducts\(products,requested\)/);
   assert.match(estimate,/resolveOrderProducts\(products,body\.items\)/);
   assert.match(catalogApi,/allowSnapshotFallback:true/);
