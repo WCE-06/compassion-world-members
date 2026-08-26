@@ -33,8 +33,10 @@ export async function getOrderProducts(options:{includeOverrides?:boolean;includ
  let hours:typeof storeHours.$inferSelect|undefined;
  let exceptions:typeof businessCalendar.$inferSelect[]=[];
  let categoryRules:Record<string,typeof categorySchedules.$inferSelect>={};
- const [overrideRows,hourRows,exceptionRows,ruleRows]=await Promise.all([getDb().select().from(catalogOverrides).catch(()=>[]),getDb().select().from(storeHours).limit(1).catch(()=>[]),getDb().select().from(businessCalendar).catch(()=>[]),getDb().select().from(categorySchedules).catch(()=>[])]);overrides=Object.fromEntries(overrideRows.map(row=>[row.productCode,row]));[hours]=hourRows;exceptions=exceptionRows;categoryRules=Object.fromEntries(ruleRows.map(row=>[row.category,row]));
- const products=(body.result.products??[]).filter(product=>product.section==="kitchen"&&Boolean(product.menuCategory)&&isKitchenInStoreBarcode(product.code)).map(product=>{
+ const [overrideRows,hourRows,exceptionRows,ruleRows,aliasRows]=await Promise.all([getDb().select().from(catalogOverrides).catch(()=>[]),getDb().select().from(storeHours).limit(1).catch(()=>[]),getDb().select().from(businessCalendar).catch(()=>[]),getDb().select().from(categorySchedules).catch(()=>[]),env.DB.prepare("SELECT old_code AS oldCode,new_code AS newCode FROM product_code_aliases").all<{oldCode:string;newCode:string}>().then(result=>result.results).catch(()=>[])]);overrides=Object.fromEntries(overrideRows.map(row=>[row.productCode,row]));[hours]=hourRows;exceptions=exceptionRows;categoryRules=Object.fromEntries(ruleRows.map(row=>[row.category,row]));
+ const canonicalCodes=new Map(aliasRows.map(row=>[row.oldCode,row.newCode]));
+ const sourceProducts=(body.result.products??[]).map(product=>canonicalCodes.has(product.code)?{...product,code:canonicalCodes.get(product.code)!}:product);
+ const products=sourceProducts.filter(product=>product.section==="kitchen"&&Boolean(product.menuCategory)&&isKitchenInStoreBarcode(product.code)).map(product=>{
   const override=overrides[product.code],menuCategory=normalizedKitchenMenuCategory(product.name,override?.menuCategory??product.menuCategory),inferred=inferMocktailPair(product.name,menuCategory);
   const regularPrice=Number(product.price),regularBasePrice=Number(product.basePrice??product.price),taxRate=Number(product.taxRate??0),taxRounding=String(product.taxRounding??"1");
   const limitedPrice=override?.limitedPrice??null,limitedPriceStartsAt=override?.limitedPriceStartsAt?.getTime()??null,limitedPriceEndsAt=override?.limitedPriceEndsAt?.getTime()??null;

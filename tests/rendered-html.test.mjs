@@ -200,11 +200,15 @@ test("商品コード完全移行中も旧端末の注文を新商品へ安全�
   assert.match(catalog,/FROM product_code_aliases/);
   assert.match(catalog,/alias\.oldCode,alias\.newCode/);
   assert.match(catalog,/alias\.newCode,alias\.oldCode/);
+  assert.match(catalog,/canonicalCodes=new Map\(aliasRows\.map/);
+  assert.match(catalog,/sourceProducts=.*canonicalCodes\.has\(product\.code\)/);
+  assert.match(catalog,/sourceProducts\.filter\(product=>product\.section==="kitchen"/);
   assert.match(orders,/resolveOrderProducts\(products,requested\)/);
   assert.match(estimate,/resolveOrderProducts\(products,body\.items\)/);
   assert.match(catalogApi,/allowSnapshotFallback:true/);
   assert.match(mobile,/refreshCatalog/);
   assert.match(mobile,/result\.refreshCatalog/);
+  assert.match(mobile,/refreshCatalog\(\)\.catch\(\(\)=>undefined\)/);
   assert.match(orders,/ORDER_ITEMS_REFRESH_REQUIRED/);
 });
 
