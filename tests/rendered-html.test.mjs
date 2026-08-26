@@ -868,10 +868,11 @@ test("スタッフ管理の全主要APIはパスワードログインを共通�
 });
 
 test("スマレジ商品マスタ全件を同期し商品別に在庫管理対象外を設定できる",async()=>{
-  const [route,panel,migration]=await Promise.all([
+  const [route,panel,migration,styles]=await Promise.all([
     readFile(new URL("app/api/v1/admin/inventory/route.ts",root),"utf8"),
     readFile(new URL("app/member-admin/InventoryPanel.tsx",root),"utf8"),
     readFile(new URL("drizzle/0024_inventory_product_settings.sql",root),"utf8"),
+    readFile(new URL("app/member-admin/member-admin.css",root),"utf8"),
   ]);
   assert.match(route,/result\.products/);
   assert.match(route,/SET_TRACKING/);
@@ -880,6 +881,7 @@ test("スマレジ商品マスタ全件を同期し商品別に在庫管理対�
   assert.match(panel,/商品マスタ・実在庫を更新/);
   assert.match(panel,/在庫を管理する/);
   assert.match(panel,/在庫管理対象外/);
+  assert.match(panel,/inventory-product-name/);assert.match(styles,/Product and inventory management use one scannable list/);
   assert.match(migration,/inventory_product_settings/);
 });
 
