@@ -772,6 +772,7 @@ test("統合管理でタスク・予約一覧・クーポン・配信・会員�
     readFile(new URL("drizzle/0020_operations_console.sql",root),"utf8"),
   ]);
   assert.match(sidebar,/SNSコントロール/);assert.match(sidebar,/精算・売上/);assert.match(sidebar,/在庫確認/);assert.match(sidebar,/作業タスク/);
+  assert.match(sidebar,/AdminMobileNav/);assert.match(sidebar,/スマートフォン用管理メニュー/);assert.match(page,/AdminMobileNav/);
   assert.match(page,/StudioReservationOverview/);assert.match(reservations,/staff\.reservations\.list/);
   assert.match(tasks,/operations_tasks/);assert.match(engagement,/message_campaigns/);assert.match(engagement,/automation_rules/);
   assert.match(page,/BulkMemberActions/);assert.match(bulk,/MEMBER_TAG_ADDED/);assert.match(bulk,/MEMBER_STATUS_CHANGED/);
@@ -974,13 +975,14 @@ test("統合会員管理から商品マスタを部門絞り込み・並び替�
 });
 
 test("スタッフサイトでSNS投稿をAIと相談し承認前の台帳へ保存する",async()=>{
-  const [page,panel,route]=await Promise.all([
+  const [page,panel,route,sidebar]=await Promise.all([
     readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
     readFile(new URL("app/member-admin/SnsAssistantPanel.tsx",root),"utf8"),
     readFile(new URL("app/api/v1/admin/sns-assistant/route.ts",root),"utf8"),
+    readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
   ]);
   assert.match(page,/SnsAssistantPanel/);
-  assert.match(page,/>SNS<\/button>/);
+  assert.match(sidebar,/label:"SNSコントロール"/);
   assert.match(panel,/投稿相談AI/);
   assert.match(panel,/投稿台帳/);
   assert.match(panel,/content_json/);
