@@ -979,6 +979,19 @@ test("統合会員管理から商品マスタを部門絞り込み・並び替�
   assert.match(panel,/スマレジ更新が新しい順/);
 });
 
+test("新規商品画像とおもひで商店専用レイアウトを管理する",async()=>{
+  const [registration,layout,catalog,master,schema]=await Promise.all([
+    readFile(new URL("app/menu-admin/ProductMasterRegistration.tsx",root),"utf8"),
+    readFile(new URL("app/menu-admin/OmohideLayoutManager.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/catalog/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/inventory/master/route.ts",root),"utf8"),
+    readFile(new URL("db/schema.ts",root),"utf8"),
+  ]);
+  assert.match(registration,/商品画像/);assert.match(registration,/image\/jpeg/);assert.match(registration,/バーコードのない商品/);
+  assert.match(layout,/おもひで商店 レイアウト管理/);assert.match(layout,/draggable/);assert.match(layout,/omohideOrder/);
+  assert.match(catalog,/omohideDisplay/);assert.match(catalog,/omohideSequence/);assert.match(master,/omohideDisplay/);assert.match(schema,/omohide_display/);
+});
+
 test("スタッフサイトでSNS投稿をAIと相談し承認前の台帳へ保存する",async()=>{
   const [page,panel,route,sidebar]=await Promise.all([
     readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
