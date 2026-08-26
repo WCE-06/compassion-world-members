@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { orderUnits } from "@/lib/kitchen-units";
 
 export const PAYMENT_LOCK_TTL_MS=5*60_000;
 
@@ -9,7 +10,7 @@ export async function expireStaleOrder(orderId?:string){
  const now=Date.now();const suffix=orderId?" AND id=?":"";const bindings=orderId?[now,orderId]:[now];
  const stale=await env.DB.prepare(`SELECT id FROM orders WHERE payment_method='STORE' AND status='WAITING_STORE_PAYMENT' AND expires_at<?${suffix}`).bind(...bindings).all<{id:string}>();
  if(!stale.results.length)return;
- await env.DB.batch(stale.results.flatMap(row=>[env.DB.prepare(`UPDATE orders SET status='EXPIRED',updated_at=? WHERE id=? AND status='WAITING_STORE_PAYMENT'`).bind(now,row.id),env.DB.prepare(`UPDATE order_fulfillments SET status='CANCELLED',updated_at=? WHERE order_id=? AND status='WAITING_PAYMENT'`).bind(now,row.id)]));
+ await env.DB.batch(stale.results.flatMap(row=>[env.DB.prepare(`UPDATE orders SET status='EXPIRED',updated_at=? WHERE id=? AND status='WAITING_STORE_PAYMENT'`).bind(now,row.id),env.DB.prepare(`UPDATE order_fulfillments SET status='CANCELLED',updated_at=? WHERE order_id=? AND status='WAITING_PAYMENT'`).bind(now,row.id),env.DB.prepare(`UPDATE kitchen_units SET status='CANCELLED',updated_at=? WHERE order_id=? AND status='WAITING_PAYMENT'`).bind(now,row.id)]));
 }
 
 export async function reconcileCompletedOrders(memberId?:string){
@@ -28,8 +29,8 @@ export async function orderDetails(order:PosOrderRow){
  const items=await env.DB.prepare(`SELECT product_id AS productId,product_code AS productCode,product_name AS productName,quantity,unit_price_excluding_tax AS priceExcludingTax,unit_price_including_tax AS priceIncludingTax,tax_rate AS taxRate,tax_division AS taxDivision,tax_rounding AS taxRounding,department AS kitchenType,preparation_minutes AS preparationMinutes,selected_options_json AS selectedOptionsJson FROM order_items WHERE order_id=? ORDER BY rowid`).bind(order.id).all<PosOrderItem>();
  const normalized=items.results.map(item=>({...item,selectedOptions:safeOptions(item.selectedOptionsJson)}));
  const subtotalExcludingTax=normalized.reduce((sum,item)=>sum+item.priceExcludingTax*item.quantity+item.selectedOptions.reduce((optionSum,option)=>optionSum+(option.priceExcludingTax??0)*item.quantity,0),0);
- const calls=await env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(order.id).all<{department:"FOOD"|"DRINK";callNumber:number;status:string}>();const food=calls.results.find(item=>item.department==="FOOD"),drink=calls.results.find(item=>item.department==="DRINK");
- return{orderId:order.id,orderNumber:order.orderNumber,memberCode:order.memberCode,status:order.status==="WAITING_STORE_PAYMENT"?"UNPAID":order.status,createdAt:new Date(order.createdAt).toISOString(),expiresAt:order.expiresAt?new Date(order.expiresAt).toISOString():null,pickupRequestedAt:order.pickupRequestedAt?new Date(order.pickupRequestedAt).toISOString():null,foodCallNumber:food?`F${String(food.callNumber).padStart(3,"0")}`:null,drinkCallNumber:drink?`D${String(drink.callNumber).padStart(3,"0")}`:null,fulfillments:calls.results,items:normalized.map(({selectedOptionsJson,...item})=>item),subtotalExcludingTax,taxAmount:order.totalIncludingTax-subtotalExcludingTax,totalIncludingTax:order.totalIncludingTax};
+ const [calls,units]=await Promise.all([env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(order.id).all<{department:"FOOD"|"DRINK";callNumber:number;status:string}>(),orderUnits(order.id)]);const food=calls.results.find(item=>item.department==="FOOD"),drink=calls.results.find(item=>item.department==="DRINK");
+ return{orderId:order.id,orderNumber:order.orderNumber,memberCode:order.memberCode,status:order.status==="WAITING_STORE_PAYMENT"?"UNPAID":order.status,createdAt:new Date(order.createdAt).toISOString(),expiresAt:order.expiresAt?new Date(order.expiresAt).toISOString():null,pickupRequestedAt:order.pickupRequestedAt?new Date(order.pickupRequestedAt).toISOString():null,foodCallNumber:food?`F${String(food.callNumber).padStart(3,"0")}`:null,drinkCallNumber:drink?`D${String(drink.callNumber).padStart(3,"0")}`:null,fulfillments:calls.results,units,items:normalized.map(({selectedOptionsJson,...item})=>item),subtotalExcludingTax,taxAmount:order.totalIncludingTax-subtotalExcludingTax,totalIncludingTax:order.totalIncludingTax};
 }
 
 function safeOptions(value:string){try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed:[]}catch{return[]}}

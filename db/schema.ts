@@ -370,7 +370,7 @@ export const kitchenUnits = sqliteTable("kitchen_units", {
   department: text("department", { enum: ["FOOD", "DRINK"] }).notNull(),
   callDate: text("call_date").notNull(),
   callNumber: integer("call_number").notNull(),
-  status: text("status", { enum: ["ACCEPTED", "COOKING", "READY", "CALLED", "PICKED_UP", "CANCELLED"] }).notNull().default("ACCEPTED"),
+  status: text("status", { enum: ["WAITING_PAYMENT", "ACCEPTED", "COOKING", "READY", "CALLED", "PICKED_UP", "CANCELLED"] }).notNull().default("WAITING_PAYMENT"),
   currentStep: integer("current_step").notNull().default(0),
   totalSteps: integer("total_steps").notNull().default(1),
   isTest: integer("is_test", { mode: "boolean" }).notNull().default(false),
@@ -387,6 +387,14 @@ export const kitchenUnits = sqliteTable("kitchen_units", {
 export const kitchenTestOrders = sqliteTable("kitchen_test_orders", {
   orderId: text("order_id").primaryKey().references(() => orders.id),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const mobileOrderMigrationAudits = sqliteTable("mobile_order_migration_audits", {
+  id: text("id").primaryKey(),
+  reason: text("reason").notNull(),
+  targetCount: integer("target_count").notNull(),
+  orderNumbersJson: text("order_numbers_json").notNull(),
+  executedAt: integer("executed_at", { mode: "timestamp_ms" }).notNull(),
 });
 
 export const catalogOverrides = sqliteTable("catalog_overrides", {

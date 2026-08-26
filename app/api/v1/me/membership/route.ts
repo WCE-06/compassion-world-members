@@ -6,6 +6,7 @@ import { expireStaleLocks,expireStaleOrder,reconcileCompletedOrders } from "@/li
 import { getOrderSchedule } from "@/lib/kitchen-schedule";
 import { memberPresentation, MEMBER_RANK_TERMS_VERSION, rankPeriodFor } from "@/lib/member-rank";
 import { memberNotices, StoredNoticeRow } from "@/lib/member-notices";
+import { orderUnits } from "@/lib/kitchen-units";
 
 export async function GET(request: NextRequest) {
   const identity = await authenticatedMember(request);
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
   await expireStaleLocks();await expireStaleOrder();await reconcileCompletedOrders(member.id);const orderRows = await env.DB.prepare(`SELECT o.id,o.order_number AS orderNumber,o.status,o.created_at AS createdAt,(SELECT call_number FROM order_fulfillments WHERE order_id=o.id AND department='FOOD') AS foodCallNumber,(SELECT status FROM order_fulfillments WHERE order_id=o.id AND department='FOOD') AS foodStatus,(SELECT call_number FROM order_fulfillments WHERE order_id=o.id AND department='DRINK') AS drinkCallNumber,(SELECT status FROM order_fulfillments WHERE order_id=o.id AND department='DRINK') AS drinkStatus FROM orders o WHERE o.member_id = ? ORDER BY o.created_at DESC`).bind(member.id).all<{id:string;orderNumber:string;status:string;createdAt:number;foodCallNumber:number|null;foodStatus:string|null;drinkCallNumber:number|null;drinkStatus:string|null}>();
   const orderStatus:Record<string,string>={WAITING_STORE_PAYMENT:"WAITING_PAYMENT",PAID:"ACCEPTED",ACCEPTED:"ACCEPTED",COOKING:"COOKING",READY:"READY"};
   const openOrderRows=orderRows.results.filter(row=>orderStatus[row.status]&&(row.status==="WAITING_STORE_PAYMENT"||![row.foodStatus,row.drinkStatus].filter(Boolean).every(status=>status==="PICKED_UP"||status==="CANCELLED")));
-  const activeOrders=await Promise.all(openOrderRows.map(async row=>({orderNumber:row.orderNumber,foodCallNumber:row.foodCallNumber,foodStatus:row.foodStatus,drinkCallNumber:row.drinkCallNumber,drinkStatus:row.drinkStatus,status:orderStatus[row.status],createdAt:new Date(row.createdAt).toISOString(),schedule:await getOrderSchedule(row.id),scheduleLabel:"提供予定時間を確認しています。しばらくお待ちください。"})));
+  const activeOrders=await Promise.all(openOrderRows.map(async row=>({orderNumber:row.orderNumber,units:await orderUnits(row.id),foodCallNumber:row.foodCallNumber,foodStatus:row.foodStatus,drinkCallNumber:row.drinkCallNumber,drinkStatus:row.drinkStatus,status:orderStatus[row.status],createdAt:new Date(row.createdAt).toISOString(),schedule:await getOrderSchedule(row.id),scheduleLabel:"提供予定時間を確認しています。しばらくお待ちください。"})));
   const orderHistory=orderRows.results.filter(row=>!openOrderRows.some(open=>open.id===row.id)).map(row=>({orderNumber:row.orderNumber,status:row.status,createdAt:new Date(row.createdAt).toISOString(),foodCallNumber:row.foodCallNumber,drinkCallNumber:row.drinkCallNumber}));
   // 年間購入額の正本はスマレジ集計のみ。一部の注文・スタジオ売上を
   // 年間実績として代替表示すると過少額になるため、未同期時は0円を返して

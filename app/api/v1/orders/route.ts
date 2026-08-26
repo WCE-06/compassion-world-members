@@ -5,22 +5,13 @@ import { getOrderProducts } from "@/lib/order-catalog";
 import { pointRuleFor } from "@/lib/point-policy";
 import { expireStaleLocks,expireStaleOrder } from "@/lib/order-pos";
 import { estimateOrderSchedule,getOrderSchedule,scheduleReadyAt } from "@/lib/kitchen-schedule";
+import { allocateKitchenUnitNumber,kitchenBusinessDate,orderUnits } from "@/lib/kitchen-units";
 
 type Department="FOOD"|"DRINK";
 const departmentLabel:Record<Department,string>={FOOD:"フード",DRINK:"ドリンク"};
 function normalizedTaxDivision(value:string){return value==="1"?"EXCLUDED":value==="2"?"NON_TAXABLE":"INCLUDED"}
 function normalizedTaxRounding(value:string){return value==="0"?"ROUND":value==="2"?"CEIL":"FLOOR"}
 function excludingTax(product:{price:number;basePrice:number;taxRate:number;taxDivision:string}){if(product.taxDivision==="1"||product.taxDivision==="2")return product.basePrice;return Math.ceil(product.price*100/(100+(product.taxRate||10)))}
-
-function businessDate(now:number){
-  return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(now));
-}
-
-async function allocateCallNumber(callDate:string,department:Department,now:number){
-  const row=await env.DB.prepare(`INSERT INTO order_call_counters (call_date,department,last_number,updated_at) VALUES (?,?,1,?) ON CONFLICT(call_date,department) DO UPDATE SET last_number=CASE WHEN last_number>=999 THEN 1 ELSE last_number+1 END,updated_at=excluded.updated_at RETURNING last_number AS callNumber`).bind(callDate,department,now).first<{callNumber:number}>();
-  if(!row)throw new Error("CALL_NUMBER_ALLOCATION_FAILED");
-  return row.callNumber;
-}
 
 export async function GET(request: NextRequest) {
   const member = await authenticatedMember(request);
@@ -31,8 +22,8 @@ export async function GET(request: NextRequest) {
     const order=await env.DB.prepare(`SELECT id AS orderId,order_number AS orderNumber,status,payment_method AS paymentMethod,total_including_tax AS totalIncludingTax,point_eligible AS pointEligible,point_status AS pointStatus,expires_at AS expiresAt FROM orders WHERE id=? AND member_id=?`).bind(orderId,member.id).first<{orderId:string;orderNumber:string;status:string;paymentMethod:"STORE"|"STRIPE";totalIncludingTax:number;pointEligible:number;pointStatus:string;expiresAt:number}>();
     if(!order)return NextResponse.json({error:"ORDER_NOT_FOUND"},{status:404});
     const fulfillments=await env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(orderId).all<{department:Department;callNumber:number;status:string}>();
-    const schedule=await getOrderSchedule(orderId);
-    return NextResponse.json({...order,pointEligible:Boolean(order.pointEligible),paymentLabel:order.paymentMethod==="STRIPE"?"スマート決済":"現地決済",fulfillments:fulfillments.results.map(item=>({...item,label:departmentLabel[item.department]})),schedule,scheduleLabel:schedule?null:"提供予定時間を確認しています。しばらくお待ちください。"},{headers:{"Cache-Control":"no-store"}});
+    const [schedule,units]=await Promise.all([getOrderSchedule(orderId),orderUnits(orderId)]);
+    return NextResponse.json({...order,pointEligible:Boolean(order.pointEligible),paymentLabel:order.paymentMethod==="STRIPE"?"スマート決済":"現地決済",fulfillments:fulfillments.results.map(item=>({...item,label:departmentLabel[item.department]})),units,schedule,scheduleLabel:schedule?null:"提供予定時間を確認しています。しばらくお待ちください。"},{headers:{"Cache-Control":"no-store"}});
   }
   const result = await env.DB.prepare(
     `SELECT id, order_number AS orderNumber, status, payment_method AS paymentMethod, total_including_tax AS totalIncludingTax,
@@ -66,19 +57,24 @@ export async function POST(request: NextRequest) {
     if(existing.memberId!==member.id)return NextResponse.json({error:"ORDER_REQUEST_CONFLICT"},{status:409});
     const existingItems=await env.DB.prepare(`SELECT product_id AS productId,quantity FROM order_items WHERE order_id=? ORDER BY product_id,quantity`).bind(id).all<{productId:string;quantity:number}>(),requestedKey=items.map(item=>`${item.product.id}:${item.quantity}`).sort().join("|"),existingKey=existingItems.results.map(item=>`${item.productId}:${item.quantity}`).sort().join("|");
     if(existing.paymentMethod!==paymentMethod||existing.totalIncludingTax!==total||existingKey!==requestedKey)return NextResponse.json({error:"ORDER_REQUEST_CONFLICT",message:"前回送信した注文内容と一致しません。注文状況を確認してから再操作してください。"},{status:409});
-    const [result,schedule]=await Promise.all([env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(id).all(),getOrderSchedule(id)]);return NextResponse.json({orderId:id,orderNumber:existing.orderNumber,status:existing.status,paymentMethod:existing.paymentMethod,totalIncludingTax:existing.totalIncludingTax,fulfillments:result.results,schedule,scheduleLabel:schedule?null:"提供予定時間を確認しています。しばらくお待ちください。"});
+    const [result,units,schedule]=await Promise.all([env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(id).all(),orderUnits(id),getOrderSchedule(id)]);return NextResponse.json({orderId:id,orderNumber:existing.orderNumber,status:existing.status,paymentMethod:existing.paymentMethod,totalIncludingTax:existing.totalIncludingTax,fulfillments:result.results,units,schedule,scheduleLabel:schedule?null:"提供予定時間を確認しています。しばらくお待ちください。"});
   }
-  const now = Date.now(); const orderNumber = `ORD-${String(now).slice(-8)}`; const expiresAt = now + 15 * 60_000;const callDate=businessDate(now);
-  const departments=[...new Set(items.map(item=>item.product.category))] as Department[];
-  const fulfillments=await Promise.all(departments.map(async department=>({department,callNumber:await allocateCallNumber(callDate,department,now),status:"WAITING_PAYMENT" as const,label:departmentLabel[department]})));
+  const now = Date.now(); const orderNumber = `ORD-${String(now).slice(-8)}`; const expiresAt = now + 15 * 60_000;const callDate=kitchenBusinessDate(now);
+  const itemRows=items.map(item=>({id:`item_${crypto.randomUUID()}`,...item}));
+  const unitRows:{id:string;orderItemId:string;productName:string;department:Department;callNumber:number;unitIndex:number}[]=[];
+  for(const item of itemRows)for(let unitIndex=1;unitIndex<=item.quantity;unitIndex++)unitRows.push({id:`ku_${crypto.randomUUID()}`,orderItemId:item.id,productName:item.product.name,department:item.product.category as Department,callNumber:await allocateKitchenUnitNumber(item.product.category as Department,callDate,now),unitIndex});
+  const departments=[...new Set(unitRows.map(unit=>unit.department))];
+  const fulfillments=departments.map(department=>{const first=unitRows.find(unit=>unit.department===department)!;return{department,callNumber:first.callNumber,status:"WAITING_PAYMENT" as const,label:departmentLabel[department]}});
   const scheduleItems=items.map(item=>({productId:item.product.id,productCode:item.product.code,name:item.product.name,quantity:item.quantity,department:item.product.category,preparationMinutes:item.product.preparationMinutes,options:[]}));
   const schedule=await estimateOrderSchedule(requestId,scheduleItems).catch(()=>null);const pickupAt=scheduleReadyAt(schedule);
   const statements=[env.DB.prepare(
     `INSERT INTO orders (id, order_number, member_id, status, payment_method, total_including_tax, point_eligible, point_status, pickup_at, expires_at, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?)`,
   ).bind(id, orderNumber, member.id, paymentMethod === "STRIPE" ? "PENDING_PAYMENT" : "WAITING_STORE_PAYMENT", paymentMethod, total, pointRule.eligible ? 1 : 0, pickupAt, expiresAt, now, now),
-  ...items.map(item=>env.DB.prepare(`INSERT INTO order_items (id,order_id,product_id,product_code,product_name,department,quantity,unit_price_excluding_tax,unit_price_including_tax,tax_rate,tax_division,tax_rounding,preparation_minutes,selected_options_json,line_total_including_tax) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(crypto.randomUUID(),id,item.product.id,item.product.code,item.product.name,item.product.category,item.quantity,excludingTax(item.product),item.product.price,item.product.taxRate||10,normalizedTaxDivision(item.product.taxDivision),normalizedTaxRounding(item.product.taxRounding),item.product.preparationMinutes,"[]",item.product.price*item.quantity)),
-  ...fulfillments.map(item=>env.DB.prepare(`INSERT INTO order_fulfillments (id,order_id,department,call_date,call_number,status,updated_at) VALUES (?,?,?,?,?,'WAITING_PAYMENT',?)`).bind(crypto.randomUUID(),id,item.department,callDate,item.callNumber,now))];
+  ...itemRows.map(item=>env.DB.prepare(`INSERT INTO order_items (id,order_id,product_id,product_code,product_name,department,quantity,unit_price_excluding_tax,unit_price_including_tax,tax_rate,tax_division,tax_rounding,preparation_minutes,selected_options_json,line_total_including_tax) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(item.id,id,item.product.id,item.product.code,item.product.name,item.product.category,item.quantity,excludingTax(item.product),item.product.price,item.product.taxRate||10,normalizedTaxDivision(item.product.taxDivision),normalizedTaxRounding(item.product.taxRounding),item.product.preparationMinutes,"[]",item.product.price*item.quantity)),
+  ...fulfillments.map(item=>env.DB.prepare(`INSERT INTO order_fulfillments (id,order_id,department,call_date,call_number,status,updated_at) VALUES (?,?,?,?,?,'WAITING_PAYMENT',?)`).bind(crypto.randomUUID(),id,item.department,`LEGACY:${callDate}`,item.callNumber,now)),
+  ...unitRows.map(unit=>env.DB.prepare(`INSERT INTO kitchen_units(id,order_id,order_item_id,unit_index,department,call_date,call_number,status,current_step,total_steps,is_test,updated_at) VALUES(?,?,?,?,?,?,?,'WAITING_PAYMENT',0,1,0,?)`).bind(unit.id,id,unit.orderItemId,unit.unitIndex,unit.department,callDate,unit.callNumber,now))];
   await env.DB.batch(statements);
-  return NextResponse.json({ orderId: id, orderNumber, fulfillments, status: paymentMethod === "STRIPE" ? "PENDING_PAYMENT" : "WAITING_STORE_PAYMENT", paymentMethod, paymentLabel:paymentMethod === "STRIPE" ? "スマート決済" : "現地決済", pointEligible:pointRule.eligible, pointStatus:"PENDING", totalIncludingTax: total, expiresAt, schedule, scheduleLabel:schedule?null:"提供予定時間を確認しています。しばらくお待ちください。" }, { status: 201 });
+  const units=await orderUnits(id);
+  return NextResponse.json({ orderId: id, orderNumber, fulfillments, units, status: paymentMethod === "STRIPE" ? "PENDING_PAYMENT" : "WAITING_STORE_PAYMENT", paymentMethod, paymentLabel:paymentMethod === "STRIPE" ? "スマート決済" : "現地決済", pointEligible:pointRule.eligible, pointStatus:"PENDING", totalIncludingTax: total, expiresAt, schedule, scheduleLabel:schedule?null:"提供予定時間を確認しています。しばらくお待ちください。" }, { status: 201 });
 }

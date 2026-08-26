@@ -408,12 +408,14 @@ test("レシート番号を使わずフードとドリンクを別々に呼び�
   ]);
   assert.match(schema, /orderFulfillments/);
   assert.match(schema, /orderCallCounters/);
-  assert.match(orders, /allocateCallNumber/);
+  assert.match(orders, /allocateKitchenUnitNumber/);
+  assert.match(orders, /unitRows/);
+  assert.match(orders, /'WAITING_PAYMENT'/);
   assert.match(orders, /item\.product\.category/);
   assert.match(kitchen, /START.*READY.*CALL.*PICKUP/s);
   assert.match(kitchen, /KITCHEN_API_TOKEN|requireKitchenToken/);
   assert.match(orders, /FOOD:"フード",DRINK:"ドリンク"/);
-  assert.match(mobileOrder, /item\.label} 呼出番号/);
+  assert.match(mobileOrder, /displayUnits\(complete\)/);
   assert.match(mobileOrder, /padStart\(3,"0"\)/);
   assert.match(css, /font:800 74px/);
   assert.match(migration, /order_fulfillments/);
@@ -421,6 +423,35 @@ test("レシート番号を使わずフードとドリンクを別々に呼び�
   assert.match(payment, /smaregi_transaction_id/);
   assert.match(indexes, /orders_smaregi_transaction_unique/);
   assert.match(guide, /レシート番号は顧客呼出しに使用しません/);
+});
+
+test("商品単位の呼出番号を注文・決済・会員証・セルフレジで共有する", async () => {
+  const [orders, units, payment, stripe, pos, membership, mobile, memberPage, migration] = await Promise.all([
+    readFile(new URL("app/api/v1/orders/route.ts", root), "utf8"),
+    readFile(new URL("lib/kitchen-units.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/orders/payment-confirmation/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/stripe/webhook/route.ts", root), "utf8"),
+    readFile(new URL("lib/order-pos.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/me/membership/route.ts", root), "utf8"),
+    readFile(new URL("app/mobile-order/page.tsx", root), "utf8"),
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("drizzle/0032_mobile_order_item_units.sql", root), "utf8"),
+  ]);
+  assert.match(orders, /unitIndex<=item\.quantity/);
+  assert.match(orders, /kitchen_units.*WAITING_PAYMENT/s);
+  assert.match(orders, /orderUnits\(id\)/);
+  assert.match(units, /kitchen_unit_counters/);
+  assert.doesNotMatch(orders, /INSERT INTO order_call_counters/);
+  assert.match(payment, /UPDATE kitchen_units SET status='ACCEPTED'/);
+  assert.match(stripe, /UPDATE kitchen_units SET status='ACCEPTED'/);
+  assert.match(pos, /units/);
+  assert.match(membership, /units:await orderUnits/);
+  assert.match(mobile, /displayUnits\(complete\)/);
+  assert.match(mobile, /できあがった商品から個別に呼び出します/);
+  assert.match(memberPage, /orderCallSummary/);
+  assert.match(migration, /MOBILE_ORDER_ITEM_UNIT_MIGRATION/);
+  assert.match(migration, /kitchen_test_orders/);
+  assert.match(migration, /smaregi_transaction_id IS NULL/);
 });
 
 test("Stripe Checkoutを署名検証・任意保存・冪等処理付きで接続する", async () => {

@@ -225,6 +225,13 @@
       "when": 1787770800000,
       "tag": "0031_staff_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1787776200000,
+      "tag": "0032_mobile_order_item_units",
+      "breakpoints": true
     }
   ]
 }
