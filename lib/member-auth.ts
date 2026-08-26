@@ -16,7 +16,7 @@ export async function authenticatedLineProfile(request:NextRequest):Promise<Line
 }
 export async function authenticatedLineUserId(request:NextRequest):Promise<string|null>{return (await authenticatedLineProfile(request))?.userId??null}
 
-export async function authenticatedMember(request: NextRequest): Promise<MemberIdentity | null> {
+export async function authenticatedLiveMember(request: NextRequest): Promise<MemberIdentity | null> {
   const auth = request.headers.get("authorization") ?? "";
   if (auth.startsWith("Bearer ")) {
     const profile=await authenticatedLineProfile(request);
@@ -29,6 +29,12 @@ export async function authenticatedMember(request: NextRequest): Promise<MemberI
     return member;
   }
 
+  return null;
+}
+
+export async function authenticatedMember(request: NextRequest): Promise<MemberIdentity | null> {
+  const liveMember=await authenticatedLiveMember(request);
+  if(liveMember)return liveMember;
   const runtime = env as unknown as Record<string, string | undefined>;
   if (request.headers.get("x-compass-preview") === "representative" && runtime.PREVIEW_MEMBER_CODE) {
     return env.DB.prepare(

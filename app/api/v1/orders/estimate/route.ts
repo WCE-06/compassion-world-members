@@ -1,5 +1,5 @@
 import { NextRequest,NextResponse } from "next/server";
-import { authenticatedMember } from "@/lib/member-auth";
+import { authenticatedLiveMember as authenticatedMember } from "@/lib/member-auth";
 import { getOrderProducts } from "@/lib/order-catalog";
 import { estimateOrderSchedule } from "@/lib/kitchen-schedule";
 

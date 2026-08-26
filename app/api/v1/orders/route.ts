@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
-import { authenticatedMember } from "@/lib/member-auth";
+import { authenticatedLiveMember } from "@/lib/member-auth";
 import { getOrderProducts } from "@/lib/order-catalog";
 import { pointRuleFor } from "@/lib/point-policy";
 import { expireStaleLocks,expireStaleOrder } from "@/lib/order-pos";
@@ -14,7 +14,7 @@ function normalizedTaxRounding(value:string){return value==="0"?"ROUND":value===
 function excludingTax(product:{price:number;basePrice:number;taxRate:number;taxDivision:string}){if(product.taxDivision==="1"||product.taxDivision==="2")return product.basePrice;return Math.ceil(product.price*100/(100+(product.taxRate||10)))}
 
 export async function GET(request: NextRequest) {
-  const member = await authenticatedMember(request);
+  const member = await authenticatedLiveMember(request);
   if (!member) return NextResponse.json({ error: "MEMBER_LOGIN_REQUIRED" }, { status: 401 });
   await expireStaleLocks();await expireStaleOrder();
   const orderId=request.nextUrl.searchParams.get("orderId")?.trim();
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const member = await authenticatedMember(request);
+  const member = await authenticatedLiveMember(request);
   if (!member) return NextResponse.json({ error: "MEMBER_LOGIN_REQUIRED" }, { status: 401 });
   const body = await request.json().catch(() => null) as { items?: { productId?: string; quantity?: number }[]; pickupAt?: number; requestId?: string; paymentMethod?: "STORE"|"STRIPE" } | null;
   const requested = body?.items ?? [];
