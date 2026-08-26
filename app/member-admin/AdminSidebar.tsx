@@ -1,6 +1,7 @@
 "use client";
 
 import { BarChart3, CalendarDays, ClipboardCheck, Database, Gift, LayoutDashboard, Megaphone, PackageSearch, Radio, Settings, UserCog, Users, WalletCards } from "lucide-react";
+import {ButtonFeedback} from "./ButtonFeedback";
 
 export type AdminSection = "dashboard" | "members" | "studio" | "tasks" | "sns" | "benefits" | "communication" | "residents" | "finance" | "products" | "inventory" | "analytics" | "staff" | "settings";
 
@@ -22,14 +23,14 @@ const items: Array<{key: AdminSection; label: string; icon: typeof Users; ready:
 ];
 
 export function AdminSidebar({active,onSelect}:{active:AdminSection;onSelect:(section:AdminSection)=>void}){
-  return <aside className="admin-sidebar">
+  return <><ButtonFeedback/><aside className="admin-sidebar">
     <div className="admin-sidebar-brand"><small>COMPASSION WORLD</small><strong>STAFF CONSOLE</strong></div>
     <nav aria-label="管理メニュー">
       {items.map(({key,label,icon:Icon,ready})=><button key={key} className={active===key?"active":""} onClick={()=>onSelect(key)}>
         <Icon size={18}/><span>{label}</span>{!ready&&<small>準備中</small>}
       </button>)}
     </nav>
-  </aside>;
+  </aside></>;
 }
 
 export function AdminMobileNav({active,onSelect}:{active:AdminSection;onSelect:(section:AdminSection)=>void}){

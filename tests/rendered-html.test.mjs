@@ -1091,6 +1091,16 @@ test("スタッフを期限付きメール招待し個別アカウントと権�
   assert.match(sidebar,/スタッフ・権限/);assert.match(page,/StaffAccountsPanel/);
 });
 
+test("スタッフサイトの全ボタンは押下と受付完了を視覚表示する",async()=>{
+  const [feedback,sidebar,styles]=await Promise.all([
+    readFile(new URL("app/member-admin/ButtonFeedback.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/member-admin.css",root),"utf8"),
+  ]);
+  assert.match(feedback,/\.member-admin-page button/);assert.match(feedback,/staff-button-accepted/);assert.match(feedback,/addEventListener\("click"/);
+  assert.match(sidebar,/ButtonFeedback/);assert.match(styles,/button:not\(:disabled\):active/);assert.match(styles,/focus-visible/);assert.match(styles,/prefers-reduced-motion/);
+});
+
 test("テスト注文は本番の呼出番号を消費せず受渡後に完了する",async()=>{
   const route=await readFile(new URL("app/api/v1/kitchen/units/route.ts",root),"utf8");
   assert.match(route,/item\.isTest\?`TEST:\$\{date\}`:date/);
