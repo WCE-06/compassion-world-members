@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   if (!await requireKitchenToken(request)) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const products = (await getOrderProducts({ includeOverrides: true, includeClosedProducts: true, allowSnapshotFallback: true })).products;
-  return NextResponse.json({ products: products.map((product) => ({ productCode: product.code, showOnSelfRegister: product.showOnSelfRegister, showOnMobileOrder: product.showOnMobileOrder })) }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ products: products.map((product) => ({ productCode: product.code, displaySequence: product.displaySequence, showOnSelfRegister: product.showOnSelfRegister, showOnMobileOrder: product.showOnMobileOrder })) }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function PATCH(request: NextRequest) {
