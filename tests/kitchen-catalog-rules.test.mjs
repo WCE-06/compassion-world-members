@@ -11,4 +11,5 @@ test("29インストアバーコード以外を注文カタログへ含めない
 test("ファンタなどの飲料をサイドメニューへ分類しない",()=>{
   assert.equal(normalizedKitchenMenuCategory("ファンタ メロン","food-side"),"soft-simple");
   assert.equal(normalizedKitchenMenuCategory("オレンジジュース","food-side"),"soft-simple");
+  assert.equal(normalizedKitchenMenuCategory("自家製レモネード","food-side"),"soft-simple");
 });
