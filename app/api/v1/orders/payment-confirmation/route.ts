@@ -12,8 +12,7 @@ async function success(orderId:string,paymentId:string,idempotentReplay:boolean)
  await ensureOrderAcceptedNotice(orderId);
  const fulfillments=await env.DB.prepare(`SELECT department,call_number AS callNumber,status FROM order_fulfillments WHERE order_id=? ORDER BY department`).bind(orderId).all<{department:"FOOD"|"DRINK";callNumber:number;status:string}>();const food=fulfillments.results.find(item=>item.department==="FOOD"),drink=fulfillments.results.find(item=>item.department==="DRINK");
  const units=await orderUnits(orderId);const schedule=await confirmOrderSchedule(orderId,idempotentReplay?"決済完了予定の再同期":"セルフレジ決済完了時の確定計算").catch(()=>null);
- if(!schedule)return NextResponse.json({ok:false,error:"KITCHEN_SCHEDULE_PENDING",message:"決済は完了しました。提供予定の同期を再試行してください",paymentConfirmed:true,orderId,paymentId,retryable:true},{status:503});
- return NextResponse.json({ok:true,orderId,paymentId,orderStatus:"PAID",kitchenStatus:units.every(item=>item.status==="ACCEPTED")?"ACCEPTED":"PARTIAL",foodCallNumber:food?`F${String(food.callNumber).padStart(3,"0")}`:null,drinkCallNumber:drink?`D${String(drink.callNumber).padStart(3,"0")}`:null,idempotentReplay,fulfillments:fulfillments.results,units,schedule});
+ return NextResponse.json({ok:true,orderId,paymentId,orderStatus:"PAID",kitchenStatus:units.every(item=>item.status==="ACCEPTED")?"ACCEPTED":"PARTIAL",foodCallNumber:food?`F${String(food.callNumber).padStart(3,"0")}`:null,drinkCallNumber:drink?`D${String(drink.callNumber).padStart(3,"0")}`:null,idempotentReplay,fulfillments:fulfillments.results,units,schedule,schedulePending:!schedule,scheduleLabel:schedule?null:"提供予定時間を確認しています。しばらくお待ちください。"});
 }
 
 export async function POST(request:NextRequest){
