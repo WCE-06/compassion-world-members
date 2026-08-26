@@ -1045,6 +1045,20 @@ test("商品マスタ管理は既存GAS経由でスマレジの商品書き込�
   assert.match(route,/product\.status/);
 });
 
+test("商品マスタ削除は二段階確認し販売停止後も売上履歴を保持する",async()=>{
+  const [workspace,editor,route,masterList,migration]=await Promise.all([
+    readFile(new URL("app/menu-admin/ProductMasterWorkspace.tsx",root),"utf8"),
+    readFile(new URL("app/menu-admin/MasterCatalogPanel.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/product-master/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/inventory/master/route.ts",root),"utf8"),
+    readFile(new URL("drizzle/0035_product_master_deletions.sql",root),"utf8"),
+  ]);
+  assert.match(editor,/deleteConfirming/);assert.match(editor,/削除を確定する/);assert.match(editor,/method:"DELETE"/);
+  assert.match(route,/confirmation!==`\$\{data\.productCode\}:\$\{data\.name\}`/);assert.match(route,/forward\("product\.status"/);assert.match(route,/PRODUCT_MASTER_DELETED/);
+  assert.match(masterList,/LEFT JOIN product_master_deletions/);assert.match(masterList,/d\.product_code IS NULL/);
+  assert.match(workspace,/onDeleted=\{deleted\}/);assert.match(migration,/CREATE TABLE `product_master_deletions`/);
+});
+
 test("商品マスタ同期は在庫権限エラーと分離し0件成功を表示しない",async()=>{
   const [route,panel]=await Promise.all([
     readFile(new URL("app/api/v1/admin/inventory/route.ts",root),"utf8"),

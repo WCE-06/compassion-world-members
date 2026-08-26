@@ -141,6 +141,11 @@ export function ProductMasterWorkspace({
       );
       setSelected(product);
       setMessage(`${product.productName}を更新しました`);
+    },
+    deleted = (product: MasterProduct) => {
+      setProducts((current) => current.filter((item) => item.productCode !== product.productCode));
+      setSelected(null);
+      setMessage(`${product.productName}を商品マスタから削除しました`);
     };
   return (
     <>
@@ -334,6 +339,7 @@ export function ProductMasterWorkspace({
             product={selected}
             onClose={() => setSelected(null)}
             onSaved={saved}
+            onDeleted={deleted}
           />
         )}
       </section>
