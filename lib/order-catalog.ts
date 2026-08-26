@@ -12,6 +12,19 @@ type CatalogResponse={ok:boolean;result?:{products?:SourceProduct[];sync?:{state
 
 function taxIncluded(excluding:number,rate:number,rounding:string){const raw=excluding*(100+rate)/100;return rounding==="0"?Math.round(raw):rounding==="2"?Math.ceil(raw):Math.floor(raw)}
 
+export async function resolveOrderProducts(products:OrderProduct[],inputs:{productId?:string;quantity?:number}[]){
+ const aliases=await env.DB.prepare("SELECT old_code AS oldCode,new_code AS newCode FROM product_code_aliases").all<{oldCode:string;newCode:string}>().catch(()=>({results:[]}));
+ const linked=new Map<string,Set<string>>();
+ for(const alias of aliases.results){for(const [from,to] of [[alias.oldCode,alias.newCode],[alias.newCode,alias.oldCode]]){const values=linked.get(from)??new Set<string>();values.add(to);linked.set(from,values)}}
+ return inputs.map(input=>{
+  const requested=String(input.productId??"");const code=requested.startsWith("smaregi:")?requested.slice(9):requested;
+  const candidates=new Set([code,...(linked.get(code)??[])]);
+  const product=products.find(item=>item.id===requested||candidates.has(item.code));
+  const quantity=Number(input.quantity);
+  return product&&Number.isInteger(quantity)&&quantity>0&&quantity<=20?{product,quantity,requestedProductId:requested,resolvedProductId:product.id}:null;
+ });
+}
+
 export async function getOrderProducts(options:{includeOverrides?:boolean;includeClosedProducts?:boolean;channel?:"MOBILE_ORDER"|"SELF_REGISTER";timeoutMs?:number;allowSnapshotFallback?:boolean}={}){
  const runtime=env as unknown as Record<string,string|undefined>;const url=runtime.SELF_REGISTER_CATALOG_URL;
  let body:CatalogResponse;try{if(!url)throw new Error("CATALOG_URL_NOT_CONFIGURED");const response=await fetch(url,{redirect:"follow",cf:{cacheEverything:true,cacheTtl:300},signal:AbortSignal.timeout(options.timeoutMs??15_000)});if(!response.ok)throw new Error("CATALOG_UNAVAILABLE");body=await response.json() as CatalogResponse;if(!body.ok||!body.result)throw new Error("CATALOG_INVALID_RESPONSE")}catch(error){if(!options.allowSnapshotFallback)throw error;body={ok:true,result:{products:(catalogSnapshot.products as unknown as SourceProduct[]).map(product=>({...product,section:"kitchen"})),sync:{state:"SNAPSHOT_FALLBACK"}}}}

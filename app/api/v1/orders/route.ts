@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
 import { authenticatedLiveMember } from "@/lib/member-auth";
-import { getOrderProducts } from "@/lib/order-catalog";
+import { getOrderProducts,resolveOrderProducts } from "@/lib/order-catalog";
 import { pointRuleFor } from "@/lib/point-policy";
 import { expireStaleLocks,expireStaleOrder } from "@/lib/order-pos";
 import { estimateOrderSchedule,getOrderSchedule,scheduleReadyAt } from "@/lib/kitchen-schedule";
@@ -39,12 +39,9 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null) as { items?: { productId?: string; quantity?: number }[]; pickupAt?: number; requestId?: string; paymentMethod?: "STORE"|"STRIPE" } | null;
   const requested = body?.items ?? [];
   const {products}=await getOrderProducts({timeoutMs:3_000,allowSnapshotFallback:true});
-  const items = requested.map(item => {
-    const product = products.find(candidate => candidate.id === item.productId&&!candidate.soldOut);
-    const quantity = Number(item.quantity);
-    return product && Number.isInteger(quantity) && quantity > 0 && quantity <= 20 ? { product, quantity } : null;
-  }).filter((item): item is NonNullable<typeof item> => Boolean(item));
-  if (!items.length || items.length !== requested.length) return NextResponse.json({ error: "INVALID_ORDER_ITEMS" }, { status: 400 });
+  const resolvedItems=await resolveOrderProducts(products,requested);
+  const items = resolvedItems.filter((item): item is NonNullable<typeof item> => Boolean(item)&&!item.product.soldOut).map(item=>({product:item.product,quantity:item.quantity}));
+  if (!items.length || items.length !== requested.length) return NextResponse.json({ error: "ORDER_ITEMS_REFRESH_REQUIRED",message:"商品情報が更新されました。最新の内容を読み込んでいます。もう一度ご確認ください。",refreshCatalog:true }, { status: 409 });
   const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const paymentMethod = body?.paymentMethod === "STRIPE" ? "STRIPE" : "STORE";
   const runtime = env as unknown as Record<string,string|undefined>;

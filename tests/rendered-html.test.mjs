@@ -182,7 +182,8 @@ test("モバイル注文は直前メニューを即表示し商品取得を背�
     readFile(new URL("app/api/v1/catalog/route.ts", root), "utf8"),
     readFile(new URL("lib/order-catalog.ts", root), "utf8"),
   ]);
-  assert.match(page, /compassion-mobile-order-catalog-v1/);
+  assert.match(page, /compassion-mobile-order-catalog-v2/);
+  assert.match(page, /catalogCacheMaxAge=10\*60_000/);
   assert.match(page, /catalogSnapshot/);
   assert.match(page, /useState<Product\[\]>\(initialProducts\)/);
   assert.match(page, /localStorage\.getItem\(catalogCacheKey\)/);
@@ -190,6 +191,21 @@ test("モバイル注文は直前メニューを即表示し商品取得を背�
   assert.match(route, /s-maxage=60, stale-while-revalidate=120/);
   assert.match(catalog, /cacheEverything:true,cacheTtl:300/);
   assert.match(catalog, /Promise\.all/);
+});
+
+test("商品コード完全移行中も旧端末の注文を新商品へ安全に解決する",async()=>{
+  const [catalog,orders,estimate,catalogApi,mobile]=await Promise.all([
+    "lib/order-catalog.ts","app/api/v1/orders/route.ts","app/api/v1/orders/estimate/route.ts","app/api/v1/catalog/route.ts","app/mobile-order/page.tsx",
+  ].map(path=>readFile(new URL(path,root),"utf8")));
+  assert.match(catalog,/FROM product_code_aliases/);
+  assert.match(catalog,/alias\.oldCode,alias\.newCode/);
+  assert.match(catalog,/alias\.newCode,alias\.oldCode/);
+  assert.match(orders,/resolveOrderProducts\(products,requested\)/);
+  assert.match(estimate,/resolveOrderProducts\(products,body\.items\)/);
+  assert.match(catalogApi,/allowSnapshotFallback:true/);
+  assert.match(mobile,/refreshCatalog/);
+  assert.match(mobile,/result\.refreshCatalog/);
+  assert.match(orders,/ORDER_ITEMS_REFRESH_REQUIRED/);
 });
 
 test("モクテルをベースと割材の掛け算で注文できる", async () => {
@@ -922,7 +938,7 @@ test("商品マスタ登録と販売期間を共通商品管理へ追加する",
   assert.match(component,/5分ごとに自動更新/);assert.match(component,/販売開始/);assert.match(component,/販売終了/);
   assert.match(catalog,/saleWindowOpen/);assert.match(migration,/sale_starts_at/);assert.match(migration,/sale_ends_at/);
   assert.match(menu,/ProductMasterRegistration/);
-  assert.match(admin,/ProductMasterWorkspace allowCreate/);assert.match(workspace,/allowCreate&&<ProductMasterRegistration/);
+  assert.match(admin,/ProductMasterWorkspace allowCreate/);assert.match(workspace,/allowCreate\s*&&\s*\(\s*<ProductMasterRegistration/);
   assert.match(guide,/予約/);assert.match(guide,/確定/);assert.match(guide,/値引き用JAN/);
 });
 
@@ -1011,7 +1027,7 @@ test("スマレジ型の商品マスタ一覧で700件超をページ分割し�
     readFile(new URL("app/api/v1/admin/inventory/master/route.ts",root),"utf8"),
     readFile(new URL("drizzle/0025_inventory_master_fields.sql",root),"utf8"),
   ]);
-  assert.match(panel,/pageSize=50/);
+  assert.match(panel,/pageSize\s*=\s*50/);
   assert.match(panel,/スマレジから全件更新/);
   assert.match(panel,/非表示・サービス商品/);
   assert.match(page,/ProductMasterWorkspace/);

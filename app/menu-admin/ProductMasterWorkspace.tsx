@@ -23,7 +23,6 @@ export function ProductMasterWorkspace({
     [sort, setSort] = useState("NAME_ASC"),
     [page, setPage] = useState(1),
     [busy, setBusy] = useState(false),
-    [migrating, setMigrating] = useState(false),
     [message, setMessage] = useState("");
   const load = async (refresh = false) => {
     if (busy) return;
@@ -143,55 +142,6 @@ export function ProductMasterWorkspace({
       setSelected(product);
       setMessage(`${product.productName}を更新しました`);
     };
-  const migrateCodes = async () => {
-    if (migrating) return;
-    setMigrating(true);
-    setMessage("飲食商品の商品コード188件をスマレジへ反映しています…");
-    try {
-      const response = await fetch(
-          "/api/v1/admin/product-master/migrate-codes",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ confirmCount: 188 }),
-            signal: AbortSignal.timeout(140000),
-          },
-        ),
-        result = await response.json().catch(() => ({}));
-      if (!response.ok)
-        throw new Error(
-          result.detail?.error ?? result.error ?? "MIGRATION_FAILED",
-        );
-      setMessage(
-        `商品コード${Number(result.updated || 0).toLocaleString()}件を数字へ変更しました。商品一覧を再取得します。`,
-      );
-      await load(true);
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? `商品コードを変更できませんでした（${error.message}）`
-          : "商品コードを変更できませんでした",
-      );
-    } finally {
-      setMigrating(false);
-    }
-  };
-  useEffect(() => {
-    if (
-      products.length &&
-      products.some(
-        (product) =>
-          /[A-Za-z]/.test(product.productCode) &&
-          ["テイクアウトフード", "テイクアウトドリンク"].includes(
-            product.categoryName,
-          ),
-      ) &&
-      !sessionStorage.getItem("food-code-migration-188-v2")
-    ) {
-      sessionStorage.setItem("food-code-migration-188-v2", "started");
-      void migrateCodes();
-    }
-  }, [products]);
   return (
     <>
       {allowCreate && (
