@@ -38,11 +38,11 @@ for (let attempt = 1; attempt <= 3; attempt++) {
     break;
   } catch (error) {
     if (attempt === 3) {
-      const snapshot = JSON.parse(await readFile(snapshotUrl, "utf8"));
-      snapshot.products = enrichSavedProducts(snapshot.products);
-      await writeFile(snapshotUrl, JSON.stringify(snapshot, null, 2));
-      console.warn(`Live catalog unavailable; using ${snapshot.products.length} saved products`);
-      process.exit(0);
+      // A preview/deployment built from an old bundled snapshot can send stale
+      // product codes to the register.  Keep the existing file for runtime
+      // fallback, but fail the build so it can never be published as current.
+      console.error("Live catalog unavailable; refusing to publish a stale bundled snapshot");
+      process.exit(1);
     }
     console.warn(`Catalog attempt ${attempt} failed; retrying`);
   }
@@ -78,6 +78,12 @@ const products = body.result.products
   .sort((a, b) => a.displaySequence - b.displaySequence || a.name.localeCompare(b.name, "ja"));
 
 if (!products.length) throw new Error("Current self-register kitchen catalog is empty");
+const invalidCodes = products.filter(product => !/^\d+$/.test(product.code));
+if (invalidCodes.length) {
+  throw new Error(`Catalog contains non-numeric product codes: ${invalidCodes.map(product => `${product.name}(${product.code})`).join(", ")}`);
+}
+const duplicateCodes = products.filter((product, index) => products.findIndex(candidate => candidate.code === product.code) !== index);
+if (duplicateCodes.length) throw new Error(`Catalog contains duplicate product codes: ${[...new Set(duplicateCodes.map(product => product.code))].join(", ")}`);
 await mkdir(new URL("../preview/generated/", import.meta.url), { recursive: true });
 await writeFile(snapshotUrl, JSON.stringify({
   products,
