@@ -6,8 +6,10 @@ export function normalizedKitchenMenuCategory(name:string,current?:string){
   const text=name.trim().toLocaleLowerCase("ja-JP"),existing=current??"";
   if(/かき氷|アイスクリーム|ソフトクリーム|パフェ|ケーキ|プリン|ゼリー|デザート|わたあめ/.test(text))return"dessert";
   if(/モクテル/.test(text))return"soft-mocktail";
-  if(/カクテル/.test(text))return"alcohol-cocktail";
-  if(/ビール|ハイボール|サワー|焼酎|日本酒|ワイン|梅酒|アルコール/.test(text))return"alcohol-main";
+  if(/ノンアル/.test(text))return"soft-simple";
+  // 割材名（ウーロン・コーラ等）より先に酒類の商品名を判定する。
+  if(/カクテル|カシス|カルーア|テキーラ|ファジーネーブル|レゲエパンチ|スミス・アンド・ウエッソン|ブレイブ・ブル|ビアコーク|大人の(?:いちごミルク|レモネード)|^(?:ストロベリー|ピーチ)|レモン(?:オレンジ|コーク)/.test(text))return"alcohol-cocktail";
+  if(/ビール|ハイボール|(?:ウーロン|緑茶|コーク)ハイ|サワー|焼酎|日本酒|ワイン|梅酒|泡盛|ウイスキー|バーボン|アルコール|(?:オレンジ|カルピス|ミルク|ラムネ|水)割り\((?:芋|麦|角|バーボン)\)/.test(text))return"alcohol-main";
   if(/コーヒー|カフェラテ|カフェオレ|エスプレッソ|紅茶|ココア|ティー/.test(text))return"soft-cafe";
   if(/レモネード|ファンタ|スプライト|ジンジャーエール|カルピス|コーラ|ジュース|ソーダ|ラムネ|サイダー|ウーロン|緑茶|ほうじ茶|麦茶|ミルク|ドリンク|ウォーター|お茶/.test(text))return"soft-simple";
   if(/つけ麺/.test(text))return"food-tsukemen";
