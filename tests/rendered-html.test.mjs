@@ -674,6 +674,14 @@ test("提供予定をキッチン正本へ統一し固定30分を使用しない
   assert.match(schedule, /getOrderSchedule/);
 });
 
+test("商品選び直し後は支払い方法表示時にも提供予定を再計算する", async () => {
+  const mobile=await readFile(new URL("app/mobile-order/page.tsx",root),"utf8");
+  assert.match(mobile,/estimateRevision/);
+  assert.match(mobile,/setEstimateRevision\(value=>value\+1\)/);
+  assert.match(mobile,/disabled=\{!count\|\|sending\|\|estimateLoading\|\|!estimate\}/);
+  assert.match(mobile,/現在の注文内容で提供予定を再計算しています/);
+});
+
 test("初回登録・既存会員移行・会員サービス詳細を実画面として提供する", async () => {
   const [page,links,registration,members,css] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
