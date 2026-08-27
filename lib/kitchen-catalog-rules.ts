@@ -15,6 +15,7 @@ export function normalizedKitchenMenuCategory(name:string,current?:string){
   if(/つけ麺/.test(text))return"food-tsukemen";
   if(/うどん|ほうとう/.test(text))return"food-udon";
   if(/パスタ|スパゲッティ/.test(text))return"food-pasta";
+  if(/^(?:ちょこっと|普通|大盛)?ライス$|単品ライス/.test(text))return"food-side";
   if(/丼|ご飯|ライス/.test(text))return"food-don";
   return validCategories.has(existing)?existing:"food-side";
 }
