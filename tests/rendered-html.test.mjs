@@ -749,8 +749,9 @@ test("スマレジの直近365日集計を正本として会員証とセルフ�
   assert.match(membership, /smaregiSpend\?\.qualifyingSpend\?\?0/);
   assert.match(membership, /smaregiSpend\?"SMAREGI":"NOT_SYNCED"/);
   assert.doesNotMatch(membership, /localSpend/);
-  assert.match(home, /年間購入額をスマレジから集計しています/);
-  assert.match(home, /一部の購入額を年間実績として表示しません/);
+  assert.match(home, /年間のご利用実績を確認しています/);
+  assert.match(home, /過去1年のご利用実績を確認しています/);
+  assert.doesNotMatch(home, /スマレジと同期しています|年間購入額をスマレジから集計しています/);
   assert.match(syncApi, /MEMBER_MIGRATION_KEY/);
   assert.match(syncApi, /spanDays<360\|\|spanDays>370/);
   assert.match(syncApi, /ON CONFLICT\(member_id\) DO UPDATE/);

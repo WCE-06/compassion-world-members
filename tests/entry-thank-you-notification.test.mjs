@@ -8,6 +8,8 @@ const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
 const migration = readFileSync(new URL("../drizzle/0021_member_notifications.sql", import.meta.url), "utf8");
 const notices = readFileSync(new URL("../lib/member-notices.ts", import.meta.url), "utf8");
 const availability = readFileSync(new URL("../app/availability/page.tsx", import.meta.url), "utf8");
+const inbox = readFileSync(new URL("../app/inbox/page.tsx", import.meta.url), "utf8");
+const notificationsRoute = readFileSync(new URL("../app/api/v1/me/notifications/route.ts", import.meta.url), "utf8");
 
 test("来店通知は認証とeventIdによる冪等性を必須にする", () => {
   assert.match(entryRoute, /requireCheckinNotificationToken/);
@@ -42,4 +44,12 @@ test("会員本人の受信箱だけに保存通知を表示し既読化でき�
   assert.match(membershipRoute, /member_notifications/);
   assert.match(page, /api\/v1\/me\/notifications/);
   assert.match(page, /unread:false/);
+});
+
+test("受信ボックスは本人の未読通知を一括既読にできる", () => {
+  assert.match(inbox, /すべて既読にする/);
+  assert.match(inbox, /method:"PATCH"/);
+  assert.match(inbox, /setNotices\(current=>current\.map\(item=>\(\{\.\.\.item,unread:false\}\)\)\)/);
+  assert.match(notificationsRoute, /WHERE member_id=\? AND read_at IS NULL/);
+  assert.match(notificationsRoute, /authenticatedMember/);
 });
