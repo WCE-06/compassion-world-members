@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
 import { getOrderProducts, resolveOrderProducts } from "@/lib/order-catalog";
 import { requirePosToken } from "@/lib/pos-api";
+import { authorizedVerificationSystem } from "@/lib/member-verification";
 import { ensureOrderAcceptedNotice } from "@/lib/order-notifications";
 import { confirmOrderSchedule } from "@/lib/kitchen-schedule";
 import {
@@ -62,7 +63,10 @@ async function responseFor(orderId: string, paymentId: string, idempotentReplay:
 
 /** セルフレジで新しく選んだ料理を、決済成立後にキッチンへ一度だけ登録する。 */
 export async function POST(request: NextRequest) {
-  if (!await requirePosToken(request)) {
+  // The Android register uses its dedicated member-verification credential for
+  // direct order lookups and locks. Accept that same SELF_REGISTER-scoped
+  // credential here; credentials for the other facility systems remain invalid.
+  if (!await requirePosToken(request) && !await authorizedVerificationSystem(request, "SELF_REGISTER")) {
     return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   }
   const body = await request.json().catch(() => null) as Body | null;
