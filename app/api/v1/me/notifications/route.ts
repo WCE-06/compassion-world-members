@@ -12,3 +12,12 @@ export async function GET(request: NextRequest) {
   if(!profile)return NextResponse.json({error:"MEMBERSHIP_NOT_FOUND"},{status:404});
   return NextResponse.json({ notices: memberNotices(rows.results,profile) }, { headers: { "Cache-Control": "no-store" } });
 }
+
+export async function PATCH(request: NextRequest) {
+  const member = await authenticatedMember(request);
+  if (!member) return NextResponse.json({ error: "LINE_AUTH_REQUIRED" }, { status: 401 });
+  const now=Date.now();
+  const result=await env.DB.prepare("UPDATE member_notifications SET read_at=COALESCE(read_at,?),updated_at=? WHERE member_id=? AND read_at IS NULL")
+    .bind(now,now,member.id).run();
+  return NextResponse.json({ok:true,updated:Number(result.meta.changes??0)},{headers:{"Cache-Control":"no-store"}});
+}

@@ -213,3 +213,4 @@
 .order-review-next:disabled{background:#aaa69d}
 .order-review-return{margin-top:8px;background:#eeeae1;color:#625f57}
 @media(max-width:600px){.order-review-sheet{max-height:90dvh}}
+.inbox-heading>div{display:flex;align-items:center;gap:10px}.inbox-heading>div>button{border:1px solid #bda77e;border-radius:999px;padding:7px 10px;background:#fff;color:#173b31;font-size:9px;font-weight:800}.inbox-heading>div>button:disabled{opacity:.55}
