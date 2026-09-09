@@ -17,9 +17,9 @@ async function subscriptions(priceId:string){const result:ExpandedSubscription[]
 function add(index:Map<string,Set<string>>,key:string,memberId:string){if(!key)return;const values=index.get(key)??new Set<string>();values.add(memberId);index.set(key,values)}
 function unique(index:Map<string,Set<string>>,key:string){const values=[...(index.get(key)??[])];return values.length===1?values[0]:null}
 
-export async function POST(request:NextRequest){
+async function migrate(request:NextRequest,apply:boolean,requestId:string){
  const actor=await requireAdminSession(request);if(!actor)return NextResponse.json({error:"UNAUTHORIZED"},{status:401});
- const body=await request.json().catch(()=>({})) as {apply?:boolean;requestId?:string};const apply=body.apply===true,requestId=String(body.requestId??"");if(apply&&!requestId)return NextResponse.json({error:"REQUEST_ID_REQUIRED"},{status:400});
+ if(apply&&!requestId)return NextResponse.json({error:"REQUEST_ID_REQUIRED"},{status:400});
  const prior=apply?await env.DB.prepare("SELECT id FROM member_registration_events WHERE event_type='RESIDENT_SUBSCRIPTION_BULK_MIGRATION' AND details_json LIKE ? LIMIT 1").bind(`%${requestId}%`).first():null;if(prior)return NextResponse.json({ok:true,idempotent:true,requestId});
  try{
   const price=await residentPrice(),memberRows=(await env.DB.prepare(`SELECT m.id,m.member_code AS memberCode,m.email,m.phone,(SELECT provider_user_id FROM identity_links i WHERE i.member_id=m.id AND i.provider='LINE' AND i.revoked_at IS NULL ORDER BY linked_at DESC LIMIT 1) AS lineUserId FROM members m WHERE m.status='ACTIVE'`).all<Member>()).results;
@@ -30,3 +30,6 @@ export async function POST(request:NextRequest){
   return NextResponse.json({ok:true,dryRun:!apply,priceId:price.id,total:results.length,matched,skipped,results},{headers:{"Cache-Control":"no-store"}});
  }catch(error){const message=error instanceof Error?error.message:"MIGRATION_FAILED";return NextResponse.json({error:"RESIDENT_SUBSCRIPTION_MIGRATION_FAILED",message},{status:502})}
 }
+
+export async function GET(request:NextRequest){return migrate(request,false,"")}
+export async function POST(request:NextRequest){const body=await request.json().catch(()=>({})) as {apply?:boolean;requestId?:string};return migrate(request,body.apply===true,String(body.requestId??""))}
