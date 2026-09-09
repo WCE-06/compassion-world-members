@@ -8,11 +8,15 @@ type StripeList<T> = { data:T[];has_more:boolean };
 export type StripeSubscription = { id:string;customer:string;status:string;cancel_at_period_end?:boolean;current_period_end?:number;items?:{data?:Array<{price?:StripePrice}>};metadata?:Record<string,string> };
 function runtime(){return env as unknown as Record<string,string|undefined>}
 export function residentSubscriptionActive(status:unknown){return ACTIVE_STATUSES.has(String(status??"").toLowerCase())}
+export async function residentPrices(){
+  const params=new URLSearchParams({active:"true",type:"recurring",limit:"100"});params.append("expand[]","data.product");
+  const list=await stripeRequest<StripeList<StripePrice>>(`/prices?${params.toString()}`);
+  return list.data.filter(price=>price.currency==="jpy"&&price.unit_amount===RESIDENT_MONTHLY_AMOUNT_JPY&&price.recurring?.interval==="month");
+}
 export async function residentPrice(){
   const configured=runtime().RESIDENT_SUBSCRIPTION_PRICE_ID?.trim();
   if(configured){const price=await stripeRequest<StripePrice>(`/prices/${encodeURIComponent(configured)}`);if(!price.active||price.currency!=="jpy"||price.unit_amount!==RESIDENT_MONTHLY_AMOUNT_JPY||price.recurring?.interval!=="month")throw new Error("RESIDENT_PRICE_CONFIGURATION_MISMATCH");return price;}
-  const params=new URLSearchParams({active:"true",type:"recurring",limit:"100"});params.append("expand[]","data.product");
-  const list=await stripeRequest<StripeList<StripePrice>>(`/prices?${params.toString()}`),matches=list.data.filter(price=>price.currency==="jpy"&&price.unit_amount===RESIDENT_MONTHLY_AMOUNT_JPY&&price.recurring?.interval==="month");
+  const matches=await residentPrices();
   if(matches.length!==1)throw new Error(matches.length?"RESIDENT_PRICE_AMBIGUOUS":"RESIDENT_PRICE_NOT_FOUND");return matches[0];
 }
 export async function syncResidentSubscription(subscription:StripeSubscription,eventId:string){
