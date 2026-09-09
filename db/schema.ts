@@ -281,6 +281,22 @@ export const stripeCustomers = sqliteTable("stripe_customers", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 }, (table) => [uniqueIndex("stripe_customers_customer_unique").on(table.stripeCustomerId)]);
 
+export const residentSubscriptions = sqliteTable("resident_subscriptions", {
+  memberId: text("member_id").primaryKey().references(() => members.id),
+  stripeCustomerId: text("stripe_customer_id").notNull(),
+  stripeSubscriptionId: text("stripe_subscription_id").notNull(),
+  stripePriceId: text("stripe_price_id").notNull(),
+  status: text("status").notNull(),
+  currentPeriodEnd: integer("current_period_end", { mode: "timestamp_ms" }),
+  cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" }).notNull().default(false),
+  lastStripeEventId: text("last_stripe_event_id"),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [
+  uniqueIndex("resident_subscriptions_subscription_unique").on(table.stripeSubscriptionId),
+  index("resident_subscriptions_customer_idx").on(table.stripeCustomerId),
+  index("resident_subscriptions_status_idx").on(table.status),
+]);
+
 export const stripeWebhookEvents = sqliteTable("stripe_webhook_events", {
   eventId: text("event_id").primaryKey(),
   eventType: text("event_type").notNull(),

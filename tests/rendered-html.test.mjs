@@ -146,8 +146,30 @@ test("読み込み中の仮通知を表示せず無料会員を住民登録へ�
   assert.match(page, /member\.membershipType!=="RESIDENT"/);
   assert.match(page, /住民登録へアップグレード/);
   assert.match(residentPage, /ゴールドランク以上を保証/);
-  assert.match(upgradeApi, /RESIDENT_SUBSCRIPTION_CHECKOUT_URL/);
+  assert.match(upgradeApi, /residentPrice/);
+  assert.match(upgradeApi, /mode:"subscription"/);
   assert.match(upgradeApi, /client_reference_id/);
+  assert.match(upgradeApi, /subscriptionsForCustomer/);
+  assert.match(residentPage, /月額3,278円/);
+});
+
+test("住民サブスクは既存3278円Priceを利用しWebhookで資格を同期する", async () => {
+  const [upgrade,webhook,policy,schema,portal] = await Promise.all([
+    readFile(new URL("app/api/v1/resident-upgrade/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/stripe/webhook/route.ts", root), "utf8"),
+    readFile(new URL("lib/resident-subscription.ts", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/resident-subscription/portal/route.ts", root), "utf8"),
+  ]);
+  assert.match(policy, /RESIDENT_MONTHLY_AMOUNT_JPY = 3278/);
+  assert.match(policy, /RESIDENT_SUBSCRIPTION_PRICE_ID/);
+  assert.match(policy, /unit_amount===RESIDENT_MONTHLY_AMOUNT_JPY/);
+  assert.match(upgrade, /resident-checkout:/);
+  assert.match(upgrade, /STRIPE_CUSTOMER_AMBIGUOUS/);
+  assert.match(webhook, /customer\.subscription\./);
+  assert.match(webhook, /invoice\.payment_failed/);
+  assert.match(schema, /residentSubscriptions/);
+  assert.match(portal, /billing_portal\/sessions/);
 });
 
 test("予約導線は外部サイトへ移動せず会員証と同一サイト内で完結する", async () => {
