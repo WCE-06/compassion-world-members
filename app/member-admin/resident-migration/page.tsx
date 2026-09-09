@@ -1,0 +1,13 @@
+"use client";
+import Link from "next/link";
+import {useState} from "react";
+import "../member-admin.css";
+
+type Result={subscriptionId:string;customerId:string;status:string;result:string;memberCode:string|null;matchedBy:string[]};
+type Report={ok?:boolean;dryRun?:boolean;total?:number;matched?:number;skipped?:number;results?:Result[];error?:string;message?:string};
+
+export default function ResidentMigrationPage(){
+ const [report,setReport]=useState<Report|null>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
+ async function run(apply=false){if(busy)return;setBusy(true);setMessage(apply?"一意に照合できた契約を移行しています…":"Stripeの既存契約を照合しています…");try{const response=await fetch("/api/v1/admin/resident-subscriptions/migrate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apply,requestId:apply?crypto.randomUUID():undefined}),signal:AbortSignal.timeout(120000)});if(response.status===401){location.replace("/member-admin/login");return}const result=await response.json() as Report;if(!response.ok)throw new Error(result.message??result.error??"処理できませんでした");setReport(result);setMessage(apply?`${result.matched??0}件の契約を移行しました`:`${result.matched??0}件が一意に一致し、${result.skipped??0}件は確認対象です`)}catch(error){setMessage(error instanceof Error?error.message:"処理できませんでした")}finally{setBusy(false)}}
+ return <main className="member-admin-page"><div className="admin-main-content resident-migration-page"><header className="admin-main-header"><div><small>RESIDENT SUBSCRIPTION</small><h1>既存住民契約の移行</h1><p>月額3,278円のStripe契約を会員番号・LINE・連絡先で照合します。</p></div><Link href="/member-admin">管理画面へ戻る</Link></header><section className="admin-settings-card"><h2>安全な一括移行</h2><p>最初に照合だけを行います。複数候補や一致しない契約は変更されません。</p><button disabled={busy} onClick={()=>void run(false)}>{busy?"処理中…":"照合結果を確認する"}</button>{message&&<p className="member-admin-message" role="status">{message}</p>}{report&&<><dl><div><dt>対象契約</dt><dd>{report.total??0}件</dd></div><div><dt>一意に一致</dt><dd>{report.matched??0}件</dd></div><div><dt>確認が必要</dt><dd>{report.skipped??0}件</dd></div></dl><div className="reservation-admin-list">{report.results?.map(row=><article key={row.subscriptionId}><div><b>{row.result==="MATCHED"?"移行可能":row.result==="CONFLICTING_IDENTIFIERS"?"情報が競合":"一致なし"}</b><strong>{row.memberCode??"スタッフ確認が必要"}</strong><small>{row.customerId}　{row.matchedBy.join("・")||"照合情報なし"}</small></div></article>)}</div>{report.dryRun&&Number(report.matched)>0&&<button disabled={busy} onClick={()=>confirm(`${report.matched}件の契約を会員台帳へ移行しますか？`)&&void run(true)}>一致した契約を移行する</button>}</>}</section></div></main>
+}
