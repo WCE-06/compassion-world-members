@@ -154,12 +154,13 @@ test("読み込み中の仮通知を表示せず無料会員を住民登録へ�
 });
 
 test("住民サブスクは既存3278円Priceを利用しWebhookで資格を同期する", async () => {
-  const [upgrade,webhook,policy,schema,portal] = await Promise.all([
+  const [upgrade,webhook,policy,schema,portal,migration] = await Promise.all([
     readFile(new URL("app/api/v1/resident-upgrade/route.ts", root), "utf8"),
     readFile(new URL("app/api/v1/stripe/webhook/route.ts", root), "utf8"),
     readFile(new URL("lib/resident-subscription.ts", root), "utf8"),
     readFile(new URL("db/schema.ts", root), "utf8"),
     readFile(new URL("app/api/v1/resident-subscription/portal/route.ts", root), "utf8"),
+    readFile(new URL("app/api/v1/admin/resident-subscriptions/migrate/route.ts", root), "utf8"),
   ]);
   assert.match(policy, /RESIDENT_MONTHLY_AMOUNT_JPY = 3278/);
   assert.match(policy, /RESIDENT_SUBSCRIPTION_PRICE_ID/);
@@ -170,6 +171,12 @@ test("住民サブスクは既存3278円Priceを利用しWebhookで資格を同�
   assert.match(webhook, /invoice\.payment_failed/);
   assert.match(schema, /residentSubscriptions/);
   assert.match(portal, /billing_portal\/sessions/);
+  assert.match(portal, /resident_subscriptions/);
+  assert.match(policy, /INSERT OR IGNORE INTO stripe_customers/);
+  assert.match(migration, /price:priceId/);
+  assert.match(migration, /CONFLICTING_IDENTIFIERS/);
+  assert.match(migration, /NO_UNIQUE_MATCH/);
+  assert.match(migration, /RESIDENT_SUBSCRIPTION_BULK_MIGRATION/);
 });
 
 test("予約導線は外部サイトへ移動せず会員証と同一サイト内で完結する", async () => {
