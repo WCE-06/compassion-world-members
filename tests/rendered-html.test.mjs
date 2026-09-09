@@ -176,6 +176,8 @@ test("住民サブスクは既存3278円Priceを利用しWebhookで資格を同�
   assert.match(migration, /price:priceId/);
   assert.match(migration, /CONFLICTING_IDENTIFIERS/);
   assert.match(migration, /NO_UNIQUE_MATCH/);
+  assert.match(migration, /MANUAL_MATCH/);
+  assert.match(migration, /manualMappings/);
   assert.match(migration, /RESIDENT_SUBSCRIPTION_BULK_MIGRATION/);
 });
 
