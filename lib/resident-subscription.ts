@@ -21,7 +21,7 @@ export async function syncResidentSubscription(subscription:StripeSubscription,e
   if(!memberId||!customerId)return false;
   const priceId=String(subscription.items?.data?.[0]?.price?.id??subscription.metadata?.price_id??""),now=Date.now(),active=residentSubscriptionActive(subscription.status),periodEnd=subscription.current_period_end?subscription.current_period_end*1000:null;
   await env.DB.batch([
-    env.DB.prepare(`INSERT INTO stripe_customers (member_id,stripe_customer_id,updated_at) VALUES (?,?,?) ON CONFLICT(member_id) DO UPDATE SET stripe_customer_id=excluded.stripe_customer_id,updated_at=excluded.updated_at`).bind(memberId,customerId,now),
+    env.DB.prepare(`INSERT OR IGNORE INTO stripe_customers (member_id,stripe_customer_id,updated_at) VALUES (?,?,?)`).bind(memberId,customerId,now),
     env.DB.prepare(`INSERT INTO resident_subscriptions (member_id,stripe_customer_id,stripe_subscription_id,stripe_price_id,status,current_period_end,cancel_at_period_end,last_stripe_event_id,updated_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(member_id) DO UPDATE SET stripe_customer_id=excluded.stripe_customer_id,stripe_subscription_id=excluded.stripe_subscription_id,stripe_price_id=excluded.stripe_price_id,status=excluded.status,current_period_end=excluded.current_period_end,cancel_at_period_end=excluded.cancel_at_period_end,last_stripe_event_id=excluded.last_stripe_event_id,updated_at=excluded.updated_at`).bind(memberId,customerId,subscription.id,priceId,subscription.status,periodEnd,subscription.cancel_at_period_end?1:0,eventId,now),
     env.DB.prepare("UPDATE members SET resident_status=?,resident_checked_at=?,updated_at=? WHERE id=?").bind(active?"ACTIVE":"INACTIVE",now,now,memberId),
     env.DB.prepare(`UPDATE member_rank_states
