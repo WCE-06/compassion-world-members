@@ -136,7 +136,7 @@ test("予約台帳の一時障害を予約なしとして表示しない", async
   assert.match(membershipApi, /const reservationsAvailable=reservationResult\.rows!==null/);
   assert.match(membershipApi, /Object\.assign\(presentation,\{reservationsAvailable\}\)/);
   assert.match(page, /member\.reservationsAvailable===false/);
-  assert.match(page, /一時的なエラーで予約情報を確認できませんでした/);
+  assert.match(page, /予約・注文の最新情報を確認できませんでした/);
   assert.match(page, /member\.reservationsAvailable!==false&&!member\.session/);
 });
 
@@ -1417,4 +1417,14 @@ test("外部連携を実測監視し冪等な再照合を管理画面から実�
  const [api,panel,page]=await Promise.all([readFile(new URL("app/api/v1/admin/integrations/route.ts",root),"utf8"),readFile(new URL("app/member-admin/IntegrationHealthPanel.tsx",root),"utf8"),readFile(new URL("app/member-admin/page.tsx",root),"utf8")]);
  assert.match(api,/CHECK_ALL/);assert.match(api,/RECONCILE_ALL/);assert.match(api,/AbortSignal\.timeout/);assert.match(api,/INTEGRATION_MAINTENANCE/);assert.match(api,/details_json LIKE/);assert.match(api,/reconcileAllResidentSubscriptions/);assert.match(api,/expireStaleLocks/);
  assert.match(panel,/すべての接続を確認/);assert.match(panel,/注文・住民契約を再照合/);assert.match(panel,/setInterval/);assert.match(page,/IntegrationHealthPanel/);
+});
+
+test("会員証トップは次の行動を優先し通信失敗を情報なしと誤表示しない",async()=>{
+ const page=await readFile(new URL("app/page.tsx",root),"utf8");
+ assert.match(page,/NextAction/);assert.match(page,/15分以内にセルフレジでお支払いください/);assert.match(page,/できあがった商品があります/);assert.match(page,/当日は受付端末へ会員証をご提示ください/);assert.match(page,/表示中の内容は前回確認した情報です/);assert.match(page,/予約なし・注文なしとしては扱っていません/);assert.match(page,/もう一度確認する/);assert.match(page,/detailsUpdatedAt/);assert.doesNotMatch(page,/スマレジ会員情報を連携しています/);
+});
+
+test("スタジオ空き枠を認証と並列取得し受付APIの長時間待機を防ぐ",async()=>{
+ const [page,facility]=await Promise.all([readFile(new URL("app/availability/page.tsx",root),"utf8"),readFile(new URL("lib/facility-api.ts",root),"utf8")]);
+ assert.match(page,/const dayPromise = loadDay\(today\)/);assert.match(page,/Promise\.allSettled\(\[dayPromise,historyPromise\]\)/);assert.doesNotMatch(page,/availability\/range/);assert.match(facility,/AbortSignal\.timeout\(8_000\)/);
 });
