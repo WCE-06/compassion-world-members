@@ -649,7 +649,7 @@ test("スマート決済後は呼出番号画面へ戻り現地決済は支払�
   ]);
   assert.match(mobile, /payment!=="success"/);
   assert.match(mobile, /orderId=.*encodeURIComponent/);
-  assert.match(mobile, /お支払い・ご注文を受け付けました/);
+  assert.match(mobile, /商品の準備状況/);
   assert.match(orders, /request\.nextUrl\.searchParams\.get\("orderId"\)/);
   assert.match(kitchen, /status IN \('ACCEPTED','COOKING','READY','CALLED'\)/);
   assert.doesNotMatch(kitchen, /WAITING_PAYMENT.*ORDER BY/);
@@ -1354,4 +1354,19 @@ test("通知は確定結果だけを一度表示し一括既読後に再表示�
   assert.match(orders,/番のお品物が完成しました/);
   assert.match(points,/SMAREGI_PURCHASE_THANK_YOU:\$\{item\.id\}/);
   assert.match(points,/今回のお会計で\$\{item\.grantedPoint\}ポイントが付与されました/);
+});
+
+test("注文状況と商品別呼出番号をキッチン正本から自動更新する",async()=>{
+  const [orders,page,mobile,units]=await Promise.all([
+    readFile(new URL("app/api/v1/me/orders/route.ts",root),"utf8"),
+    readFile(new URL("app/page.tsx",root),"utf8"),
+    readFile(new URL("app/mobile-order/page.tsx",root),"utf8"),
+    readFile(new URL("lib/kitchen-units.ts",root),"utf8"),
+  ]);
+  assert.match(orders,/authenticatedMember/);assert.match(orders,/orderUnits\(row\.id\)/);
+  assert.match(orders,/Cache-Control":"no-store/);assert.match(orders,/PICKED_UP/);
+  assert.match(page,/fetch\("\/api\/v1\/me\/orders"/);assert.match(page,/setInterval\(refreshOrders,5_000\)/);
+  assert.match(mobile,/setInterval\(refresh,3_000\)/);assert.match(mobile,/画面は自動更新されます/);
+  assert.match(mobile,/unitStatusLabel\(item\.status\)/);assert.match(mobile,/item\.callNumberLabel/);
+  assert.match(units,/u\.id AS unitId/);assert.match(units,/callNumberLabel/);
 });
