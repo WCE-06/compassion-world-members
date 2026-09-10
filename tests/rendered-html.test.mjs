@@ -1412,3 +1412,9 @@ test("スタッフ権限を操作単位で強制し本人別の監査履歴を�
   assert.match(audit,/現在の権限・操作履歴/);assert.match(audit,/重要な変更/);
   assert.match(page,/AdminAuditPanel/);
 });
+
+test("外部連携を実測監視し冪等な再照合を管理画面から実行する",async()=>{
+ const [api,panel,page]=await Promise.all([readFile(new URL("app/api/v1/admin/integrations/route.ts",root),"utf8"),readFile(new URL("app/member-admin/IntegrationHealthPanel.tsx",root),"utf8"),readFile(new URL("app/member-admin/page.tsx",root),"utf8")]);
+ assert.match(api,/CHECK_ALL/);assert.match(api,/RECONCILE_ALL/);assert.match(api,/AbortSignal\.timeout/);assert.match(api,/INTEGRATION_MAINTENANCE/);assert.match(api,/details_json LIKE/);assert.match(api,/reconcileAllResidentSubscriptions/);assert.match(api,/expireStaleLocks/);
+ assert.match(panel,/すべての接続を確認/);assert.match(panel,/注文・住民契約を再照合/);assert.match(panel,/setInterval/);assert.match(page,/IntegrationHealthPanel/);
+});
