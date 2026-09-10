@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
 import { authenticatedMember } from "@/lib/member-auth";
+import { RANK_RULES,rankIndex } from "@/lib/member-rank";
 
 type PointEntry={id:string;occurredAt:string;kind:string;grantedPoint:number;usedPoint:number;delta:number;balanceAfter:number|null;amount:number;cancelled:boolean;label?:string};
 type PointHistoryResult={memberCode:string;month:string;balance:number;entries:PointEntry[];source:string;syncedAt:string};
@@ -10,6 +11,10 @@ export async function GET(request:NextRequest){
  if(!member)return NextResponse.json({error:"LINE_AUTH_REQUIRED"},{status:401});
  const month=(request.nextUrl.searchParams.get("month")??"").trim();
  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))return NextResponse.json({error:"INVALID_MONTH"},{status:400});
+ const [rankState,spendSnapshot]=await Promise.all([
+  env.DB.prepare(`SELECT current_rank AS currentRank,current_rate_percent AS pointRatePercent,rank_period_ends_at AS periodEndsAt FROM member_rank_states WHERE member_id=? LIMIT 1`).bind(member.id).first<{currentRank:string;pointRatePercent:number;periodEndsAt:number}>(),
+  env.DB.prepare(`SELECT qualifying_spend_excluding_tax AS qualifyingSpend,synced_at AS syncedAt FROM member_spend_snapshots WHERE member_id=? LIMIT 1`).bind(member.id).first<{qualifyingSpend:number;syncedAt:number}>(),
+ ]);
  const runtime=env as unknown as Record<string,string|undefined>,url=runtime.SMAREGI_SPEND_RECALC_URL,key=runtime.SMAREGI_SPEND_SYNC_KEY;
  if(!url||!key)return NextResponse.json({error:"POINT_HISTORY_NOT_CONFIGURED",message:"ポイント履歴の接続設定を確認しています"},{status:503});
  try{
@@ -28,6 +33,9 @@ export async function GET(request:NextRequest){
   const statements=[env.DB.prepare("UPDATE members SET points_balance=?,updated_at=? WHERE id=?").bind(balance,now,member.id)];
   for(const item of recentPurchaseEntries){const eventId=`SMAREGI_PURCHASE_THANK_YOU:${item.id}`;statements.push(env.DB.prepare(`INSERT OR IGNORE INTO member_notifications(id,event_id,member_id,event_type,category,title,body,sender,channel,delivery_status,metadata_json,occurred_at,created_at,updated_at) VALUES(?,?,?,'PURCHASE_THANK_YOU','POINT','ご利用ありがとうございます',?,'COMPASSION WORLD','CARD','SAVED',?,?,?,?)`).bind(`notice_purchase_${crypto.randomUUID()}`,eventId,member.id,`今回のお会計で${item.grantedPoint}ポイントが付与されました。\n現在の保有ポイントは${balance.toLocaleString("ja-JP")}ポイントです。\n\nまたのご利用を心よりお待ちしております。`,JSON.stringify({pointHistoryId:item.id,grantedPoint:item.grantedPoint,amount:item.amount,balance}),Date.parse(item.occurredAt),now,now))}
   await env.DB.batch(statements);
-  return NextResponse.json({...body.result,balance,entries},{headers:{"Cache-Control":"private, no-store"}});
+  const earned=entries.filter(item=>!item.cancelled&&item.delta>0).reduce((sum,item)=>sum+item.delta,0),used=Math.abs(entries.filter(item=>!item.cancelled&&item.delta<0).reduce((sum,item)=>sum+item.delta,0));
+  const currentRank=rankState?.currentRank??"STANDARD",nextRule=RANK_RULES[rankIndex(currentRank)+1]??null,qualifyingSpend=Math.max(0,Math.trunc(spendSnapshot?.qualifyingSpend??0));
+  const rankProgress={currentRank,currentRankLabel:RANK_RULES[rankIndex(currentRank)]?.label??"スタンダード",pointRatePercent:rankState?.pointRatePercent??1,qualifyingSpend,nextRank:nextRule?.rank??null,nextRankLabel:nextRule?.label??null,amountToNextRank:nextRule?Math.max(0,nextRule.minimumSpend-qualifyingSpend):0,periodEndsAt:rankState?.periodEndsAt?new Date(rankState.periodEndsAt).toISOString():null,syncedAt:spendSnapshot?.syncedAt?new Date(spendSnapshot.syncedAt).toISOString():null};
+  return NextResponse.json({...body.result,balance,entries,summary:{earned,used,net:earned-used,count:entries.length},rankProgress},{headers:{"Cache-Control":"private, no-store"}});
  }catch{return NextResponse.json({error:"POINT_HISTORY_TIMEOUT",message:"ポイント履歴を取得できませんでした。時間をおいて再度お試しください"},{status:504})}
 }
