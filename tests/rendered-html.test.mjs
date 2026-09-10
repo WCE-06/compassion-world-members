@@ -617,7 +617,7 @@ test("会員証コードを最優先表示し詳細情報を背後で読み込�
   assert.match(home,/setView\("member"\)[\s\S]*fetch\("\/api\/v1\/me\/membership"/);
   assert.match(home,/requestAnimationFrame\(\(\)=>window\.setTimeout\(sync,0\)\)/);
   assert.match(home,/setInterval\(sync,30_000\)/);
-  assert.match(home,/setMember\(current=>\(\{\.\.\.next,points:current\?\.points\?\?next\.points\}\)\)/);
+  assert.match(home,/return\{\.\.\.next,points:current\.points\?\?next\.points\}/);
   assert.match(home,/最新情報を確認中/);
   assert.match(home,/予約・注文・お知らせを読み込んでいます/);
   assert.match(auth,/Promise\.all/);

@@ -23,6 +23,19 @@ test("注文・見積・スマート決済APIは本番会員認証のみを許�
   }
 });
 
+test("会員証はサーバー確定済みの本人番号だけを2次元コードへ使用する",async()=>{
+  const [page,card,membership]=await Promise.all([
+    readFile(new URL("app/page.tsx",root),"utf8"),
+    readFile(new URL("app/api/v1/me/card/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/me/membership/route.ts",root),"utf8"),
+  ]);
+  assert.match(card,/qrValue:row\.memberCode/);
+  assert.match(membership,/qrValue:member\.memberCode/);
+  assert.match(page,/next\.memberCode!==next\.qrValue/);
+  assert.match(page,/current\.memberId!==next\.memberId/);
+  assert.match(page,/<MemberQr value=\{member\.qrValue\}/);
+});
+
 test("スマート決済後は通常ブラウザではなくLIFFの注文画面へ戻す",async()=>{
   const route=await readFile(new URL("app/api/v1/orders/[id]/smart-payment/route.ts",root),"utf8");
   assert.match(route,/https:\/\/liff\.line\.me\//);

@@ -24,6 +24,7 @@ type MemberNotice = {
 type Member = {
   memberId: string;
   memberCode: string;
+  qrValue: string;
   displayName: string;
   points: number;
   rank: string;
@@ -78,6 +79,7 @@ declare global {
 const DEMO_MEMBER: Member = {
   memberId: "mem_01JCOMPASSION",
   memberCode: "A7K4P9X2M6",
+  qrValue: "A7K4P9X2M6",
   displayName: "山田 花子",
   points: 480,
   rank: "STANDARD",
@@ -216,7 +218,7 @@ export default function Home() {
   useEffect(()=>{if(!qrExpanded)return;const onKey=(event:KeyboardEvent)=>{if(event.key==="Escape")setQrExpanded(false)};const previous=document.body.style.overflow;document.body.style.overflow="hidden";window.addEventListener("keydown",onKey);return()=>{document.body.style.overflow=previous;window.removeEventListener("keydown",onKey)}},[qrExpanded]);
   useEffect(()=>{if(view!=="member")return;let active=true;let sentinel:{released?:boolean;release:()=>Promise<void>}|null=null;const requestWakeLock=async()=>{if(!active||document.visibilityState!=="visible"||sentinel&&!sentinel.released)return;try{const wakeLock=(navigator as Navigator&{wakeLock?:{request:(type:"screen")=>Promise<{released?:boolean;release:()=>Promise<void>}>}}).wakeLock;if(!wakeLock)return setScreenAwake(false);sentinel=await wakeLock.request("screen");if(active)setScreenAwake(true)}catch{if(active)setScreenAwake(false)}};void requestWakeLock();const onVisible=()=>{if(document.visibilityState==="visible")void requestWakeLock();else setScreenAwake(false)};document.addEventListener("visibilitychange",onVisible);return()=>{active=false;document.removeEventListener("visibilitychange",onVisible);setScreenAwake(false);void sentinel?.release().catch(()=>undefined)}},[view]);
   const openNotice=(item:MemberNotice)=>{setSelectedNotice({...item,unread:false});if(!item.unread||item.id.startsWith("welcome:"))return;setMember(current=>current?{...current,notices:current.notices.map(notice=>notice.id===item.id?{...notice,unread:false}:notice)}:current);if(!demo)void fetch(`/api/v1/me/notifications/${encodeURIComponent(item.id)}`,{method:"PATCH",headers:{Authorization:`Bearer ${lineToken}`}}).catch(()=>undefined)};
-  const installMembership=useCallback((next:Member)=>{setMember(current=>({...next,points:current?.points??next.points}));next.notices.forEach(item=>seenNoticeIds.current.add(item.id))},[]);
+  const installMembership=useCallback((next:Member)=>{setMember(current=>{if(next.memberCode!==next.qrValue||current.memberId!==next.memberId||current.memberCode!==next.memberCode){setNotice("会員情報を安全に確認できませんでした。会員証を開き直してください");setView("error");return current}return{...next,points:current.points??next.points}});next.notices.forEach(item=>seenNoticeIds.current.add(item.id))},[]);
 
   useEffect(() => {
     async function start() {
@@ -300,7 +302,7 @@ export default function Home() {
         <>
           <section className={`wallet-card rank-card rank-card-${member.rank.toLowerCase()}`}>
             <div className="wallet-card-head"><div><span>会員証 {member.membershipLabel&&<b className="resident-badge">{member.membershipLabel}</b>}</span><strong>{member.displayName} 様</strong></div><div className="rank-emblem"><small>{member.rankLabel??member.rank}</small><b>{member.pointRatePercent??1}%</b><span>POINT</span></div><button onClick={() => setQrExpanded(true)} aria-haspopup="dialog">拡大</button></div>
-            <MemberQr value={member.memberCode} />
+            <MemberQr value={member.qrValue} />
             <div className="wallet-balances">
               <button onClick={() => {window.location.href="/points"}}><small>保有ポイント</small><strong>{member.points.toLocaleString("ja-JP")}<span> P</span></strong><em>{pointSyncState==="SYNCING"?"最新情報を確認中…":pointSyncState==="RETRY"?"次回の同期で再確認":pointSyncedAt?`更新 ${new Date(pointSyncedAt).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"})}`:"履歴を見る ›"}</em></button>
               <button onClick={() => openFutureFeature("会員特典")}><small>会員ランク</small><strong className={`rank-value rank-${member.rank.toLowerCase()}`}>{member.rankLabel??member.rank}</strong><em>特典を見る ›</em></button>
@@ -309,7 +311,7 @@ export default function Home() {
             {member.qualifyingSpendSource!=="SMAREGI"&&<p className="sync-status">過去1年のご利用実績を確認しています</p>}
           </section>
 
-          {qrExpanded&&<div className="qr-zoom-backdrop" onClick={()=>setQrExpanded(false)}><section className="qr-zoom" role="dialog" aria-modal="true" aria-label="会員証の2次元コードを拡大表示" onClick={event=>event.stopPropagation()}><header><div><small>COMPASSION WORLD</small><strong>会員証</strong></div><button onClick={()=>setQrExpanded(false)} aria-label="拡大表示を閉じる">×</button></header><MemberQr value={member.memberCode} large/><p>受付端末へこの2次元コードをご提示ください</p><small className={`screen-awake-status${screenAwake?" active":""}`}>{screenAwake?"表示中は画面が暗くならないようにしています":"読み取りにくい場合は画面を明るくしてください"}</small><button className="qr-zoom-close" onClick={()=>setQrExpanded(false)}>閉じる</button></section></div>}
+          {qrExpanded&&<div className="qr-zoom-backdrop" onClick={()=>setQrExpanded(false)}><section className="qr-zoom" role="dialog" aria-modal="true" aria-label="会員証の2次元コードを拡大表示" onClick={event=>event.stopPropagation()}><header><div><small>COMPASSION WORLD</small><strong>会員証</strong></div><button onClick={()=>setQrExpanded(false)} aria-label="拡大表示を閉じる">×</button></header><MemberQr value={member.qrValue} large/><p>受付端末へこの2次元コードをご提示ください</p><small className={`screen-awake-status${screenAwake?" active":""}`}>{screenAwake?"表示中は画面が暗くならないようにしています":"読み取りにくい場合は画面を明るくしてください"}</small><button className="qr-zoom-close" onClick={()=>setQrExpanded(false)}>閉じる</button></section></div>}
 
           {member.membershipType!=="RESIDENT"&&<button className="resident-upgrade-banner" onClick={()=>{window.location.href="/resident"}}><span>RESIDENT MEMBERSHIP</span><strong>住民登録へアップグレード</strong><small>住民限定特典とゴールドランク保証を確認する　›</small></button>}
 
