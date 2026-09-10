@@ -202,6 +202,21 @@ test("住民サブスクは既存3278円Priceを利用しWebhookで資格を同�
   assert.match(migration, /RESIDENT_SUBSCRIPTION_BULK_MIGRATION/);
 });
 
+test("住民契約はWebhookに加えて定期再照合し古い状態を管理画面へ警告する",async()=>{
+  const [subscription,membership,reconcile,operations]=await Promise.all([
+    readFile(new URL("lib/resident-subscription.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/me/membership/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/resident-subscriptions/reconcile/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/operations/route.ts",root),"utf8"),
+  ]);
+  assert.match(subscription,/reconcileResidentSubscriptionForMember/);
+  assert.match(subscription,/\/subscriptions\/\$\{encodeURIComponent\(row\.subscriptionId\)\}/);
+  assert.match(membership,/reconcileResidentSubscriptionForMember\(member\.id\)/);
+  assert.match(reconcile,/requireAdminSession/);
+  assert.match(reconcile,/reconcileAllResidentSubscriptions/);
+  assert.match(operations,/住民契約の再確認が必要な会員/);
+});
+
 test("予約導線は外部サイトへ移動せず会員証と同一サイト内で完結する", async () => {
   const [page, bookingPage] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
