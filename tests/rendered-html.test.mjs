@@ -1384,3 +1384,19 @@ test("ポイント履歴は月別内訳・付与理由・ランク進捗を表�
   assert.match(page,/history\.summary\.earned/);assert.match(page,/会員登録後のポイント履歴/);
   assert.match(styles,/\.point-rank-progress/);assert.match(styles,/\.point-month-summary/);
 });
+
+test("スタッフ権限を操作単位で強制し本人別の監査履歴を表示する",async()=>{
+  const [session,sessionApi,operations,audit,page]=await Promise.all([
+    readFile(new URL("lib/admin-session.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/auth/session/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/admin/operations/route.ts",root),"utf8"),
+    readFile(new URL("app/member-admin/AdminAuditPanel.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+  ]);
+  assert.match(session,/AdminPermission/);assert.match(session,/permissionForRequest/);
+  assert.match(session,/STAFF_ADMIN/);assert.match(session,/CATALOG_WRITE/);assert.match(session,/MEMBER_WRITE/);
+  assert.match(sessionApi,/adminActor/);assert.match(sessionApi,/permissions/);
+  assert.match(operations,/auditEvents/);assert.match(operations,/member_registration_events/);
+  assert.match(audit,/現在の権限・操作履歴/);assert.match(audit,/重要な変更/);
+  assert.match(page,/AdminAuditPanel/);
+});
