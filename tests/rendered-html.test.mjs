@@ -57,6 +57,14 @@ test("会員証アプリを正常に配信する", async () => {
   assert.doesNotMatch(`${layout}\n${page}`, /Your site is taking shape|codex-preview/);
 });
 
+test("会員証表示中は自動減光を防ぎ画面を離れると解除する",async()=>{
+  const page=await readFile(new URL("app/page.tsx",root),"utf8");
+  assert.match(page,/wakeLock\.request\("screen"\)/);
+  assert.match(page,/sentinel\?\.release\(\)/);
+  assert.match(page,/document\.visibilityState==="visible"/);
+  assert.match(page,/表示中は画面が暗くならないようにしています/);
+});
+
 test("LIFF・移行・共通セッションの接続点を保持する", async () => {
   const [page, membershipApi, memberAuth, linkApi, schema, hosting] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
