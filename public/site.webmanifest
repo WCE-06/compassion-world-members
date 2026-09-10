@@ -1,0 +1,10 @@
+{
+  "name": "COMPASSION WORLD Members",
+  "short_name": "CW Members",
+  "description": "COMPASSION WORLDのデジタル会員証",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f2e8",
+  "theme_color": "#143d33",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

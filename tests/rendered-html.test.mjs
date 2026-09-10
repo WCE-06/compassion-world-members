@@ -57,6 +57,19 @@ test("会員証アプリを正常に配信する", async () => {
   assert.doesNotMatch(`${layout}\n${page}`, /Your site is taking shape|codex-preview/);
 });
 
+test("サイトアイコンとアプリ名をCOMPASSION WORLDブランドへ統一する",async()=>{
+  const [layout,icon,manifest]=await Promise.all([
+    readFile(new URL("app/layout.tsx",root),"utf8"),
+    readFile(new URL("public/favicon.svg",root),"utf8"),
+    readFile(new URL("public/site.webmanifest",root),"utf8"),
+  ]);
+  assert.match(layout,/applicationName: "COMPASSION WORLD Members"/);
+  assert.match(layout,/manifest: "\/site\.webmanifest"/);
+  assert.match(icon,/>CW<\/text>/);
+  assert.equal(JSON.parse(manifest).theme_color,"#143d33");
+  assert.doesNotMatch(icon,/#68C4FF|#0C79D8|#2E9EFF/);
+});
+
 test("会員証表示中は自動減光を防ぎ画面を離れると解除する",async()=>{
   const page=await readFile(new URL("app/page.tsx",root),"utf8");
   assert.match(page,/wakeLock\.request\("screen"\)/);
