@@ -17,7 +17,10 @@ export async function PATCH(request: NextRequest) {
   const member = await authenticatedMember(request);
   if (!member) return NextResponse.json({ error: "LINE_AUTH_REQUIRED" }, { status: 401 });
   const now=Date.now();
-  const result=await env.DB.prepare("UPDATE member_notifications SET read_at=COALESCE(read_at,?),updated_at=? WHERE member_id=? AND read_at IS NULL")
-    .bind(now,now,member.id).run();
+  const [,result]=await env.DB.batch([
+    env.DB.prepare(`INSERT OR IGNORE INTO notification_popup_deliveries(notification_id,member_id,delivered_at)
+      SELECT id,member_id,? FROM member_notifications WHERE member_id=? AND read_at IS NULL`).bind(now,member.id),
+    env.DB.prepare("UPDATE member_notifications SET read_at=COALESCE(read_at,?),updated_at=? WHERE member_id=? AND read_at IS NULL").bind(now,now,member.id),
+  ]);
   return NextResponse.json({ok:true,updated:Number(result.meta.changes??0)},{headers:{"Cache-Control":"no-store"}});
 }

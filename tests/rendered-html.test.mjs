@@ -1343,3 +1343,27 @@ test("共通会員認証は会員DBだけを参照し用途別トークン・監
   assert.match(migration, /verification_status`='SUSPENDED'/);
   assert.match(docs, /503 `VERIFICATION_SERVICE_UNAVAILABLE`/);
 });
+
+test("通知は確定結果だけを一度表示し一括既読後に再表示しない",async()=>{
+  const [entry,list,item,popup,inbox,orders,points]=await Promise.all([
+    readFile(new URL("app/api/v1/notifications/entry-thank-you/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/me/notifications/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/me/notifications/[id]/route.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/me/notifications/popup/route.ts",root),"utf8"),
+    readFile(new URL("app/inbox/page.tsx",root),"utf8"),
+    readFile(new URL("lib/order-notifications.ts",root),"utf8"),
+    readFile(new URL("app/api/v1/me/points/route.ts",root),"utf8"),
+  ]);
+  assert.match(entry,/pending: true, notificationId: null/);
+  assert.match(entry,/status: 202/);
+  assert.doesNotMatch(entry,/read_at=NULL/);
+  assert.match(popup,/pointGranted/);assert.match(popup,/alreadyGranted/);
+  assert.match(list,/INSERT OR IGNORE INTO notification_popup_deliveries/);
+  assert.match(item,/INSERT OR IGNORE INTO notification_popup_deliveries/);
+  assert.match(inbox,/すべて既読にする/);
+  assert.match(orders,/ORDER_ACCEPTED:\$\{orderId\}/);
+  assert.match(orders,/KITCHEN_UNIT_READY:\$\{unitId\}/);
+  assert.match(orders,/番のお品物が完成しました/);
+  assert.match(points,/SMAREGI_PURCHASE_THANK_YOU:\$\{item\.id\}/);
+  assert.match(points,/今回のお会計で\$\{item\.grantedPoint\}ポイントが付与されました/);
+});
