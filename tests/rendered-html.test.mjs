@@ -1382,3 +1382,17 @@ test("注文状況と商品別呼出番号をキッチン正本から自動更�
   assert.match(mobile,/unitStatusLabel\(item\.status\)/);assert.match(mobile,/item\.callNumberLabel/);
   assert.match(units,/u\.id AS unitId/);assert.match(units,/callNumberLabel/);
 });
+
+test("ポイント履歴は月別内訳・付与理由・ランク進捗を表示する",async()=>{
+  const [api,page,styles]=await Promise.all([
+    readFile(new URL("app/api/v1/me/points/route.ts",root),"utf8"),
+    readFile(new URL("app/points/page.tsx",root),"utf8"),
+    readFile(new URL("app/globals.css",root),"utf8"),
+  ]);
+  assert.match(api,/summary:\{earned,used,net:earned-used,count:entries\.length\}/);
+  assert.match(api,/rankProgress/);assert.match(api,/amountToNextRank/);
+  assert.match(page,/お買い上げ・ポイント利用/);assert.match(page,/ご来館によるポイント/);
+  assert.match(page,/次の\{history\.rankProgress\.nextRankLabel\}まで/);
+  assert.match(page,/history\.summary\.earned/);assert.match(page,/会員登録後のポイント履歴/);
+  assert.match(styles,/\.point-rank-progress/);assert.match(styles,/\.point-month-summary/);
+});
