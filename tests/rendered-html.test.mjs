@@ -202,19 +202,25 @@ test("住民サブスクは既存3278円Priceを利用しWebhookで資格を同�
   assert.match(migration, /RESIDENT_SUBSCRIPTION_BULK_MIGRATION/);
 });
 
-test("住民契約はWebhookに加えて定期再照合し古い状態を管理画面へ警告する",async()=>{
-  const [subscription,membership,reconcile,operations]=await Promise.all([
+test("住民契約はWebhookに加えて自動見守りし実異常または7日超だけ警告する",async()=>{
+  const [subscription,membership,reconcile,operations,stripe]=await Promise.all([
     readFile(new URL("lib/resident-subscription.ts",root),"utf8"),
     readFile(new URL("app/api/v1/me/membership/route.ts",root),"utf8"),
     readFile(new URL("app/api/v1/admin/resident-subscriptions/reconcile/route.ts",root),"utf8"),
     readFile(new URL("app/api/v1/admin/operations/route.ts",root),"utf8"),
+    readFile(new URL("lib/stripe.ts",root),"utf8"),
   ]);
   assert.match(subscription,/reconcileResidentSubscriptionForMember/);
   assert.match(subscription,/\/subscriptions\/\$\{encodeURIComponent\(row\.subscriptionId\)\}/);
   assert.match(membership,/reconcileResidentSubscriptionForMember\(member\.id\)/);
   assert.match(reconcile,/requireAdminSession/);
   assert.match(reconcile,/reconcileAllResidentSubscriptions/);
-  assert.match(operations,/住民契約の再確認が必要な会員/);
+  assert.match(operations,/72\*60\*60\*1000/);
+  assert.match(operations,/now-7\*86400000/);
+  assert.match(operations,/past_due/);
+  assert.match(operations,/住民契約に支払い・契約上の問題/);
+  assert.doesNotMatch(operations,/26\*60\*60\*1000/);
+  assert.match(stripe,/AbortSignal\.timeout\(6000\)/);
 });
 
 test("今日やることは対象会員・注文と次の操作を表示し全店舗売上を区別する",async()=>{
