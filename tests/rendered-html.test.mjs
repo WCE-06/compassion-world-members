@@ -1227,7 +1227,7 @@ test("統合会員管理から商品マスタを部門絞り込み・並び替�
     readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
     readFile(new URL("app/menu-admin/ProductMasterWorkspace.tsx",root),"utf8"),
   ]);
-  assert.match(sidebar,/key:"products",label:"商品マスタ・期間売価"/);
+  assert.match(sidebar,/key:\s*"products"[\s\S]*?label:\s*"商品マスタ・期間売価"/);
   assert.match(page,/tab==="products"/);
   assert.match(page,/<ProductMasterWorkspace allowCreate\/>/);
   assert.match(panel,/部門で絞り込み/);
@@ -1260,7 +1260,7 @@ test("スタッフサイトでSNS投稿をAIと相談し承認前の台帳へ保
     readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
   ]);
   assert.match(page,/SnsAssistantPanel/);
-  assert.match(sidebar,/label:"SNSコントロール"/);
+  assert.match(sidebar,/label:\s*"SNSコントロール"/);
   assert.match(panel,/投稿相談AI/);
   assert.match(panel,/投稿台帳/);
   assert.match(panel,/content_json/);
@@ -1449,4 +1449,17 @@ test("精算管理へスマレジ店舗売上明細を表示し入荷登録を�
  assert.match(settlement,/スマレジ店舗売上/);assert.match(settlement,/レシート番号なし/);
  assert.match(inventory,/バーコード・商品名/);assert.match(inventory,/商品マスタへ登録して入荷を続ける/);
  assert.match(inventory,/createProductForReceipt/);assert.match(inventory,/action: "RECEIVE"/);
+});
+
+test("スタッフ管理はスマホ用分類メニューとカメラバーコード読取を備える",async()=>{
+ const [nav,inventory,styles]=await Promise.all([
+  readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
+  readFile(new URL("app/member-admin/InventoryPanel.tsx",root),"utf8"),
+  readFile(new URL("app/member-admin/member-admin.css",root),"utf8"),
+ ]);
+ assert.match(nav,/顧客/);assert.match(nav,/営業/);assert.match(nav,/商品/);assert.match(nav,/運営/);
+ assert.match(nav,/admin-mobile-menu-sheet/);assert.match(nav,/aria-expanded/);
+ assert.match(inventory,/BarcodeDetector/);assert.match(inventory,/getUserMedia/);
+ assert.match(inventory,/facingMode/);assert.match(inventory,/スマホカメラで読み取る/);
+ assert.match(inventory,/カメラ読取を利用できません/);assert.match(styles,/inventory-camera-reader/);
 });

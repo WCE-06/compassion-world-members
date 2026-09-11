@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Product = {
   code: string;
@@ -53,6 +53,7 @@ export function InventoryPanel() {
     [message, setMessage] = useState(""),
     [q, setQ] = useState(""),
     [receiveQuery, setReceiveQuery] = useState(""),
+    [cameraOpen, setCameraOpen] = useState(false),
     [showNewProduct, setShowNewProduct] = useState(false),
     [newProduct, setNewProduct] = useState({
       productCode: "",
@@ -68,6 +69,9 @@ export function InventoryPanel() {
       expiryDate: "",
       note: "",
     });
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraStream = useRef<MediaStream | null>(null);
+  const scanFrame = useRef<number | null>(null);
   const load = useCallback(async (refresh = false) => {
     setBusy(refresh ? "SYNC" : "LOAD");
     setMessage(refresh ? "スマレジの商品マスタと実在庫を取得しています…" : "");
@@ -160,20 +164,25 @@ export function InventoryPanel() {
       )
       .slice(0, 8);
   }, [managedProducts, receiveQuery]);
-  const searchProduct = () => {
-    const exact = receiveMatches.find(
-      (product) =>
-        product.code.toLowerCase() === receiveQuery.trim().toLowerCase(),
+  const searchProduct = (searchValue = receiveQuery) => {
+    const needle = searchValue.trim().toLowerCase();
+    const matches = managedProducts
+      .filter((product) =>
+        `${product.code} ${product.name}`.toLowerCase().includes(needle),
+      )
+      .slice(0, 8);
+    const exact = matches.find(
+      (product) => product.code.toLowerCase() === needle,
     );
-    if (exact || receiveMatches.length === 1) {
-      const product = exact ?? receiveMatches[0];
+    if (exact || matches.length === 1) {
+      const product = exact ?? matches[0];
       setForm((value) => ({ ...value, productCode: product.code }));
       setReceiveQuery(`${product.name}（${product.code}）`);
       setShowNewProduct(false);
       return;
     }
-    if (!receiveMatches.length && receiveQuery.trim()) {
-      const scanned = receiveQuery.trim();
+    if (!matches.length && searchValue.trim()) {
+      const scanned = searchValue.trim();
       const looksLikeCode = /^[A-Za-z0-9_-]{4,40}$/.test(scanned);
       setNewProduct((value) => ({
         ...value,
@@ -181,6 +190,80 @@ export function InventoryPanel() {
         name: looksLikeCode ? "" : scanned,
       }));
       setShowNewProduct(true);
+    }
+  };
+  const stopCamera = useCallback(() => {
+    if (scanFrame.current !== null) cancelAnimationFrame(scanFrame.current);
+    scanFrame.current = null;
+    cameraStream.current?.getTracks().forEach((track) => track.stop());
+    cameraStream.current = null;
+    setCameraOpen(false);
+  }, []);
+  useEffect(() => stopCamera, [stopCamera]);
+  const startCamera = async () => {
+    type Detector = {
+      detect: (source: ImageBitmapSource) => Promise<{ rawValue?: string }[]>;
+    };
+    type DetectorConstructor = new (options?: {
+      formats?: string[];
+    }) => Detector;
+    const Detector = (
+      window as unknown as { BarcodeDetector?: DetectorConstructor }
+    ).BarcodeDetector;
+    if (!Detector || !navigator.mediaDevices?.getUserMedia) {
+      setMessage(
+        "この端末ではカメラ読取を利用できません。入力欄または外付けリーダーをご利用ください",
+      );
+      return;
+    }
+    try {
+      stopCamera();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      cameraStream.current = stream;
+      setCameraOpen(true);
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
+      const video = videoRef.current;
+      if (!video) throw new Error("CAMERA_NOT_READY");
+      video.srcObject = stream;
+      await video.play();
+      const detector = new Detector({
+        formats: [
+          "ean_13",
+          "ean_8",
+          "upc_a",
+          "upc_e",
+          "code_128",
+          "code_39",
+          "itf",
+        ],
+      });
+      const scan = async () => {
+        try {
+          const values = await detector.detect(video);
+          const value = values[0]?.rawValue?.trim();
+          if (value) {
+            setReceiveQuery(value);
+            stopCamera();
+            searchProduct(value);
+            setMessage("バーコードを読み取りました");
+            return;
+          }
+        } catch {
+          // 映像が準備できるまで次のフレームで再試行する。
+        }
+        scanFrame.current = requestAnimationFrame(() => void scan());
+      };
+      void scan();
+    } catch {
+      stopCamera();
+      setMessage(
+        "カメラを開始できませんでした。カメラの利用を許可して、もう一度お試しください",
+      );
     }
   };
   const createProductForReceipt = async () => {
@@ -399,7 +482,25 @@ export function InventoryPanel() {
             >
               登録を確認
             </button>
+            <button
+              type="button"
+              className="camera-scan-button"
+              onClick={() => (cameraOpen ? stopCamera() : void startCamera())}
+            >
+              {cameraOpen ? "カメラを閉じる" : "スマホカメラで読み取る"}
+            </button>
           </div>
+          {cameraOpen && (
+            <div className="inventory-camera-reader">
+              <video
+                ref={videoRef}
+                muted
+                playsInline
+                aria-label="バーコード読み取りカメラ"
+              />
+              <span>枠の中にバーコードを合わせてください</span>
+            </div>
+          )}
           {!selected && receiveQuery.trim() && receiveMatches.length > 1 && (
             <div className="inventory-receive-results">
               <small>該当する商品を選択</small>
