@@ -15,7 +15,7 @@ async function salesSummary(runtime:Record<string,string|undefined>,start:number
  try{
   const target=new URL(url),from=new Date(start).toISOString(),to=new Date(end).toISOString();
   if(dedicated){target.searchParams.set("from",from);target.searchParams.set("to",to);target.searchParams.set("scope","ALL_STORES")}
-  const response=await fetch(target,dedicated?{headers:{Authorization:`Bearer ${key}`,"X-API-Key":key},signal:AbortSignal.timeout(12000)}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({op:"smaregiSalesSummary",syncKey:key,from,to,scope:"ALL_STORES"}),signal:AbortSignal.timeout(12000)});
+  const response=await fetch(target,dedicated?{headers:{Authorization:`Bearer ${key}`,"X-API-Key":key},signal:AbortSignal.timeout(5000)}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({op:"smaregiSalesSummary",syncKey:key,from,to,scope:"ALL_STORES"}),signal:AbortSignal.timeout(5000)});
   if(!response.ok)throw new Error(`HTTP_${response.status}`);
   const body=await response.json() as Record<string,unknown>;
   if(body.ok===false)throw new Error(String(body.error??"SALES_SUMMARY_FAILED"));
