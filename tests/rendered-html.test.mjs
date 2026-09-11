@@ -217,6 +217,19 @@ test("住民契約はWebhookに加えて定期再照合し古い状態を管理�
   assert.match(operations,/住民契約の再確認が必要な会員/);
 });
 
+test("今日やることは対象会員・注文と次の操作を表示し全店舗売上を区別する",async()=>{
+  const [operations,dashboard,page]=await Promise.all([
+    readFile(new URL("app/api/v1/admin/operations/route.ts",root),"utf8"),
+    readFile(new URL("app/member-admin/CoreDashboard.tsx",root),"utf8"),
+    readFile(new URL("app/member-admin/page.tsx",root),"utf8"),
+  ]);
+  assert.match(operations,/staleResidentRows/);assert.match(operations,/posMissingRows/);
+  assert.match(operations,/scope","ALL_STORES"/);
+  assert.match(dashboard,/対象を見る/);assert.match(dashboard,/住民契約管理を開く/);assert.match(dashboard,/統合取引台帳を開く/);
+  assert.match(dashboard,/本日の全店舗売上/);assert.match(dashboard,/おもひで商店は未集計/);
+  assert.match(page,/商品・価格・販促をまとめて管理/);assert.match(page,/クーポン設定を開く/);
+});
+
 test("予約導線は外部サイトへ移動せず会員証と同一サイト内で完結する", async () => {
   const [page, bookingPage] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
@@ -994,7 +1007,7 @@ test("統合管理でタスク・予約一覧・クーポン・配信・会員�
     readFile(new URL("app/api/v1/admin/members/bulk/route.ts",root),"utf8"),
     readFile(new URL("drizzle/0020_operations_console.sql",root),"utf8"),
   ]);
-  assert.match(sidebar,/SNSコントロール/);assert.match(sidebar,/精算・売上/);assert.match(sidebar,/在庫確認/);assert.match(sidebar,/作業タスク/);
+  assert.match(sidebar,/SNSコントロール/);assert.match(sidebar,/精算・売上/);assert.match(sidebar,/在庫確認/);assert.match(sidebar,/スタッフToDo/);
   assert.match(sidebar,/AdminMobileNav/);assert.match(sidebar,/スマートフォン用管理メニュー/);assert.match(page,/AdminMobileNav/);
   assert.match(page,/StudioReservationOverview/);assert.match(reservations,/staff\.reservations\.list/);
   assert.match(tasks,/operations_tasks/);assert.match(engagement,/message_campaigns/);assert.match(engagement,/automation_rules/);
@@ -1206,7 +1219,7 @@ test("統合会員管理から商品マスタを部門絞り込み・並び替�
     readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
     readFile(new URL("app/menu-admin/ProductMasterWorkspace.tsx",root),"utf8"),
   ]);
-  assert.match(sidebar,/key:"products",label:"商品マスタ"/);
+  assert.match(sidebar,/key:"products",label:"商品マスタ・期間売価"/);
   assert.match(page,/tab==="products"/);
   assert.match(page,/<ProductMasterWorkspace allowCreate\/>/);
   assert.match(panel,/部門で絞り込み/);

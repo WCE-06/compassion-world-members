@@ -48,7 +48,7 @@ export default function MemberAdmin(){
   {(tab==="benefits"||tab==="communication")&&<EngagementPanel mode={tab}/>} 
   {tab==="finance"&&<SettlementPanel/>}
   {tab==="inventory"&&<InventoryPanel/>}
-  {tab==="products"&&<section className="integrated-product-master"><ProductMasterWorkspace allowCreate/><OmohideLayoutManager/></section>}
+  {tab==="products"&&<section className="integrated-product-master"><div className="product-control-guide"><div><small>PRODUCT SALES CONTROL</small><h2>商品・価格・販促をまとめて管理</h2><p>通常の商品情報と期間売価はこの画面で編集できます。クーポンは共通の設定画面で作成し、公開状態と利用実績を管理します。</p></div><button onClick={()=>setTab("benefits")}>クーポン設定を開く</button></div><ProductMasterWorkspace allowCreate/><OmohideLayoutManager/></section>}
   {tab==="staff"&&<><StaffAccountsPanel/><AdminAuditPanel/></>}
   {tab==="sns"&&<><OperationsPanel section="sns"/><SnsAssistantPanel/></>}
   {(["residents","analytics"] as AdminSection[]).includes(tab)&&<OperationsPanel section={tab as "residents"|"analytics"}/>} 
