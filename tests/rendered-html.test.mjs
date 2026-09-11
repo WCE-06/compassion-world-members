@@ -1449,3 +1449,16 @@ test("スタジオ空き枠を認証と並列取得し受付APIの長時間待�
  const [page,facility]=await Promise.all([readFile(new URL("app/availability/page.tsx",root),"utf8"),readFile(new URL("lib/facility-api.ts",root),"utf8")]);
  assert.match(page,/const dayPromise = loadDay\(today\)/);assert.match(page,/Promise\.allSettled\(\[dayPromise,historyPromise\]\)/);assert.doesNotMatch(page,/availability\/range/);assert.match(facility,/AbortSignal\.timeout\(8_000\)/);
 });
+
+test("精算管理へスマレジ店舗売上明細を表示し入荷登録を検索起点に一本化する",async()=>{
+ const [salesApi,settlement,salesPanel,inventory]=await Promise.all([
+  readFile(new URL("app/api/v1/admin/sales-summary/route.ts",root),"utf8"),
+  readFile(new URL("app/member-admin/SettlementPanel.tsx",root),"utf8"),
+  readFile(new URL("app/member-admin/SmaregiSalesSummary.tsx",root),"utf8"),
+  readFile(new URL("app/member-admin/InventoryPanel.tsx",root),"utf8"),
+ ]);
+ assert.match(salesApi,/rawTransactions/);assert.match(salesApi,/receiptNo/);assert.match(salesPanel,/onLoaded/);
+ assert.match(settlement,/スマレジ店舗売上/);assert.match(settlement,/レシート番号なし/);
+ assert.match(inventory,/バーコード・商品名/);assert.match(inventory,/商品マスタへ登録して入荷を続ける/);
+ assert.match(inventory,/createProductForReceipt/);assert.match(inventory,/action: "RECEIVE"/);
+});

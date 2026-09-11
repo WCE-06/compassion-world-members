@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { SmaregiSalesSummary } from "./SmaregiSalesSummary";
+import { SmaregiSalesSummary, type SmaregiSales } from "./SmaregiSalesSummary";
 type Row = {
   id: string;
   source: "ORDER" | "STUDIO";
@@ -46,6 +46,7 @@ export function SettlementPanel() {
     [q, setQ] = useState(""),
     [busy, setBusy] = useState(false),
     [cancelling, setCancelling] = useState(""),
+    [smaregiSales, setSmaregiSales] = useState<SmaregiSales | null>(null),
     [error, setError] = useState("");
   const load = useCallback(async () => {
     setBusy(true);
@@ -119,6 +120,17 @@ export function SettlementPanel() {
     const timer = setTimeout(() => void load(), 200);
     return () => clearTimeout(timer);
   }, [load]);
+  const smaregiRows = (smaregiSales?.transactions ?? []).filter((row) => {
+    if (source !== "ALL" && source !== "SMAREGI") return false;
+    const rowStatus = row.division === "RETURN" ? "REFUNDED" : "PAID";
+    if (status !== "ALL" && status !== rowStatus) return false;
+    return (
+      !q ||
+      `${row.storeName} ${row.receiptNo} ${row.id} ${row.memberCode}`
+        .toLowerCase()
+        .includes(q.toLowerCase())
+    );
+  });
   return (
     <section className="operations-panel settlement-panel">
       <header>
@@ -133,7 +145,7 @@ export function SettlementPanel() {
           {busy ? "更新しています…" : "精算状況を更新"}
         </button>
       </header>
-      <SmaregiSalesSummary />
+      <SmaregiSalesSummary onLoaded={setSmaregiSales} />
       <div className="settlement-section-heading">
         <small>PAYMENT MANAGEMENT</small>
         <h3>精算・注文の管理</h3>
@@ -161,7 +173,8 @@ export function SettlementPanel() {
           placeholder="会員番号・氏名・注文番号・取引IDで検索"
         />
         <select value={source} onChange={(e) => setSource(e.target.value)}>
-          <option value="ALL">注文・スタジオ</option>
+          <option value="ALL">すべての取引</option>
+          <option value="SMAREGI">スマレジ店舗売上</option>
           <option value="ORDER">モバイルオーダー</option>
           <option value="STUDIO">スタジオ</option>
         </select>
@@ -178,6 +191,73 @@ export function SettlementPanel() {
         <p className="member-admin-message" role="alert">
           {error}
         </p>
+      )}
+      {(source === "ALL" || source === "SMAREGI") && (
+        <div className="smaregi-ledger-section">
+          <h4>スマレジ店舗売上</h4>
+          <p>おもひで商店を含む、上で選択した日の店舗会計です。</p>
+          {smaregiSales ? (
+            smaregiRows.length ? (
+              <div className="settlement-table-wrap">
+                <table className="settlement-table">
+                  <thead>
+                    <tr>
+                      <th>日時</th>
+                      <th>店舗・レシート</th>
+                      <th>会員番号</th>
+                      <th>金額</th>
+                      <th>状態</th>
+                      <th>取引ID</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {smaregiRows.map((row) => (
+                      <tr key={`smaregi-${row.id}`}>
+                        <td>
+                          {row.occurredAt
+                            ? new Date(row.occurredAt).toLocaleString("ja-JP", {
+                                timeZone: "Asia/Tokyo",
+                                month: "numeric",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "—"}
+                        </td>
+                        <td>
+                          <b>{row.storeName}</b>
+                          <small>
+                            {row.receiptNo
+                              ? `レシート ${row.receiptNo}`
+                              : "レシート番号なし"}
+                          </small>
+                        </td>
+                        <td>
+                          <small>{row.memberCode || "会員紐付けなし"}</small>
+                        </td>
+                        <td className="settlement-amount">{yen(row.amount)}</td>
+                        <td>
+                          <span
+                            className={`settlement-status ${row.division === "RETURN" ? "refunded" : "paid"}`}
+                          >
+                            {row.division === "RETURN" ? "返品" : "精算済み"}
+                          </span>
+                        </td>
+                        <td>
+                          <small>{row.id}</small>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="admin-empty">条件に該当する店舗売上はありません</p>
+            )
+          ) : (
+            <p className="admin-empty">店舗売上を読み込んでいます…</p>
+          )}
+        </div>
       )}
       {!data && !error ? (
         <p className="admin-empty">統合取引台帳を読み込んでいます…</p>
