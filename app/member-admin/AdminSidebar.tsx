@@ -81,9 +81,11 @@ const items: Array<{
 export function AdminSidebar({
   active,
   onSelect,
+  allowed,
 }: {
   active: AdminSection;
   onSelect: (section: AdminSection) => void;
+  allowed?: Set<AdminSection>;
 }) {
   return (
     <>
@@ -94,7 +96,7 @@ export function AdminSidebar({
           <strong>STAFF CONSOLE</strong>
         </div>
         <nav aria-label="管理メニュー">
-          {items.map(({ key, label, icon: Icon, ready }) => (
+          {items.filter(({key})=>!allowed||allowed.has(key)).map(({ key, label, icon: Icon, ready }) => (
             <button
               key={key}
               className={active === key ? "active" : ""}
@@ -114,9 +116,11 @@ export function AdminSidebar({
 export function AdminMobileNav({
   active,
   onSelect,
+  allowed,
 }: {
   active: AdminSection;
   onSelect: (section: AdminSection) => void;
+  allowed?: Set<AdminSection>;
 }) {
   const groups = useMemo(
     () => [
@@ -170,7 +174,7 @@ export function AdminMobileNav({
             </button>
           </header>
           <div>
-            {current.items.map((key) => {
+            {current.items.filter(key=>!allowed||allowed.has(key)).map((key) => {
               const item = items.find((value) => value.key === key)!;
               const Icon = item.icon;
               return (
@@ -205,7 +209,7 @@ export function AdminMobileNav({
           <LayoutDashboard size={18} />
           <span>ホーム</span>
         </button>
-        {groups.map(({ key, label, icon: Icon }) => (
+        {groups.filter(group=>group.items.some(key=>!allowed||allowed.has(key))).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             className={activeGroup === key || open === key ? "active" : ""}

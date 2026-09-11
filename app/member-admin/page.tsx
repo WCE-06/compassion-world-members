@@ -16,8 +16,10 @@ import {InventoryPanel} from "./InventoryPanel";
 import {ProductMasterWorkspace} from "../menu-admin/ProductMasterWorkspace";
 import {OmohideLayoutManager} from "../menu-admin/OmohideLayoutManager";
 import {StaffAccountsPanel} from "./StaffAccountsPanel";
+import {StaffPagePermissions} from "./StaffPagePermissions";
 import {AdminAuditPanel} from "./AdminAuditPanel";
 import {IntegrationHealthPanel} from "./IntegrationHealthPanel";
+import {pagePermission} from "@/lib/admin-permissions";
 
 type MemberRow=MemberTableRow&{acquisitionSource:string|null;legacyTags:string|null;syncError:string|null;pointRatePercent?:number|null};
 type Reservation={reservationId:string;memberCode:string;startAt:string;endAt:string;status:string};
@@ -27,10 +29,13 @@ const when=(value:string|number)=>new Date(value).toLocaleString("ja-JP",{timeZo
 const initialStart=()=>{const date=new Date(Date.now()+3600000);date.setMinutes(Math.ceil(date.getMinutes()/15)*15,0,0);const offset=date.getTimezoneOffset()*60000;return new Date(date.getTime()-offset).toISOString().slice(0,16)};
 
 export default function MemberAdmin(){
+ const [permissions,setPermissions]=useState<string[]|null>(null);
+ const allowed=new Set((Object.keys(pagePermission) as AdminSection[]).filter(section=>permissions?.includes(pagePermission[section])));
  const [tab,setTab]=useState<AdminSection>("dashboard"),[selectedMembers,setSelectedMembers]=useState<Set<string>>(new Set()),[members,setMembers]=useState<MemberRow[]>([]),[duplicates,setDuplicates]=useState<{phone:string;count:number}[]>([]),[stats,setStats]=useState<{total:number;active:number;migrated:number;lineLinked:number}|null>(null),[q,setQ]=useState(""),[filters,setFilters]=useState({status:"",rank:"",resident:"",sync:"",tag:"",source:"",sort:"CREATED_DESC"}),[message,setMessage]=useState(""),[busy,setBusy]=useState(""),[selected,setSelected]=useState(""),[studio,setStudio]=useState<StudioData|null>(null),[startAt,setStartAt]=useState(initialStart),[hours,setHours]=useState(1),[reservationConfirm,setReservationConfirm]=useState(false),[passwords,setPasswords]=useState({currentPassword:"",newPassword:"",confirmation:""}),[syncStatus,setSyncStatus]=useState<{activeMembers:number;lineLinked:number;lineNameMissing:number;spendSynced:number;lineLoginSyncEnabled:boolean;bulkLineSyncConfigured:boolean;spendRecalcConfigured:boolean;spendJob:null|{status:string;transactionCount:number;memberCount:number;syncedCount:number;missingCount:number;startedAt:string;completedAt:string;error:string}}|null>(null);
  const memberRequest=useRef(0);
  const load=useCallback(async()=>{const current=++memberRequest.current,summary=tab==="dashboard",query=new URLSearchParams(summary?{mode:"SUMMARY"}:{q,...filters});try{const response=await fetch(`/api/v1/admin/members?${query}`,{cache:"default",signal:AbortSignal.timeout(8000)});if(current!==memberRequest.current)return;if(response.status===401){location.replace("/member-admin/login");return}if(!response.ok){setMessage("会員情報を取得できませんでした");return}const result=await response.json();if(!summary)setMembers(result.members??[]);if(result.duplicates)setDuplicates(result.duplicates);if(result.stats)setStats(result.stats)}catch{if(current===memberRequest.current)setMessage("会員情報の取得に時間がかかっています。もう一度お試しください")}},[tab,q,filters]);
  useEffect(()=>{if(!["dashboard","members","studio"].includes(tab))return;const timer=setTimeout(()=>void load(),tab==="dashboard"?0:250);return()=>clearTimeout(timer)},[tab,load]);
+ useEffect(()=>{fetch("/api/v1/admin/auth/session",{cache:"no-store"}).then(async response=>{if(!response.ok){location.replace("/member-admin/login");return}const session=await response.json() as {permissions?:string[]};const next=session.permissions??[];setPermissions(next);if(!next.includes(pagePermission[tab])){const first=(Object.keys(pagePermission) as AdminSection[]).find(section=>next.includes(pagePermission[section]));if(first)setTab(first)}}).catch(()=>setMessage("権限情報を確認できませんでした。再読み込みしてください"))},[]);
  const logout=async()=>{await fetch("/api/v1/admin/auth/logout",{method:"POST"});location.replace("/member-admin/login")};
  const loadSyncStatus=async()=>{try{const response=await fetch("/api/v1/admin/sync-center",{cache:"default",signal:AbortSignal.timeout(5000)});if(response.ok)setSyncStatus(await response.json())}catch{setMessage("同期状況は後から再取得できます。ほかの操作はそのまま利用できます")}};
  useEffect(()=>{if(tab!=="settings"||syncStatus?.spendJob?.status!=="RUNNING")return;const timer=setInterval(()=>void loadSyncStatus(),5000);return()=>clearInterval(timer)},[tab,syncStatus?.spendJob?.status]);
@@ -40,16 +45,16 @@ export default function MemberAdmin(){
  const loadStudio=async(memberCode=selected)=>{if(!memberCode)return;setBusy(memberCode);setMessage("予約・利用状況を確認しています…");try{const response=await fetch(`/api/v1/admin/studio?memberCode=${encodeURIComponent(memberCode)}`,{cache:"no-store",signal:AbortSignal.timeout(8000)}),result=await response.json();if(!response.ok)throw new Error(result.error??"取得できませんでした");setSelected(memberCode);setStudio(result);setMessage(result.warnings?.length?"一部の情報を取得できませんでした":"最新状態を表示しました")}catch(error){setStudio(null);setMessage(error instanceof Error&&error.name!=="TimeoutError"?error.message:"8秒以内に取得できませんでした。もう一度お試しください")}finally{setBusy("")}};
  const studioAction=async(action:"CREATE_RESERVATION"|"CANCEL_RESERVATION"|"START_SESSION",extra:Record<string,unknown>={})=>{if(!selected||busy)return;setBusy(action);setMessage(action==="CREATE_RESERVATION"?"予約登録を開始しました。共通予約台帳へ反映しています…":"共通予約台帳へ反映しています…");try{const response=await fetch("/api/v1/admin/studio",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,memberCode:selected,requestId:crypto.randomUUID(),...extra})}),result=await response.json();if(!response.ok)throw new Error(result.error??"処理できませんでした");setMessage(action==="CREATE_RESERVATION"?"予約を登録しました":action==="CANCEL_RESERVATION"?"予約をキャンセルしました":"受付を完了し、利用中へ変更しました");if(action==="CREATE_RESERVATION")setReservationConfirm(false);await loadStudio(selected)}catch(error){setMessage(error instanceof Error?error.message:"処理できませんでした")}finally{setBusy("")}};
  return <main className="member-admin-page" onClickCapture={event=>{const button=(event.target as HTMLElement).closest("button");if(button?.textContent?.trim()==="スタッフ予約を登録"){event.preventDefault();event.stopPropagation();if(!busy)setReservationConfirm(true)}}}>
-  <AdminSidebar active={tab} onSelect={section=>{setTab(section);if(section==="settings")void loadSyncStatus()}}/>
+  <AdminSidebar active={tab} allowed={allowed} onSelect={section=>{setTab(section);if(section==="settings")void loadSyncStatus()}}/>
   <div className="admin-main-content">
   <header className="admin-main-header"><div><small>COMPASSION WORLD STAFF</small><h1>統合会員管理・運営</h1><p>会員、スタジオ予約・受付、注文、精算、商品、在庫、業務を一元管理します。</p></div><button onClick={()=>void logout()}>ログアウト</button></header>
-  <AdminMobileNav active={tab} onSelect={section=>{setTab(section);if(section==="settings")void loadSyncStatus()}}/>
+  <AdminMobileNav active={tab} allowed={allowed} onSelect={section=>{setTab(section);if(section==="settings")void loadSyncStatus()}}/>
   {tab==="tasks"&&<TaskPanel/>}
   {(tab==="benefits"||tab==="communication")&&<EngagementPanel mode={tab}/>} 
   {tab==="finance"&&<SettlementPanel/>}
   {tab==="inventory"&&<InventoryPanel/>}
   {tab==="products"&&<section className="integrated-product-master"><div className="product-control-guide"><div><small>PRODUCT SALES CONTROL</small><h2>商品・価格・販促をまとめて管理</h2><p>通常の商品情報と期間売価はこの画面で編集できます。クーポンは共通の設定画面で作成し、公開状態と利用実績を管理します。</p></div><button onClick={()=>setTab("benefits")}>クーポン設定を開く</button></div><ProductMasterWorkspace allowCreate/><OmohideLayoutManager/></section>}
-  {tab==="staff"&&<><StaffAccountsPanel/><AdminAuditPanel/></>}
+  {tab==="staff"&&<><StaffAccountsPanel/><StaffPagePermissions/><AdminAuditPanel/></>}
   {tab==="sns"&&<><OperationsPanel section="sns"/><SnsAssistantPanel/></>}
   {(["residents","analytics"] as AdminSection[]).includes(tab)&&<OperationsPanel section={tab as "residents"|"analytics"}/>} 
   {tab==="settings"&&<section className="admin-settings-grid"><IntegrationHealthPanel/></section>}

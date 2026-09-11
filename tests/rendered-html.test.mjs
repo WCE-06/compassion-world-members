@@ -1463,3 +1463,13 @@ test("スタッフ管理はスマホ用分類メニューとカメラバーコ�
  assert.match(inventory,/facingMode/);assert.match(inventory,/スマホカメラで読み取る/);
  assert.match(inventory,/カメラ読取を利用できません/);assert.match(styles,/inventory-camera-reader/);
 });
+
+test("スタッフごとに開けるページを設定し画面とAPIの両方で権限を強制する",async()=>{
+ const [panel,page,sidebar,session,staffApi,migration]=await Promise.all([
+  readFile(new URL("app/member-admin/StaffPagePermissions.tsx",root),"utf8"),readFile(new URL("app/member-admin/page.tsx",root),"utf8"),readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),readFile(new URL("lib/admin-session.ts",root),"utf8"),readFile(new URL("app/api/v1/admin/staff/route.ts",root),"utf8"),readFile(new URL("drizzle/0039_staff_custom_permissions.sql",root),"utf8"),
+ ]);
+ assert.match(panel,/開けるページをスタッフ別に設定/);assert.match(panel,/permissions/);
+ assert.match(page,/pagePermission/);assert.match(sidebar,/allowed/);
+ assert.match(session,/permissions_json/);assert.match(session,/permissionForRequest/);
+ assert.match(staffApi,/permissionsJson/);assert.match(migration,/permissions_json/);
+});
