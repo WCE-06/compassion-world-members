@@ -1,6 +1,16 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-type Sales = {
+export type SmaregiTransaction = {
+  id: string;
+  receiptNo: string;
+  storeId: string;
+  storeName: string;
+  amount: number;
+  occurredAt: string;
+  memberCode: string;
+  division: "SALE" | "RETURN";
+};
+export type SmaregiSales = {
   available: boolean;
   date: string;
   amount: number;
@@ -10,6 +20,7 @@ type Sales = {
     amount: number;
     transactionCount: number;
   }[];
+  transactions: SmaregiTransaction[];
   transactionCount: number;
   syncedAt: string;
 };
@@ -21,9 +32,13 @@ const today = () =>
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-export function SmaregiSalesSummary() {
+export function SmaregiSalesSummary({
+  onLoaded,
+}: {
+  onLoaded?: (sales: SmaregiSales) => void;
+}) {
   const [date, setDate] = useState(today),
-    [sales, setSales] = useState<Sales | null>(null),
+    [sales, setSales] = useState<SmaregiSales | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const load = useCallback(async () => {
@@ -44,6 +59,7 @@ export function SmaregiSalesSummary() {
       if (!response.ok || !result.available)
         throw new Error(result.error ?? `HTTP_${response.status}`);
       setSales(result);
+      onLoaded?.(result);
     } catch {
       setSales(null);
       setError(
@@ -52,7 +68,7 @@ export function SmaregiSalesSummary() {
     } finally {
       setBusy(false);
     }
-  }, [date]);
+  }, [date, onLoaded]);
   useEffect(() => {
     void load();
   }, [load]);

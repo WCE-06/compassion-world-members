@@ -95,6 +95,24 @@ export async function GET(request: NextRequest) {
         };
       })
       .filter((row) => Number.isFinite(row.amount));
+    const rawTransactions = Array.isArray(data.transactions)
+      ? data.transactions
+      : [];
+    const transactions = rawTransactions
+      .map((value) => {
+        const row = value as Record<string, unknown>;
+        return {
+          id: String(row.id ?? ""),
+          receiptNo: String(row.receiptNo ?? ""),
+          storeId: String(row.storeId ?? ""),
+          storeName: String(row.storeName ?? row.storeId ?? "店舗"),
+          amount: Number(row.amount ?? 0),
+          occurredAt: String(row.occurredAt ?? ""),
+          memberCode: String(row.memberCode ?? ""),
+          division: String(row.division ?? "SALE"),
+        };
+      })
+      .filter((row) => row.id && Number.isFinite(row.amount));
     const amount = Number(
       data.amount ??
         data.sales ??
@@ -108,6 +126,7 @@ export async function GET(request: NextRequest) {
         date: requested,
         amount: Number.isFinite(amount) ? amount : 0,
         stores,
+        transactions,
         transactionCount: Number(data.transactionCount ?? 0),
         syncedAt: String(data.syncedAt ?? new Date().toISOString()),
       },
