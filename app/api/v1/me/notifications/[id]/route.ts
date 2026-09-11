@@ -6,7 +6,10 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   const member = await authenticatedMember(request);
   if (!member) return NextResponse.json({ error: "LINE_AUTH_REQUIRED" }, { status: 401 });
   const { id } = await context.params;
-  if (!/^[A-Za-z0-9-]{8,80}$/.test(id)) return NextResponse.json({ error: "INVALID_NOTIFICATION_ID" }, { status: 400 });
+  // Notification producers use UUIDs as well as stable IDs such as
+  // `notice_order_<id>` and `notice_ready_<id>`. Keep this allowlist aligned
+  // with those server-generated identifiers while rejecting path/control data.
+  if (!/^[A-Za-z0-9:_-]{8,160}$/.test(id)) return NextResponse.json({ error: "INVALID_NOTIFICATION_ID" }, { status: 400 });
   const now=Date.now();
   const [,result] = await env.DB.batch([
     env.DB.prepare(`INSERT OR IGNORE INTO notification_popup_deliveries(notification_id,member_id,delivered_at)
