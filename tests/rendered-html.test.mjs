@@ -231,6 +231,8 @@ test("今日やることは対象会員・注文と次の操作を表示し全�
   ]);
   assert.match(operations,/staleResidentRows/);assert.match(operations,/posMissingRows/);
   assert.match(operations,/scope","ALL_STORES"/);
+  assert.match(operations,/AbortSignal\.timeout\(5000\)/);
+  assert.doesNotMatch(operations,/AbortSignal\.timeout\(12000\)/);
   assert.match(dashboard,/対象を見る/);assert.match(dashboard,/住民契約管理を開く/);assert.match(dashboard,/統合取引台帳を開く/);
   assert.match(dashboard,/本日の全店舗売上/);assert.match(dashboard,/おもひで商店は未集計/);
   assert.match(page,/商品・価格・販促をまとめて管理/);assert.match(page,/クーポン設定を開く/);
