@@ -1488,6 +1488,19 @@ test("入荷管理は簡単登録を上部、商品別設定を最下部に配�
  assert.match(styles,/inventory-primary-actions/);
 });
 
+test("商品管理はマスタ専用ページとしキッチン営業時間を操作対象から外す",async()=>{
+ const [page,route,inventory]=await Promise.all([
+  readFile(new URL("app/menu-admin/page.tsx",root),"utf8"),
+  readFile(new URL("app/product-master/page.tsx",root),"utf8"),
+  readFile(new URL("app/member-admin/InventoryPanel.tsx",root),"utf8"),
+ ]);
+ assert.match(page,/PRODUCT MASTER/);assert.match(page,/商品情報・価格・画像/);
+ assert.match(page,/キッチンの営業時間はキッチンモニターで管理します/);
+ assert.doesNotMatch(page,/onClick=\{\(\)=>setView\("HOURS"\)\}/);
+ assert.match(page,/画像・掲載・並び順/);assert.match(route,/menu-admin\/page/);
+ assert.match(inventory,/href="\/product-master"/);
+});
+
 test("スタッフ管理はスマホ用分類メニューとカメラバーコード読取を備える",async()=>{
  const [nav,inventory,styles]=await Promise.all([
   readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
