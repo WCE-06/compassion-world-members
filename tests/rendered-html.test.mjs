@@ -343,6 +343,18 @@ test("商品カード並び替え、二部営業、月別例外、ジャンル�
   assert.match(migration, /CREATE TABLE `category_schedules`/);
 });
 
+test("キッチン画面からジャンル別提供時間を更新し単品ライスもご飯もの設定へ従う", async () => {
+  const [kitchenApi, catalog] = await Promise.all([
+    readFile(new URL("app/api/v1/kitchen/category-schedules/route.ts", root), "utf8"),
+    readFile(new URL("lib/order-catalog.ts", root), "utf8"),
+  ]);
+  assert.match(kitchenApi, /requireKitchenToken/);
+  assert.match(kitchenApi, /categorySchedules/);
+  assert.match(kitchenApi, /平日は炊飯しない運用/);
+  assert.match(catalog, /\/丼\|ご飯\|ライス\//);
+  assert.match(catalog, /categoryRules\["food-don"\]/);
+});
+
 test("任意の日をイベントと無関係に通し営業へ変更できる", async () => {
   const [page, hoursApi, catalog, schema] = await Promise.all([
     readFile(new URL("app/menu-admin/page.tsx", root), "utf8"),
