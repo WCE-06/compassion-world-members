@@ -1454,6 +1454,8 @@ test("精算管理へスマレジ店舗売上明細を表示し入荷登録を�
  assert.match(inventory,/inventory-suppliers/);assert.match(inventory,/使用日の新しい順/);
  assert.match(inventory,/期間限定価格・特売/);assert.match(inventory,/仕入れ価格ランキング/);
  assert.match(inventory,/supplierName: form\.supplierName/);assert.match(inventory,/isLimitedPrice: form\.isLimitedPrice/);
+ assert.match(inventory,/かんたん入荷登録へ/);assert.match(inventory,/商品マスタを開く/);
+ assert.match(inventory,/id="quick-stock-receipt"/);
 });
 
 test("入荷履歴から仕入れ先候補と商品別の安値ランキングを作る",async()=>{
@@ -1465,6 +1467,13 @@ test("入荷履歴から仕入れ先候補と商品別の安値ランキング�
  assert.match(route,/ORDER BY p\.product_code,p\.unit_price/);assert.match(route,/isLimitedPrice/);
  assert.match(migration,/inventory_suppliers/);assert.match(migration,/inventory_purchase_prices/);
  assert.match(migration,/inventory_purchase_prices_product_supplier_idx/);
+});
+
+test("入荷管理は簡単登録を上部、商品別設定を最下部に配置する",async()=>{
+ const styles=await readFile(new URL("app/member-admin/member-admin.css",root),"utf8");
+ assert.match(styles,/inventory-panel>\.inventory-layout\{order:3\}/);
+ assert.match(styles,/inventory-panel>\.inventory-products\{order:7\}/);
+ assert.match(styles,/inventory-primary-actions/);
 });
 
 test("スタッフ管理はスマホ用分類メニューとカメラバーコード読取を備える",async()=>{

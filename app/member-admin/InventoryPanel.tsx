@@ -358,10 +358,14 @@ export function InventoryPanel() {
         </button>
       </header>
       {message && (
-        <p className="member-admin-message" role="status">
+        <p className="member-admin-message inventory-status-message" role="status">
           {message}
         </p>
       )}
+      <nav className="inventory-primary-actions" aria-label="入荷・商品管理">
+        <a href="#quick-stock-receipt">かんたん入荷登録へ</a>
+        <a href="/menu-admin">商品マスタを開く</a>
+      </nav>
       <div className="inventory-summary">
         <Kpi label="商品マスタ" value={`${data?.products.length ?? 0}件`} />
         <Kpi label="在庫管理対象" value={`${managedProducts.length}件`} />
@@ -471,12 +475,9 @@ export function InventoryPanel() {
             );
           })}
         </div>
-        <a className="operations-primary-link" href="/menu-admin">
-          商品マスタ・画像・掲載設定を開く
-        </a>
       </section>
       <div className="inventory-layout">
-        <article className="inventory-receive">
+        <article className="inventory-receive" id="quick-stock-receipt">
           <small>STOCK RECEIPT</small>
           <h3>かんたん入荷登録</h3>
           <p>バーコードを読み取るか、商品名を入力してください。</p>
