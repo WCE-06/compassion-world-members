@@ -1,0 +1,17 @@
+import {env} from "cloudflare:workers";
+import {NextRequest,NextResponse} from "next/server";
+
+export type ReceiptDevice={id:string;deviceId:string;scopes:string[]};
+const encoder=new TextEncoder();
+export const receiptHeaders={"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"};
+export function receiptResponse(body:Record<string,unknown>,status=200,extra:Record<string,string>={}){return NextResponse.json(body,{status,headers:{...receiptHeaders,...extra}})}
+export function receiptError(status:number,code:string,message:string,requestId?:string,retryable=false,details?:unknown){return receiptResponse({ok:false,error:{code,message,retryable,...(details===undefined?{}:{details})},...(requestId?{requestId}:{})},status)}
+export function normalizeMemberCode(value:unknown){return typeof value==="string"?value.normalize("NFKC").replace(/[\s\r\n]+/g,"").toUpperCase():""}
+export function validRequestId(value:unknown):value is string{return typeof value==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)}
+export async function sha256(value:string){const bytes=new Uint8Array(await crypto.subtle.digest("SHA-256",encoder.encode(value)));return [...bytes].map(byte=>byte.toString(16).padStart(2,"0")).join("")}
+export function stableStringify(value:unknown):string{if(value===null||typeof value!=="object")return JSON.stringify(value);if(Array.isArray(value))return`[${value.map(stableStringify).join(",")}]`;return`{${Object.entries(value as Record<string,unknown>).sort(([a],[b])=>a.localeCompare(b)).map(([key,item])=>`${JSON.stringify(key)}:${stableStringify(item)}`).join(",")}}`}
+export async function sourceHash(value:unknown){return sha256(stableStringify(value))}
+export function receiptBucket(){return(env as unknown as{PRODUCT_IMAGES:R2Bucket}).PRODUCT_IMAGES}
+export async function requireReceiptDevice(request:NextRequest,scope:string):Promise<ReceiptDevice|null>{const auth=request.headers.get("authorization")??"",token=auth.startsWith("Bearer ")?auth.slice(7).trim():"",runtime=env as unknown as Record<string,string|undefined>,pepper=runtime.RECEIPT_TOKEN_PEPPER?.trim()??"";if(!token||!pepper)return null;const tokenHash=await sha256(`${pepper}\0${token}`),row=await env.DB.prepare("SELECT id,device_id AS deviceId,scopes_json AS scopesJson FROM receipt_devices WHERE token_hash=? AND status='ACTIVE' LIMIT 1").bind(tokenHash).first<{id:string;deviceId:string;scopesJson:string}>();if(!row)return null;const scopes=JSON.parse(row.scopesJson) as string[];if(!scopes.includes(scope))return null;await env.DB.prepare("UPDATE receipt_devices SET last_used_at=? WHERE id=?").bind(Date.now(),row.id).run();return{id:row.id,deviceId:row.deviceId,scopes}}
+export function receiptId(){return`RCP-${crypto.randomUUID().replace(/-/g,"").slice(0,20).toUpperCase()}`}
+export async function auditReceipt(values:{actorType:"MEMBER"|"DEVICE"|"STAFF"|"SYSTEM";actorId:string;action:string;receiptId?:string;transactionId?:string;deviceId?:string;result:string;reason?:string}){await env.DB.prepare("INSERT INTO purchase_audit_logs(id,actor_type,actor_id_hash,action,receipt_id,transaction_id_hash,device_id,result,reason,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),values.actorType,await sha256(values.actorId),values.action,values.receiptId??null,values.transactionId?await sha256(values.transactionId):null,values.deviceId??null,values.result,values.reason??null,Date.now()).run()}

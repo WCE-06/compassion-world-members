@@ -518,6 +518,106 @@ export const categorySchedules = sqliteTable("category_schedules", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
 
+export const receiptDevices = sqliteTable("receipt_devices", {
+  id: text("id").primaryKey(),
+  deviceId: text("device_id").notNull(),
+  displayName: text("display_name").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  scopesJson: text("scopes_json").notNull().default("[]"),
+  status: text("status", { enum: ["ACTIVE", "REVOKED"] }).notNull().default("ACTIVE"),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+  revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+}, (table) => [uniqueIndex("receipt_devices_device_unique").on(table.deviceId), uniqueIndex("receipt_devices_token_unique").on(table.tokenHash)]);
+
+export const purchases = sqliteTable("purchases", {
+  id: text("id").primaryKey(),
+  receiptId: text("receipt_id").notNull(),
+  requestId: text("request_id").notNull(),
+  transactionId: text("transaction_id").notNull(),
+  memberId: text("member_id").notNull().references(() => members.id),
+  memberCodeHash: text("member_code_hash").notNull(),
+  storeId: text("store_id").notNull(),
+  storeName: text("store_name").notNull(),
+  transactionDateTime: integer("transaction_date_time", { mode: "timestamp_ms" }).notNull(),
+  status: text("status", { enum: ["PAYMENT_UNKNOWN", "CONFIRMED", "CANCELLED", "PARTIALLY_REFUNDED", "REFUNDED"] }).notNull(),
+  receiptMode: text("receipt_mode", { enum: ["PAPER", "ELECTRONIC", "NONE"] }).notNull(),
+  currency: text("currency").notNull().default("JPY"),
+  subtotal: integer("subtotal").notNull(),
+  taxTotal: integer("tax_total").notNull(),
+  totalIncludingTax: integer("total_including_tax").notNull(),
+  pointsUsed: integer("points_used").notNull().default(0),
+  paymentMethod: text("payment_method").notNull(),
+  paymentBreakdownJson: text("payment_breakdown_json").notNull().default("{}"),
+  receiptVersion: integer("receipt_version").notNull().default(1),
+  sourceDataHash: text("source_data_hash").notNull(),
+  sourceDeviceId: text("source_device_id").notNull(),
+  confirmedAt: integer("confirmed_at", { mode: "timestamp_ms" }),
+  cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [
+  uniqueIndex("purchases_receipt_unique").on(table.receiptId),
+  uniqueIndex("purchases_transaction_unique").on(table.transactionId),
+  uniqueIndex("purchases_request_unique").on(table.requestId),
+  index("purchases_member_date_idx").on(table.memberId, table.transactionDateTime),
+  index("purchases_status_updated_idx").on(table.status, table.updatedAt),
+]);
+
+export const purchaseItems = sqliteTable("purchase_items", {
+  id: text("id").primaryKey(),
+  purchaseId: text("purchase_id").notNull().references(() => purchases.id),
+  lineNumber: integer("line_number").notNull(),
+  productCode: text("product_code").notNull(),
+  productName: text("product_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPriceIncludingTax: integer("unit_price_including_tax").notNull(),
+  lineTotal: integer("line_total").notNull(),
+  taxRate: integer("tax_rate").notNull(),
+  optionsJson: text("options_json").notNull().default("[]"),
+}, (table) => [uniqueIndex("purchase_items_purchase_line_unique").on(table.purchaseId, table.lineNumber), index("purchase_items_purchase_idx").on(table.purchaseId)]);
+
+export const purchaseAdjustments = sqliteTable("purchase_adjustments", {
+  id: text("id").primaryKey(),
+  requestId: text("request_id").notNull(),
+  purchaseId: text("purchase_id").notNull().references(() => purchases.id),
+  type: text("type", { enum: ["CANCEL", "RETURN"] }).notNull(),
+  sourceTransactionId: text("source_transaction_id").notNull(),
+  amount: integer("amount").notNull(),
+  reason: text("reason"),
+  itemsJson: text("items_json").notNull().default("[]"),
+  sourceDataHash: text("source_data_hash").notNull(),
+  sourceDeviceId: text("source_device_id").notNull(),
+  occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [uniqueIndex("purchase_adjustments_request_unique").on(table.requestId), uniqueIndex("purchase_adjustments_source_transaction_unique").on(table.sourceTransactionId), index("purchase_adjustments_purchase_idx").on(table.purchaseId, table.occurredAt)]);
+
+export const receiptArtifacts = sqliteTable("receipt_artifacts", {
+  id: text("id").primaryKey(),
+  purchaseId: text("purchase_id").notNull().references(() => purchases.id),
+  version: integer("version").notNull(),
+  objectKey: text("object_key").notNull(),
+  contentType: text("content_type").notNull(),
+  sourceDataHash: text("source_data_hash").notNull(),
+  status: text("status", { enum: ["STORED", "REGENERATED", "FAILED"] }).notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [uniqueIndex("receipt_artifacts_purchase_version_unique").on(table.purchaseId, table.version), uniqueIndex("receipt_artifacts_object_unique").on(table.objectKey)]);
+
+export const purchaseAuditLogs = sqliteTable("purchase_audit_logs", {
+  id: text("id").primaryKey(),
+  actorType: text("actor_type", { enum: ["MEMBER", "DEVICE", "STAFF", "SYSTEM"] }).notNull(),
+  actorIdHash: text("actor_id_hash").notNull(),
+  action: text("action").notNull(),
+  receiptId: text("receipt_id"),
+  transactionIdHash: text("transaction_id_hash"),
+  deviceId: text("device_id"),
+  result: text("result").notNull(),
+  reason: text("reason"),
+  occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("purchase_audit_receipt_idx").on(table.receiptId, table.occurredAt), index("purchase_audit_action_idx").on(table.action, table.occurredAt)]);
+
 export const operationsTasks = sqliteTable("operations_tasks", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
