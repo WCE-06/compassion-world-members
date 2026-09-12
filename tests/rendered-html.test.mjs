@@ -1474,3 +1474,9 @@ test("スタッフごとに開けるページを設定し画面とAPIの両方�
  assert.match(session,/permissions_json/);assert.match(session,/permissionForRequest/);
  assert.match(staffApi,/permissionsJson/);assert.match(migration,/permissions_json/);
 });
+
+test("SNS投稿案を媒体別に分離して外部承認台帳へ冪等送信する",async()=>{
+ const [api,panel,form]=await Promise.all([readFile(new URL("app/api/v1/admin/sns-control/route.ts",root),"utf8"),readFile(new URL("app/member-admin/SnsControlTransferPanel.tsx",root),"utf8"),readFile(new URL("app/member-admin/SnsTransferForm.tsx",root),"utf8")]);
+ assert.match(api,/SNS_CONTROL_API_URL/);assert.match(api,/SNS_CONTROL_API_KEY/);assert.match(api,/sourceId/);assert.match(api,/SNS_DRAFT_TRANSFERRED/);assert.match(api,/Instagram.*Threads.*X.*LINE/);
+ assert.match(panel,/ここから直接公開されることはありません/);assert.match(form,/承認待ちへ送る/);assert.match(form,/Instagramには公開可能な画像URLが必要/);
+});
