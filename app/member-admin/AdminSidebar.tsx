@@ -3,6 +3,7 @@
 import {
   BarChart3,
   CalendarDays,
+  ChevronDown,
   ClipboardCheck,
   Database,
   Gift,
@@ -78,6 +79,13 @@ const items: Array<{
   { key: "settings", label: "設定・同期", icon: Settings, ready: true },
 ];
 
+const menuGroups = [
+  {key:"customers",label:"顧客",icon:Users,items:["members","residents","benefits"] as AdminSection[]},
+  {key:"sales",label:"営業",icon:WalletCards,items:["finance","studio","tasks"] as AdminSection[]},
+  {key:"products",label:"商品",icon:Store,items:["products","inventory","analytics"] as AdminSection[]},
+  {key:"manage",label:"運営",icon:Settings,items:["communication","sns","staff","settings"] as AdminSection[]},
+];
+
 export function AdminSidebar({
   active,
   onSelect,
@@ -87,6 +95,8 @@ export function AdminSidebar({
   onSelect: (section: AdminSection) => void;
   allowed?: Set<AdminSection>;
 }) {
+  const activeGroup=menuGroups.find(group=>group.items.includes(active))?.key??"";
+  const [open,setOpen]=useState(activeGroup||"customers");
   return (
     <>
       <ButtonFeedback />
@@ -96,17 +106,24 @@ export function AdminSidebar({
           <strong>STAFF CONSOLE</strong>
         </div>
         <nav aria-label="管理メニュー">
-          {items.filter(({key})=>!allowed||allowed.has(key)).map(({ key, label, icon: Icon, ready }) => (
+          {(!allowed||allowed.has("dashboard"))&&<button
+            className={active === "dashboard" ? "active" : ""}
+            onClick={() => onSelect("dashboard")}
+          >
+            <LayoutDashboard size={18}/><span>ダッシュボード</span>
+          </button>}
+          {menuGroups.filter(group=>group.items.some(key=>!allowed||allowed.has(key))).map(group=>{const Icon=group.icon,isOpen=open===group.key||activeGroup===group.key;return <section className="admin-sidebar-group" key={group.key}>
             <button
-              key={key}
-              className={active === key ? "active" : ""}
-              onClick={() => onSelect(key)}
+              className={activeGroup===group.key?"group-active":""}
+              aria-expanded={isOpen}
+              onClick={()=>setOpen(value=>value===group.key&&activeGroup!==group.key?"":group.key)}
             >
               <Icon size={18} />
-              <span>{label}</span>
-              {!ready && <small>準備中</small>}
+              <span>{group.label}</span>
+              <ChevronDown className={isOpen?"open":""} size={16}/>
             </button>
-          ))}
+            {isOpen&&<div className="admin-sidebar-submenu">{group.items.filter(key=>!allowed||allowed.has(key)).map(key=>{const item=items.find(value=>value.key===key)!;const ItemIcon=item.icon;return <button key={key} className={active===key?"active":""} onClick={()=>onSelect(key)}><ItemIcon size={16}/><span>{item.label}</span></button>})}</div>}
+          </section>})}
         </nav>
       </aside>
     </>
@@ -122,35 +139,7 @@ export function AdminMobileNav({
   onSelect: (section: AdminSection) => void;
   allowed?: Set<AdminSection>;
 }) {
-  const groups = useMemo(
-    () => [
-      {
-        key: "customers",
-        label: "顧客",
-        icon: Users,
-        items: ["members", "residents", "benefits"] as AdminSection[],
-      },
-      {
-        key: "sales",
-        label: "営業",
-        icon: WalletCards,
-        items: ["finance", "studio", "tasks"] as AdminSection[],
-      },
-      {
-        key: "products",
-        label: "商品",
-        icon: Store,
-        items: ["products", "inventory", "analytics"] as AdminSection[],
-      },
-      {
-        key: "manage",
-        label: "運営",
-        icon: Settings,
-        items: ["communication", "sns", "staff", "settings"] as AdminSection[],
-      },
-    ],
-    [],
-  );
+  const groups = useMemo(()=>menuGroups,[]);
   const activeGroup =
     groups.find((group) => group.items.includes(active))?.key ?? "";
   const [open, setOpen] = useState("");

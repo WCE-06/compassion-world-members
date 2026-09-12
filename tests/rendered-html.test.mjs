@@ -1470,6 +1470,7 @@ test("スタッフ管理はスマホ用分類メニューとカメラバーコ�
   readFile(new URL("app/member-admin/member-admin.css",root),"utf8"),
  ]);
  assert.match(nav,/顧客/);assert.match(nav,/営業/);assert.match(nav,/商品/);assert.match(nav,/運営/);
+ assert.match(nav,/admin-sidebar-group/);assert.match(nav,/admin-sidebar-submenu/);assert.match(nav,/ChevronDown/);
  assert.match(nav,/admin-mobile-menu-sheet/);assert.match(nav,/aria-expanded/);
  assert.match(inventory,/BarcodeDetector/);assert.match(inventory,/getUserMedia/);
  assert.match(inventory,/facingMode/);assert.match(inventory,/スマホカメラで読み取る/);
