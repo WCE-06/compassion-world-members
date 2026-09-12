@@ -1463,6 +1463,20 @@ test("精算管理へスマレジ店舗売上明細を表示し入荷登録を�
  assert.match(inventory,/createProductForReceipt/);assert.match(inventory,/action: "RECEIVE"/);
  assert.match(inventory,/期限なし/);assert.match(inventory,/disabled=\{form\.noExpiry\}/);
  assert.match(inventory,/form\.noExpiry \? null : form\.expiryDate/);
+ assert.match(inventory,/inventory-suppliers/);assert.match(inventory,/使用日の新しい順/);
+ assert.match(inventory,/期間限定価格・特売/);assert.match(inventory,/仕入れ価格ランキング/);
+ assert.match(inventory,/supplierName: form\.supplierName/);assert.match(inventory,/isLimitedPrice: form\.isLimitedPrice/);
+});
+
+test("入荷履歴から仕入れ先候補と商品別の安値ランキングを作る",async()=>{
+ const [route,migration]=await Promise.all([
+  readFile(new URL("app/api/v1/admin/inventory/route.ts",root),"utf8"),
+  readFile(new URL("drizzle/0040_inventory_supplier_prices.sql",root),"utf8"),
+ ]);
+ assert.match(route,/ORDER BY last_used_at DESC/);assert.match(route,/inventory_purchase_prices/);
+ assert.match(route,/ORDER BY p\.product_code,p\.unit_price/);assert.match(route,/isLimitedPrice/);
+ assert.match(migration,/inventory_suppliers/);assert.match(migration,/inventory_purchase_prices/);
+ assert.match(migration,/inventory_purchase_prices_product_supplier_idx/);
 });
 
 test("スタッフ管理はスマホ用分類メニューとカメラバーコード読取を備える",async()=>{

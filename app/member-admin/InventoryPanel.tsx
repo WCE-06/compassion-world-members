@@ -27,6 +27,15 @@ type Stock = {
   layawayStockAmount: number;
   syncedAt: number;
 };
+type Supplier = { id: string; name: string; lastUsedAt: number };
+type PurchasePrice = {
+  productCode: string;
+  supplierId: string;
+  supplierName: string;
+  unitPrice: number;
+  isLimitedPrice: number;
+  purchasedAt: number;
+};
 type CountItem = {
   productCode: string;
   productName: string;
@@ -40,6 +49,8 @@ type Data = {
   products: Product[];
   lots: Lot[];
   stocks: Stock[];
+  suppliers: Supplier[];
+  purchasePrices: PurchasePrice[];
   count: { id: string; startedAt: number; items: CountItem[] } | null;
 };
 const days = (date: string | null) =>
@@ -68,6 +79,9 @@ export function InventoryPanel() {
       quantity: "1",
       expiryDate: "",
       noExpiry: false,
+      supplierName: "",
+      unitPrice: "",
+      isLimitedPrice: false,
       note: "",
     });
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -145,17 +159,26 @@ export function InventoryPanel() {
           : "反映しました",
       );
       await load();
+      return true;
     } catch (error) {
       setMessage(
         error instanceof Error
           ? `処理できませんでした（${error.message}）`
           : "処理できませんでした",
       );
+      return false;
     } finally {
       setBusy("");
     }
   };
   const selected = data?.products.find((p) => p.code === form.productCode);
+  const selectedPriceRanking = useMemo(
+    () =>
+      (data?.purchasePrices ?? [])
+        .filter((price) => price.productCode === form.productCode)
+        .sort((a, b) => a.unitPrice - b.unitPrice || b.purchasedAt - a.purchasedAt),
+    [data, form.productCode],
+  );
   const receiveMatches = useMemo(() => {
     const needle = receiveQuery.trim().toLowerCase();
     if (!needle) return [];
@@ -539,6 +562,24 @@ export function InventoryPanel() {
               </button>
             </div>
           )}
+          {selected && selectedPriceRanking.length > 0 && (
+            <div className="inventory-price-ranking">
+              <small>この商品の仕入れ価格ランキング</small>
+              {selectedPriceRanking.map((price, index) => (
+                <div key={price.supplierId}>
+                  <b>{index + 1}</b>
+                  <span>
+                    <strong>{price.supplierName}</strong>
+                    <small>
+                      最終仕入れ {new Date(price.purchasedAt).toLocaleDateString("ja-JP")}
+                      {price.isLimitedPrice ? "・期間限定価格" : ""}
+                    </small>
+                  </span>
+                  <em>税込 ¥{price.unitPrice.toLocaleString()}/個</em>
+                </div>
+              ))}
+            </div>
+          )}
           {showNewProduct && (
             <div className="inventory-new-product">
               <small>商品マスタに登録がありません</small>
@@ -642,6 +683,57 @@ export function InventoryPanel() {
             />
           </label>
           <label>
+            仕入れ先
+            <input
+              list="inventory-suppliers"
+              value={form.supplierName}
+              placeholder="過去の仕入れ先を検索、または新しく入力"
+              onChange={(event) =>
+                setForm((value) => ({
+                  ...value,
+                  supplierName: event.target.value,
+                }))
+              }
+            />
+            <datalist id="inventory-suppliers">
+              {(data?.suppliers ?? []).map((supplier) => (
+                <option key={supplier.id} value={supplier.name}>
+                  最終利用 {new Date(supplier.lastUsedAt).toLocaleDateString("ja-JP")}
+                </option>
+              ))}
+            </datalist>
+            <small>使用日の新しい順に候補を表示します。初めての仕入れ先はそのまま入力できます。</small>
+          </label>
+          <label>
+            税込仕入単価（1個あたり）
+            <input
+              type="number"
+              min="1"
+              inputMode="numeric"
+              value={form.unitPrice}
+              placeholder="例：198"
+              onChange={(event) =>
+                setForm((value) => ({ ...value, unitPrice: event.target.value }))
+              }
+            />
+          </label>
+          <label className="inventory-limited-price">
+            <input
+              type="checkbox"
+              checked={form.isLimitedPrice}
+              onChange={(event) =>
+                setForm((value) => ({
+                  ...value,
+                  isLimitedPrice: event.target.checked,
+                }))
+              }
+            />
+            <span>
+              <strong>期間限定価格・特売</strong>
+              <small>通常価格ではない場合にチェックしてください</small>
+            </span>
+          </label>
+          <label>
             消費・賞味期限
             <input
               type="date"
@@ -681,17 +773,35 @@ export function InventoryPanel() {
               !selected ||
               !selected.inventoryManaged ||
               Number(form.quantity) < 1 ||
+              !form.supplierName.trim() ||
+              Number(form.unitPrice) < 1 ||
               Boolean(busy)
             }
             onClick={() =>
-              void post({
+              void (async () => {
+                const saved = await post({
                 action: "RECEIVE",
                 productCode: selected?.code,
                 productName: selected?.name,
                 quantity: Number(form.quantity),
                 expiryDate: form.noExpiry ? null : form.expiryDate,
+                supplierName: form.supplierName,
+                unitPrice: Number(form.unitPrice),
+                isLimitedPrice: form.isLimitedPrice,
                 note: form.note,
-              })
+                });
+                if (saved)
+                  setForm((value) => ({
+                    ...value,
+                    productCode: "",
+                    quantity: "1",
+                    expiryDate: "",
+                    noExpiry: false,
+                    unitPrice: "",
+                    isLimitedPrice: false,
+                    note: "",
+                  }));
+              })()
             }
           >
             {busy === "RECEIVE" ? "登録中…" : "入荷を登録"}
