@@ -67,6 +67,7 @@ export function InventoryPanel() {
       productCode: "",
       quantity: "1",
       expiryDate: "",
+      noExpiry: false,
       note: "",
     });
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -645,10 +646,28 @@ export function InventoryPanel() {
             <input
               type="date"
               value={form.expiryDate}
+              disabled={form.noExpiry}
               onChange={(e) =>
                 setForm((v) => ({ ...v, expiryDate: e.target.value }))
               }
             />
+          </label>
+          <label className="inventory-no-expiry">
+            <input
+              type="checkbox"
+              checked={form.noExpiry}
+              onChange={(event) =>
+                setForm((value) => ({
+                  ...value,
+                  noExpiry: event.target.checked,
+                  expiryDate: event.target.checked ? "" : value.expiryDate,
+                }))
+              }
+            />
+            <span>
+              <strong>期限なし</strong>
+              <small>消費・賞味期限を設定しない商品はこちら</small>
+            </span>
           </label>
           <label>
             備考
@@ -670,7 +689,7 @@ export function InventoryPanel() {
                 productCode: selected?.code,
                 productName: selected?.name,
                 quantity: Number(form.quantity),
-                expiryDate: form.expiryDate,
+                expiryDate: form.noExpiry ? null : form.expiryDate,
                 note: form.note,
               })
             }
