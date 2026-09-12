@@ -10,6 +10,13 @@ test("electronic receipt migration is additive and complete",()=>{
   assert.doesNotMatch(sql,/DROP TABLE|DELETE FROM|ALTER TABLE/);
 });
 
+test("device and artifact tables have an additive compatibility migration",()=>{
+  const sql=read("drizzle/0038_purchase_device_artifacts.sql");
+  assert.equal(sql.includes("CREATE TABLE `purchase_devices`"),true);
+  assert.equal(sql.includes("CREATE TABLE `purchase_artifacts`"),true);
+  assert.doesNotMatch(sql,/DROP TABLE|DELETE FROM|ALTER TABLE/);
+});
+
 test("purchase ingestion enforces safety rules",()=>{
   const route=read("app/api/v1/purchases/route.ts");
   assert.match(route,/IDEMPOTENCY_CONFLICT/);

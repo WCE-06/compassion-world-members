@@ -159,7 +159,7 @@ POST /api/v1/purchases/{receiptId}/adjustments
 
 ## 保存先
 
-- D1：購入、明細、取消・返品、端末、電子レシート原本メタデータ、監査記録
+- D1：購入、明細、取消・返品、端末（`purchase_devices`）、電子レシート原本メタデータ（`purchase_artifacts`）、監査記録
 - R2：既存バケット内の専用非公開プレフィックス`electronic-receipts/`
 
 R2のデータは公開配信APIから参照させない。購入時点の原本JSONを保存し、商品マスタ変更後も同じ内容を再表示できる。

@@ -267,6 +267,13 @@
       "when": 1789253798108,
       "tag": "0037_electronic_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1789254300000,
+      "tag": "0038_purchase_device_artifacts",
+      "breakpoints": true
     }
   ]
 }

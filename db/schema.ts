@@ -518,7 +518,7 @@ export const categorySchedules = sqliteTable("category_schedules", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
 
-export const receiptDevices = sqliteTable("receipt_devices", {
+export const receiptDevices = sqliteTable("purchase_devices", {
   id: text("id").primaryKey(),
   deviceId: text("device_id").notNull(),
   displayName: text("display_name").notNull(),
@@ -529,7 +529,7 @@ export const receiptDevices = sqliteTable("receipt_devices", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
   revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
-}, (table) => [uniqueIndex("receipt_devices_device_unique").on(table.deviceId), uniqueIndex("receipt_devices_token_unique").on(table.tokenHash)]);
+}, (table) => [uniqueIndex("purchase_devices_device_unique").on(table.deviceId), uniqueIndex("purchase_devices_token_unique").on(table.tokenHash)]);
 
 export const purchases = sqliteTable("purchases", {
   id: text("id").primaryKey(),
@@ -593,7 +593,7 @@ export const purchaseAdjustments = sqliteTable("purchase_adjustments", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 }, (table) => [uniqueIndex("purchase_adjustments_request_unique").on(table.requestId), uniqueIndex("purchase_adjustments_source_transaction_unique").on(table.sourceTransactionId), index("purchase_adjustments_purchase_idx").on(table.purchaseId, table.occurredAt)]);
 
-export const receiptArtifacts = sqliteTable("receipt_artifacts", {
+export const receiptArtifacts = sqliteTable("purchase_artifacts", {
   id: text("id").primaryKey(),
   purchaseId: text("purchase_id").notNull().references(() => purchases.id),
   version: integer("version").notNull(),
@@ -603,7 +603,7 @@ export const receiptArtifacts = sqliteTable("receipt_artifacts", {
   status: text("status", { enum: ["STORED", "REGENERATED", "FAILED"] }).notNull(),
   createdBy: text("created_by").notNull(),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-}, (table) => [uniqueIndex("receipt_artifacts_purchase_version_unique").on(table.purchaseId, table.version), uniqueIndex("receipt_artifacts_object_unique").on(table.objectKey)]);
+}, (table) => [uniqueIndex("purchase_artifacts_purchase_version_unique").on(table.purchaseId, table.version), uniqueIndex("purchase_artifacts_object_unique").on(table.objectKey)]);
 
 export const purchaseAuditLogs = sqliteTable("purchase_audit_logs", {
   id: text("id").primaryKey(),
