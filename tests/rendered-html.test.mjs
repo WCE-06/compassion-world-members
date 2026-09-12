@@ -1461,6 +1461,8 @@ test("精算管理へスマレジ店舗売上明細を表示し入荷登録を�
  assert.match(settlement,/スマレジ店舗売上/);assert.match(settlement,/レシート番号なし/);
  assert.match(inventory,/バーコード・商品名/);assert.match(inventory,/商品マスタへ登録して入荷を続ける/);
  assert.match(inventory,/createProductForReceipt/);assert.match(inventory,/action: "RECEIVE"/);
+ assert.match(inventory,/期限なし/);assert.match(inventory,/disabled=\{form\.noExpiry\}/);
+ assert.match(inventory,/form\.noExpiry \? null : form\.expiryDate/);
 });
 
 test("スタッフ管理はスマホ用分類メニューとカメラバーコード読取を備える",async()=>{
