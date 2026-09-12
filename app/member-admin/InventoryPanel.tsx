@@ -364,7 +364,7 @@ export function InventoryPanel() {
       )}
       <nav className="inventory-primary-actions" aria-label="入荷・商品管理">
         <a href="#quick-stock-receipt">かんたん入荷登録へ</a>
-        <a href="/menu-admin">商品マスタを開く</a>
+        <a href="/product-master">商品マスタを開く</a>
       </nav>
       <div className="inventory-summary">
         <Kpi label="商品マスタ" value={`${data?.products.length ?? 0}件`} />
