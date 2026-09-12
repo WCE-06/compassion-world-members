@@ -2,7 +2,7 @@
 
 import QRCode from "qrcode";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, CalendarDays, Coffee, History, House, IdCard, MessageSquarePlus, TicketPercent, UtensilsCrossed } from "lucide-react";
+import { Bell, CalendarDays, CheckCircle2, Coffee, History, House, IdCard, MessageSquarePlus, RefreshCw, TicketPercent, UtensilsCrossed } from "lucide-react";
 import { validateRegistration } from "@/lib/member-registration";
 
 type View = "loading" | "member" | "unlinked" | "new" | "confirm" | "error";
@@ -24,6 +24,7 @@ type MemberNotice = {
 type Member = {
   memberId: string;
   memberCode: string;
+  qrValue: string;
   displayName: string;
   points: number;
   rank: string;
@@ -78,6 +79,7 @@ declare global {
 const DEMO_MEMBER: Member = {
   memberId: "mem_01JCOMPASSION",
   memberCode: "A7K4P9X2M6",
+  qrValue: "A7K4P9X2M6",
   displayName: "山田 花子",
   points: 480,
   rank: "STANDARD",
@@ -169,6 +171,8 @@ function orderCallSummary(order:{units?:OrderUnit[];foodCallNumber?:number|null;
 }
 function orderHeadline(order:NonNullable<Member["orders"]>[number]){const units=order.units??[],finished=units.filter(unit=>["READY","CALLED","PICKED_UP"].includes(unit.status)).length;if(units.length&&finished===units.length)return"すべての商品ができあがりました";if(finished>0)return"一部の商品ができあがりました";return order.status==="WAITING_PAYMENT"?"お支払い待ち":order.status==="COOKING"?"ただいま調理中":"注文受付済み"}
 function scheduleText(schedule:NonNullable<Member["activeOrder"]>["schedule"],fallback?:string|null){const readyAt=schedule?.food?.readyAt??schedule?.drink?.readyAt;if(!readyAt)return fallback??"提供予定時間を確認しています。しばらくお待ちください。";return `提供予定 ${new Intl.DateTimeFormat("ja-JP",{hour:"2-digit",minute:"2-digit"}).format(new Date(readyAt))}ごろ`}
+function rankProgress(member:Member){const thresholds:Record<string,number>={STANDARD:30_000,BRONZE:60_000,SILVER:120_000,GOLD:180_000,PLATINUM:300_000};const target=thresholds[member.rank];if(!target||member.qualifyingSpendSource!=="SMAREGI")return null;return Math.max(0,Math.min(100,Math.round(((member.qualifyingSpend??0)/target)*100)))}
+function NextAction({member,onOrder,onReservation}:{member:Member;onOrder:()=>void;onReservation:()=>void}){const orders=member.orders??(member.activeOrder?[member.activeOrder]:[]),waiting=orders.find(order=>order.status==="WAITING_PAYMENT"),ready=orders.find(order=>order.status==="READY"||order.units?.some(unit=>["READY","CALLED"].includes(unit.status))),cooking=orders.find(order=>["ACCEPTED","COOKING"].includes(order.status));if(waiting)return <button className="next-action-card urgent" onClick={onOrder}><small>NEXT ACTION</small><strong>15分以内にセルフレジでお支払いください</strong><span>お支払い完了後に注文が確定します　›</span></button>;if(ready)return <button className="next-action-card ready" onClick={onOrder}><small>READY FOR PICKUP</small><strong>できあがった商品があります</strong><span>{orderCallSummary(ready)}　›</span></button>;if(member.session&&member.session.paymentStatus==="UNPAID")return <button className="next-action-card urgent" onClick={onReservation}><small>NEXT ACTION</small><strong>スタジオ利用料金のお支払いが必要です</strong><span>利用状況と料金を確認する　›</span></button>;if(cooking)return <button className="next-action-card" onClick={onOrder}><small>ORDER STATUS</small><strong>{orderHeadline(cooking)}</strong><span>{scheduleText(cooking.schedule,cooking.scheduleLabel)}　›</span></button>;if(member.nextReservation)return <button className="next-action-card" onClick={onReservation}><small>UPCOMING RESERVATION</small><strong>{dateLabel(member.nextReservation.startsAt)}からご予約があります</strong><span>当日は受付端末へ会員証をご提示ください　›</span></button>;return null}
 
 function Empty({text}:{text:string}){return <div className="member-empty"><span>STATUS</span><p>{text}</p></div>}
 function NoticeMail({item,onClose}:{item:MemberNotice;onClose:()=>void}){return <div className="notice-mail-backdrop" onClick={onClose}><article className="notice-mail" role="dialog" aria-modal="true" aria-labelledby="notice-mail-title" onClick={event=>event.stopPropagation()}><header><button onClick={onClose} aria-label="お知らせ一覧へ戻る">‹</button><div><small>INFORMATION</small><strong>お知らせ</strong></div><span>COMPASSION WORLD</span></header><section><p className="notice-mail-category">{item.category==="PAYMENT"?"決済":item.category==="POINT"?"ポイント":item.category==="ORDER"?"注文":item.category==="RESERVATION"?"予約":"お知らせ"}</p><h2 id="notice-mail-title">{item.title}</h2><dl><div><dt>差出人</dt><dd>{item.sender??"COMPASSION WORLD"}</dd></div><div><dt>受信日時</dt><dd>{item.createdAt}</dd></div></dl><div className="notice-mail-body">{item.body.split("\n").map((line,index)=><p key={index}>{line||<br/>}</p>)}</div>{item.ctaUrl&&<a className="notice-mail-cta" href={item.ctaUrl}>{item.ctaLabel??"詳しく見る"}</a>}<p className="notice-mail-signature">COMPASSION WORLD<br/><small>このメッセージは会員証内のお知らせです。</small></p></section><footer><button onClick={onClose}>受信箱へ戻る</button></footer></article></div>}
@@ -199,6 +203,8 @@ export default function Home() {
   const [selectedNotice,setSelectedNotice]=useState<MemberNotice|null>(null);
   const [pushNotice,setPushNotice]=useState<MemberNotice|null>(null);
   const [detailsLoading,setDetailsLoading]=useState(false);
+  const [detailsError,setDetailsError]=useState(false);
+  const [detailsUpdatedAt,setDetailsUpdatedAt]=useState<number|null>(null);
   const [pointSyncState,setPointSyncState]=useState<"WAITING"|"SYNCING"|"SYNCED"|"RETRY">("WAITING");
   const [pointSyncedAt,setPointSyncedAt]=useState<number|null>(null);
   const seenNoticeIds=useRef(new Set<string>());
@@ -211,10 +217,13 @@ export default function Home() {
   const [registration,setRegistration]=useState({displayName:"",phone:"",birthDate:"",postalCode:"",address:"",email:"",acceptedTerms:false});
   const [openingReservation,setOpeningReservation]=useState(false);
   const [qrExpanded,setQrExpanded]=useState(false);
+  const [screenAwake,setScreenAwake]=useState(false);
   const [agreeingRankTerms,setAgreeingRankTerms]=useState(false);
+  const [refreshingAll,setRefreshingAll]=useState(false);
   useEffect(()=>{if(!qrExpanded)return;const onKey=(event:KeyboardEvent)=>{if(event.key==="Escape")setQrExpanded(false)};const previous=document.body.style.overflow;document.body.style.overflow="hidden";window.addEventListener("keydown",onKey);return()=>{document.body.style.overflow=previous;window.removeEventListener("keydown",onKey)}},[qrExpanded]);
+  useEffect(()=>{if(view!=="member")return;let active=true;let sentinel:{released?:boolean;release:()=>Promise<void>}|null=null;const requestWakeLock=async()=>{if(!active||document.visibilityState!=="visible"||sentinel&&!sentinel.released)return;try{const wakeLock=(navigator as Navigator&{wakeLock?:{request:(type:"screen")=>Promise<{released?:boolean;release:()=>Promise<void>}>}}).wakeLock;if(!wakeLock)return setScreenAwake(false);sentinel=await wakeLock.request("screen");if(active)setScreenAwake(true)}catch{if(active)setScreenAwake(false)}};void requestWakeLock();const onVisible=()=>{if(document.visibilityState==="visible")void requestWakeLock();else setScreenAwake(false)};document.addEventListener("visibilitychange",onVisible);return()=>{active=false;document.removeEventListener("visibilitychange",onVisible);setScreenAwake(false);void sentinel?.release().catch(()=>undefined)}},[view]);
   const openNotice=(item:MemberNotice)=>{setSelectedNotice({...item,unread:false});if(!item.unread||item.id.startsWith("welcome:"))return;setMember(current=>current?{...current,notices:current.notices.map(notice=>notice.id===item.id?{...notice,unread:false}:notice)}:current);if(!demo)void fetch(`/api/v1/me/notifications/${encodeURIComponent(item.id)}`,{method:"PATCH",headers:{Authorization:`Bearer ${lineToken}`}}).catch(()=>undefined)};
-  const installMembership=useCallback((next:Member)=>{setMember(current=>({...next,points:current?.points??next.points}));next.notices.forEach(item=>seenNoticeIds.current.add(item.id))},[]);
+  const installMembership=useCallback((next:Member)=>{setMember(current=>{if(next.memberCode!==next.qrValue||current.memberId!==next.memberId||current.memberCode!==next.memberCode){setNotice("会員情報を安全に確認できませんでした。会員証を開き直してください");setView("error");return current}return{...next,points:current.points??next.points}});next.notices.forEach(item=>seenNoticeIds.current.add(item.id))},[]);
 
   useEffect(() => {
     async function start() {
@@ -256,7 +265,7 @@ export default function Home() {
         setMember(await cardResponse.json());
         setView("member");
         setDetailsLoading(true);
-        void fetch("/api/v1/me/membership",{headers,cache:"no-store"}).then(async response=>{if(response.ok)installMembership(await response.json())}).catch(()=>undefined).finally(()=>setDetailsLoading(false));
+        void fetch("/api/v1/me/membership",{headers,cache:"no-store"}).then(async response=>{if(!response.ok)throw new Error();installMembership(await response.json());setDetailsUpdatedAt(Date.now());setDetailsError(false)}).catch(()=>setDetailsError(true)).finally(()=>setDetailsLoading(false));
       } catch (error) {
         setNotice(error instanceof Error ? error.message : "読み込みに失敗しました");
         setView("error");
@@ -267,6 +276,8 @@ export default function Home() {
 
   useEffect(()=>{if(view!=="member"||demo||!lineToken)return;let active=true;const refresh=async()=>{try{const response=await fetch("/api/v1/me/notifications",{headers:{Authorization:`Bearer ${lineToken}`},cache:"no-store"});if(!response.ok)return;const result=await response.json() as {notices:MemberNotice[]};if(!active)return;result.notices.forEach(item=>seenNoticeIds.current.add(item.id));setMember(current=>({...current,notices:[...result.notices,...current.notices.filter(item=>item.id.startsWith("welcome:"))]}));if(!pushNotice){const popupResponse=await fetch("/api/v1/me/notifications/popup",{method:"POST",headers:{Authorization:`Bearer ${lineToken}`},cache:"no-store"});if(popupResponse.ok){const popup=await popupResponse.json() as {notice:MemberNotice|null};if(active&&popup.notice)setPushNotice(popup.notice)}}}catch{/* 次回の自動取得で再試行する */}};void refresh();const timer=window.setInterval(refresh,10_000);const onVisible=()=>{if(document.visibilityState==="visible")void refresh()};document.addEventListener("visibilitychange",onVisible);return()=>{active=false;window.clearInterval(timer);document.removeEventListener("visibilitychange",onVisible)}},[view,demo,lineToken,pushNotice]);
 
+  useEffect(()=>{if(view!=="member"||demo||!lineToken)return;let active=true,running=false;const refreshOrders=async()=>{if(running)return;running=true;try{const response=await fetch("/api/v1/me/orders",{headers:{Authorization:`Bearer ${lineToken}`},cache:"no-store"});if(!response.ok)return;const result=await response.json() as {orders:NonNullable<Member["orders"]>};if(active)setMember(current=>({...current,orders:result.orders,activeOrder:result.orders[0]??null}))}catch{/* 表示中の内容を維持して次回再試行する */}finally{running=false}};void refreshOrders();const timer=window.setInterval(refreshOrders,5_000);const onVisible=()=>{if(document.visibilityState==="visible")void refreshOrders()};document.addEventListener("visibilitychange",onVisible);return()=>{active=false;window.clearInterval(timer);document.removeEventListener("visibilitychange",onVisible)}},[view,demo,lineToken]);
+
   useEffect(()=>{if(view!=="member"||demo||!lineToken)return;let active=true,running=false;const sync=async()=>{if(running)return;running=true;if(active)setPointSyncState("SYNCING");try{const month=new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit"}).format(new Date()),response=await fetch(`/api/v1/me/points?month=${month}`,{headers:{Authorization:`Bearer ${lineToken}`},cache:"no-store"});if(!response.ok)throw new Error("POINT_SYNC_FAILED");const result=await response.json() as {balance:number;syncedAt?:string};if(active&&Number.isFinite(result.balance)){setMember(current=>({...current,points:Math.max(0,Math.trunc(result.balance))}));setPointSyncedAt(result.syncedAt?Date.parse(result.syncedAt):Date.now());setPointSyncState("SYNCED")}}catch{if(active)setPointSyncState("RETRY")}finally{running=false}};const firstFrame=window.requestAnimationFrame(()=>window.setTimeout(sync,0));const timer=window.setInterval(sync,30_000);const onVisible=()=>{if(document.visibilityState==="visible")void sync()};document.addEventListener("visibilitychange",onVisible);return()=>{active=false;window.cancelAnimationFrame(firstFrame);window.clearInterval(timer);document.removeEventListener("visibilitychange",onVisible)}},[view,demo,lineToken]);
 
   const unreadCount = view === "member" ? member.notices.filter((item) => item.unread).length : 0;
@@ -274,6 +285,8 @@ export default function Home() {
   const activeReservations=member.reservations??(member.nextReservation?[{...member.nextReservation,reservationId:"next",status:"CONFIRMED"}]:[]);
   const activeOrders=member.orders??(member.activeOrder?[member.activeOrder]:[]);
   const openFutureFeature = (label: string) => setServicePanel(label as ServicePanel);
+  const retryDetails=async()=>{if(!lineToken||detailsLoading)return;setDetailsLoading(true);setDetailsError(false);try{const response=await fetch("/api/v1/me/membership",{headers:{Authorization:`Bearer ${lineToken}`},cache:"no-store"});if(!response.ok)throw new Error();installMembership(await response.json());setDetailsUpdatedAt(Date.now())}catch{setDetailsError(true)}finally{setDetailsLoading(false)}};
+  const refreshAll=async()=>{if(refreshingAll||demo||!lineToken)return;setRefreshingAll(true);setPointSyncState("SYNCING");try{const month=new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit"}).format(new Date());const [cardResult,detailResult,pointResult]=await Promise.allSettled([fetch("/api/v1/me/card",{headers:{Authorization:`Bearer ${lineToken}`},cache:"no-store",signal:AbortSignal.timeout(8_000)}).then(async response=>{if(!response.ok)throw new Error();return response.json() as Promise<Member>}),fetch("/api/v1/me/membership",{headers:{Authorization:`Bearer ${lineToken}`},cache:"no-store",signal:AbortSignal.timeout(15_000)}).then(async response=>{if(!response.ok)throw new Error();return response.json() as Promise<Member>}),fetch(`/api/v1/me/points?month=${month}`,{headers:{Authorization:`Bearer ${lineToken}`},cache:"no-store",signal:AbortSignal.timeout(15_000)}).then(async response=>{if(!response.ok)throw new Error();return response.json() as Promise<{balance:number;syncedAt?:string}>})]);if(cardResult.status==="fulfilled"&&(cardResult.value.memberCode!==cardResult.value.qrValue||cardResult.value.memberId!==member.memberId))throw new Error("MEMBER_IDENTITY_MISMATCH");if(detailResult.status==="fulfilled"){installMembership(detailResult.value);setDetailsError(false);setDetailsUpdatedAt(Date.now())}else setDetailsError(true);if(pointResult.status==="fulfilled"&&Number.isFinite(pointResult.value.balance)){setMember(current=>({...current,points:Math.max(0,Math.trunc(pointResult.value.balance))}));setPointSyncedAt(pointResult.value.syncedAt?Date.parse(pointResult.value.syncedAt):Date.now());setPointSyncState("SYNCED")}else setPointSyncState("RETRY")}catch{setDetailsError(true);setPointSyncState("RETRY")}finally{setRefreshingAll(false)}};
   const linkMembership=async()=>{if(linking)return;setLinking(true);setNotice("");try{if(demo){const linked={...DEMO_MEMBER,memberCode};setMember(linked);setView("member");setSelectedNotice({id:"welcome-demo",category:"NEWS",title:"新しいポイントカードのご利用ありがとうございます",body:"これまでの会員情報を新しいポイントカードへ引き継ぎました。\n今後はこの画面から、ポイント・予約・注文・会員特典をご利用いただけます。",createdAt:"ただいま",unread:true});return}const response=await fetch("/api/v1/membership-links",{method:"POST",headers:{Authorization:`Bearer ${lineToken}`,"Content-Type":"application/json"},body:JSON.stringify({memberCode,...linkVerification})});const result=await response.json();if(!response.ok)throw new Error(result.message??"入力内容を確認してください");const membership=await fetch("/api/v1/me/membership",{headers:{Authorization:`Bearer ${lineToken}`}});if(!membership.ok)throw new Error("会員証を取得できませんでした");const linkedMember=await membership.json();setMember(linkedMember);setView("member");setSelectedNotice(linkedMember.notices?.find((item:MemberNotice)=>item.id.startsWith("welcome:"))??null)}catch(error){setNotice(error instanceof Error?error.message:"引き継ぎできませんでした")}finally{setLinking(false)}};
   const confirmRegistration=()=>{const result=validateRegistration(registration);setRegistrationErrors(result.errors);if(result.ok){setRegistration(result.data);setView("confirm")}else setNotice("入力内容を確認してください")};
   const lookupPostalCode=async()=>{if(postalLoading)return;setPostalLoading(true);setNotice("");try{const response=await fetch(`/api/v1/postal-code?postalCode=${encodeURIComponent(registration.postalCode)}`),result=await response.json();if(!response.ok)throw new Error(result.message??"住所を取得できませんでした");setRegistration(current=>({...current,postalCode:current.postalCode.replace(/\D/g,""),address:result.address}));setNotice("住所を入力しました")}catch(error){setNotice(error instanceof Error?error.message:"住所を取得できませんでした")}finally{setPostalLoading(false)}};
@@ -298,16 +311,20 @@ export default function Home() {
         <>
           <section className={`wallet-card rank-card rank-card-${member.rank.toLowerCase()}`}>
             <div className="wallet-card-head"><div><span>会員証 {member.membershipLabel&&<b className="resident-badge">{member.membershipLabel}</b>}</span><strong>{member.displayName} 様</strong></div><div className="rank-emblem"><small>{member.rankLabel??member.rank}</small><b>{member.pointRatePercent??1}%</b><span>POINT</span></div><button onClick={() => setQrExpanded(true)} aria-haspopup="dialog">拡大</button></div>
-            <MemberQr value={member.memberCode} />
+            <MemberQr value={member.qrValue} />
             <div className="wallet-balances">
               <button onClick={() => {window.location.href="/points"}}><small>保有ポイント</small><strong>{member.points.toLocaleString("ja-JP")}<span> P</span></strong><em>{pointSyncState==="SYNCING"?"最新情報を確認中…":pointSyncState==="RETRY"?"次回の同期で再確認":pointSyncedAt?`更新 ${new Date(pointSyncedAt).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"})}`:"履歴を見る ›"}</em></button>
               <button onClick={() => openFutureFeature("会員特典")}><small>会員ランク</small><strong className={`rank-value rank-${member.rank.toLowerCase()}`}>{member.rankLabel??member.rank}</strong><em>特典を見る ›</em></button>
             </div>
-            {member.smaregiSyncStatus&&member.smaregiSyncStatus!=="SYNCED"&&<p className={`sync-status sync-${member.smaregiSyncStatus.toLowerCase()}`}>{member.smaregiSyncStatus==="FAILED"?"会員情報の連携を再確認しています":"スマレジ会員情報を連携しています"}</p>}
+            {rankProgress(member)!==null&&member.nextRankLabel&&<div className="rank-progress-inline" aria-label={`次の${member.nextRankLabel}までの進捗 ${rankProgress(member)}パーセント`}><div><span>次の{member.nextRankLabel}まで</span><strong>あと ¥{(member.amountToNextRank??0).toLocaleString("ja-JP")}</strong></div><progress max="100" value={rankProgress(member)??0}/></div>}
+            {member.smaregiSyncStatus&&member.smaregiSyncStatus!=="SYNCED"&&<p className={`sync-status sync-${member.smaregiSyncStatus.toLowerCase()}`}>{member.smaregiSyncStatus==="FAILED"?"会員情報の更新を再確認しています":"会員情報を最新の状態へ更新しています"}</p>}
             {member.qualifyingSpendSource!=="SMAREGI"&&<p className="sync-status">過去1年のご利用実績を確認しています</p>}
+            <div className={`card-freshness ${detailsError||pointSyncState==="RETRY"?"needs-attention":""}`} role="status" aria-live="polite"><span>{refreshingAll||detailsLoading||pointSyncState==="SYNCING"?<><i className="admin-button-spinner"/>最新情報を確認しています</>:detailsError||pointSyncState==="RETRY"?"一部の最新情報を確認できませんでした":<><CheckCircle2 size={14}/>最新情報を表示しています</>}</span>{(detailsError||pointSyncState==="RETRY")&&!demo&&<button disabled={refreshingAll} onClick={()=>void refreshAll()}><RefreshCw size={13}/>{refreshingAll?"再確認中":"再確認"}</button>}</div>
           </section>
 
-          {qrExpanded&&<div className="qr-zoom-backdrop" onClick={()=>setQrExpanded(false)}><section className="qr-zoom" role="dialog" aria-modal="true" aria-label="会員証の2次元コードを拡大表示" onClick={event=>event.stopPropagation()}><header><div><small>COMPASSION WORLD</small><strong>会員証</strong></div><button onClick={()=>setQrExpanded(false)} aria-label="拡大表示を閉じる">×</button></header><MemberQr value={member.memberCode} large/><p>受付端末へこの2次元コードをご提示ください</p><button className="qr-zoom-close" onClick={()=>setQrExpanded(false)}>閉じる</button></section></div>}
+          <NextAction member={member} onOrder={()=>openFutureFeature("注文状況")} onReservation={launchReservation}/>
+
+          {qrExpanded&&<div className="qr-zoom-backdrop" onClick={()=>setQrExpanded(false)}><section className="qr-zoom" role="dialog" aria-modal="true" aria-label="会員証の2次元コードを拡大表示" onClick={event=>event.stopPropagation()}><header><div><small>COMPASSION WORLD</small><strong>会員証</strong></div><button onClick={()=>setQrExpanded(false)} aria-label="拡大表示を閉じる">×</button></header><MemberQr value={member.qrValue} large/><p>受付端末へこの2次元コードをご提示ください</p><small className={`screen-awake-status${screenAwake?" active":""}`}>{screenAwake?"表示中は画面が暗くならないようにしています":"読み取りにくい場合は画面を明るくしてください"}</small><button className="qr-zoom-close" onClick={()=>setQrExpanded(false)}>閉じる</button></section></div>}
 
           {member.membershipType!=="RESIDENT"&&<button className="resident-upgrade-banner" onClick={()=>{window.location.href="/resident"}}><span>RESIDENT MEMBERSHIP</span><strong>住民登録へアップグレード</strong><small>住民限定特典とゴールドランク保証を確認する　›</small></button>}
 
@@ -331,7 +348,8 @@ export default function Home() {
                 <article className="activity-row active-session"><span className="status-dot" /><div><small>現在利用中</small><strong>{member.session.facilityName}</strong><p>{member.session.startedAt && `開始 ${dateLabel(member.session.startedAt)}`} {member.session.scheduledEndsAt && `／終了予定 ${dateLabel(member.session.scheduledEndsAt)}`}</p></div><b>{paymentLabel(member.session.paymentStatus)}</b></article>
               )}
               {detailsLoading&&<p className="sync-status"><i className="admin-button-spinner"/> 予約・注文・お知らせを読み込んでいます</p>}
-              {!detailsLoading&&member.reservationsAvailable===false&&<p className="sync-status">一時的なエラーで予約情報を確認できませんでした。時間をおいて、もう一度会員証を開いてください。</p>}
+              {!detailsLoading&&(detailsError||member.reservationsAvailable===false)&&<div className="member-data-warning" role="status"><strong>予約・注文の最新情報を確認できませんでした</strong><p>表示中の内容は前回確認した情報です。予約なし・注文なしとしては扱っていません。</p><button onClick={()=>void retryDetails()}>もう一度確認する</button></div>}
+              {detailsUpdatedAt&&!detailsLoading&&!detailsError&&<p className="member-last-updated">最終確認 {new Date(detailsUpdatedAt).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"})}</p>}
               {activeReservations.map((reservation,index)=><article className="activity-row" key={reservation.reservationId}><span className="date-chip">{index===0?"NEXT":"BOOK"}</span><div><small>{index===0?"次回予約":"予約確定"}</small><strong>{reservation.facilityName}</strong><p>{dateLabel(reservation.startsAt)}〜</p></div><button onClick={() => openFutureFeature("予約の変更・キャンセル")}>詳細</button></article>)}
               {activeOrders.map(order=><article className="activity-row" key={order.orderNumber}><span className="date-chip">ORDER</span><div><small>{orderCallSummary(order)||"注文受付済み"}</small><strong>{orderHeadline(order)}</strong><p>{scheduleText(order.schedule,order.scheduleLabel)}</p></div><button onClick={() => openFutureFeature("注文状況")}>詳細</button></article>)}
               {!detailsLoading&&member.reservationsAvailable!==false&&!member.session&&activeReservations.length===0&&activeOrders.length===0&&<Empty text="現在のご利用予定・受付中の注文はありません"/>}
@@ -349,6 +367,7 @@ export default function Home() {
                 <div><strong>{item.title}</strong><small>{item.createdAt}</small></div>{item.unread && <i aria-label="未読" />}<b>›</b>
               </button>
             ))}
+            {!visibleNotices.length&&<Empty text="新しいお知らせはありません"/>}
             <button className="all-notices inbox-link" onClick={() => { window.location.href="/inbox"; }}>受信ボックスを確認する　›</button>
           </section>
 

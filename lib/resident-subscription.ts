@@ -43,3 +43,16 @@ export async function syncResidentSubscription(subscription:StripeSubscription,e
   ]);return true;
 }
 export async function subscriptionsForCustomer(customerId:string){const params=new URLSearchParams({customer:customerId,status:"all",limit:"100"});params.append("expand[]","data.items.data.price");return (await stripeRequest<StripeList<StripeSubscription>>(`/subscriptions?${params.toString()}`)).data;}
+
+export async function reconcileResidentSubscriptionForMember(memberId:string,maxAgeMs=6*60*60*1000){
+  const row=await env.DB.prepare("SELECT stripe_subscription_id AS subscriptionId,updated_at AS updatedAt FROM resident_subscriptions WHERE member_id=? LIMIT 1").bind(memberId).first<{subscriptionId:string;updatedAt:number}>();
+  if(!row||Date.now()-row.updatedAt<maxAgeMs)return{checked:false,updated:false};
+  const subscription=await stripeRequest<StripeSubscription>(`/subscriptions/${encodeURIComponent(row.subscriptionId)}?expand[]=items.data.price`);
+  const updated=await syncResidentSubscription(subscription,`reconcile:${subscription.id}:${subscription.status}:${subscription.current_period_end??0}`);
+  return{checked:true,updated,status:subscription.status};
+}
+
+export async function reconcileAllResidentSubscriptions(limit=100,maxAgeMs=0){
+  const cutoff=Date.now()-Math.max(0,maxAgeMs),rows=await env.DB.prepare("SELECT member_id AS memberId FROM resident_subscriptions WHERE updated_at<=? ORDER BY updated_at ASC LIMIT ?").bind(cutoff,Math.max(1,Math.min(limit,100))).all<{memberId:string}>();
+  return Promise.all(rows.results.map(async row=>{try{const result=await reconcileResidentSubscriptionForMember(row.memberId,maxAgeMs);return{memberId:row.memberId,status:result.status??"UNCHANGED",updated:result.updated}}catch(error){return{memberId:row.memberId,status:error instanceof Error?error.message:"RECONCILE_FAILED",updated:false}}}));
+}

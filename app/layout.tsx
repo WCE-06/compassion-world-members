@@ -12,7 +12,10 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: base,
     title: "COMPASSION WORLD Members",
     description: "ポイント、会員証、予約、注文をひとつにまとめたCOMPASSION WORLDのポイントカード。",
-    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+    applicationName: "COMPASSION WORLD Members",
+    manifest: "/site.webmanifest",
+    themeColor: "#143d33",
+    icons: { icon: [{url:"/favicon.svg",type:"image/svg+xml"}], shortcut: "/favicon.svg", apple: "/favicon.svg" },
     openGraph: { title: "COMPASSION WORLD Members", description: "ポイント、予約、注文をひとつに。", images: [{ url: new URL("/og.png", base).toString(), width: 1200, height: 630 }] },
     twitter: { card: "summary_large_image", title: "COMPASSION WORLD Members", description: "ポイント、予約、注文をひとつに。", images: [new URL("/og.png", base).toString()] },
   };

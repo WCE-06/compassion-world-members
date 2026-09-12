@@ -60,6 +60,11 @@ export async function POST(request: NextRequest) {
   if (!member) return NextResponse.json({ ok: false, error: "MEMBER_NOT_FOUND" }, { status: 404 });
   if (member.status !== "ACTIVE") return NextResponse.json({ ok: false, error: "MEMBER_INACTIVE" }, { status: 403 });
   if (body.memberId && body.memberId !== member.id) return NextResponse.json({ ok: false, error: "MEMBER_MISMATCH" }, { status: 409 });
+  const confirmed = (result.pointGranted && Number(result.grantedPoint) > 0) || Boolean(result.alreadyGranted);
+  // 顧客にはポイント処理の確定結果だけを通知する。確認中の仮通知は保存しない。
+  if (!confirmed) {
+    return NextResponse.json({ ok: true, pending: true, notificationId: null }, { status: 202 });
+  }
   const now = Date.now();
   const id = crypto.randomUUID();
   const storeCode = body.storeCode ?? "MAIN_BUILDING";
@@ -81,11 +86,10 @@ export async function POST(request: NextRequest) {
     WHERE member_id=? AND event_type='ENTRY_THANK_YOU' AND occurred_at>=? AND occurred_at<?
       AND COALESCE(json_extract(metadata_json,'$.storeCode'),'MAIN_BUILDING')=?
     ORDER BY created_at DESC LIMIT 1`).bind(member.id, dayStartedAt, dayEndedAt, storeCode).first<{ id: string }>();
-  const confirmed = (result.pointGranted && Number(result.grantedPoint)>0) || result.alreadyGranted;
   if (existingForDay) {
-    if (confirmed) await env.DB.prepare("UPDATE member_notifications SET body=?,metadata_json=?,read_at=NULL,updated_at=? WHERE id=?")
+    await env.DB.prepare("UPDATE member_notifications SET body=?,metadata_json=?,updated_at=? WHERE id=?")
       .bind(messageFor(result, member.displayName), JSON.stringify(metadata), now, existingForDay.id).run();
-    return NextResponse.json({ ok: true, duplicate: true, updated: Boolean(confirmed), notificationId: existingForDay.id });
+    return NextResponse.json({ ok: true, duplicate: true, updated: true, notificationId: existingForDay.id });
   }
   const inserted = await env.DB.prepare(`INSERT OR IGNORE INTO member_notifications
     (id,event_id,member_id,event_type,category,title,body,sender,channel,delivery_status,metadata_json,occurred_at,created_at,updated_at)
@@ -93,9 +97,9 @@ export async function POST(request: NextRequest) {
     .bind(id, canonicalEventId, member.id, "COMPASSION WORLDへご来店ありがとうございます", messageFor(result, member.displayName), JSON.stringify(metadata), occurredAt, now, now).run();
   if (!inserted.meta.changes) {
     const existing = await env.DB.prepare("SELECT id FROM member_notifications WHERE event_id=? LIMIT 1").bind(canonicalEventId).first<{ id: string }>();
-    if (existing && confirmed) await env.DB.prepare("UPDATE member_notifications SET body=?,metadata_json=?,read_at=NULL,updated_at=? WHERE id=?")
+    if (existing) await env.DB.prepare("UPDATE member_notifications SET body=?,metadata_json=?,updated_at=? WHERE id=?")
       .bind(messageFor(result, member.displayName), JSON.stringify(metadata), now, existing.id).run();
-    return NextResponse.json({ ok: true, duplicate: true, updated: Boolean(existing&&confirmed), notificationId: existing?.id ?? null });
+    return NextResponse.json({ ok: true, duplicate: true, updated: Boolean(existing), notificationId: existing?.id ?? null });
   }
   return NextResponse.json({ ok: true, duplicate: false, notificationId: id }, { status: 201 });
 }

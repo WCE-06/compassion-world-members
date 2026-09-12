@@ -28,7 +28,7 @@ export async function facilityPublicGet<T>(action: string, data: Record<string, 
   const url = new URL(runtimeValue("COMMON_FACILITY_GAS_URL"));
   url.searchParams.set("action", action);
   Object.entries(data).forEach(([key, value]) => url.searchParams.set(key, value));
-  const response = await fetch(url, { redirect: "follow", cache: "no-store" });
+  const response = await fetch(url, { redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(8_000) });
   if (!response.ok) throw new Error("FACILITY_API_UNAVAILABLE");
   const body = await response.json() as FacilityEnvelope<T>;
   if (!body.ok || body.data === undefined) throw new Error(body.error?.code || "FACILITY_API_ERROR");

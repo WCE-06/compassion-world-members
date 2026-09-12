@@ -60,6 +60,9 @@ export default function AvailabilityPage() {
         setLoading(false);
     } }, []);
     useEffect(() => { void (async () => { try {
+        const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
+        setDate(today);
+        const dayPromise = loadDay(today);
         const config = await fetch("/api/v1/client-config").then(r => r.json()), liffId = String(config.liffId ?? "");
         if (!liffId)
             throw new Error("LINE認証を準備できませんでした");
@@ -73,12 +76,8 @@ export default function AvailabilityPage() {
         if (!accessToken)
             throw new Error("LINE認証を確認できませんでした");
         setToken(accessToken);
-        const range = await fetch("/api/v1/availability/range").then(r => r.json()).catch(() => null);
-        const today = range?.minDate ?? new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
-        setDate(today);
-        const history = await fetch("/api/v1/reservations", { headers: { Authorization: `Bearer ${accessToken}` } }).then(r => r.ok ? r.json() : { reservations: [] });
-        setReservations(history.reservations ?? []);
-        await loadDay(today);
+        const historyPromise=fetch("/api/v1/reservations", { headers: { Authorization: `Bearer ${accessToken}` },signal:AbortSignal.timeout(8000) }).then(r => r.ok ? r.json() : { reservations: [] }).then(history=>setReservations(history.reservations??[])).catch(()=>undefined);
+        await Promise.allSettled([dayPromise,historyPromise]);
     }
     catch (error) {
         setLoading(false);
