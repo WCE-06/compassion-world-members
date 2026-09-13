@@ -235,7 +235,7 @@ test("今日やることは対象会員・注文と次の操作を表示し全�
   assert.doesNotMatch(operations,/AbortSignal\.timeout\(12000\)/);
   assert.match(dashboard,/対象を見る/);assert.match(dashboard,/住民契約管理を開く/);assert.match(dashboard,/統合取引台帳を開く/);
   assert.match(dashboard,/本日の全店舗売上/);assert.match(dashboard,/おもひで商店は未集計/);
-  assert.match(page,/商品・価格・販促をまとめて管理/);assert.match(page,/クーポン設定を開く/);
+  assert.match(page,/商品マスタ・販売設定/);assert.match(page,/クーポン設定を開く/);
 });
 
 test("予約導線は外部サイトへ移動せず会員証と同一サイト内で完結する", async () => {
@@ -1027,7 +1027,7 @@ test("統合管理でタスク・予約一覧・クーポン・配信・会員�
     readFile(new URL("app/api/v1/admin/members/bulk/route.ts",root),"utf8"),
     readFile(new URL("drizzle/0020_operations_console.sql",root),"utf8"),
   ]);
-  assert.match(sidebar,/SNSコントロール/);assert.match(sidebar,/精算・売上/);assert.match(sidebar,/在庫確認/);assert.match(sidebar,/スタッフToDo/);
+  assert.match(sidebar,/SNSコントロール/);assert.match(sidebar,/取引・精算・売上/);assert.match(sidebar,/入荷・在庫・棚卸/);assert.match(sidebar,/スタッフToDo/);
   assert.match(sidebar,/AdminMobileNav/);assert.match(sidebar,/スマートフォン用管理メニュー/);assert.match(page,/AdminMobileNav/);
   assert.match(page,/StudioReservationOverview/);assert.match(reservations,/staff\.reservations\.list/);
   assert.match(tasks,/operations_tasks/);assert.match(engagement,/message_campaigns/);assert.match(engagement,/automation_rules/);
@@ -1126,10 +1126,11 @@ test("スタッフ管理の全主要APIはパスワードログインを共通�
   assert.match(tasks,/AbortSignal\.timeout\(8000\)/);
 });
 
-test("スマレジ商品マスタ全件を同期し商品別に在庫管理対象外を設定できる",async()=>{
-  const [route,panel,migration,styles]=await Promise.all([
+test("スマレジ商品マスタ全件を同期し商品マスタ画面で在庫管理対象を設定できる",async()=>{
+  const [route,panel,master,migration,styles]=await Promise.all([
     readFile(new URL("app/api/v1/admin/inventory/route.ts",root),"utf8"),
     readFile(new URL("app/member-admin/InventoryPanel.tsx",root),"utf8"),
+    readFile(new URL("app/menu-admin/MasterCatalogPanel.tsx",root),"utf8"),
     readFile(new URL("drizzle/0024_inventory_product_settings.sql",root),"utf8"),
     readFile(new URL("app/member-admin/member-admin.css",root),"utf8"),
   ]);
@@ -1137,10 +1138,9 @@ test("スマレジ商品マスタ全件を同期し商品別に在庫管理対�
   assert.match(route,/SET_TRACKING/);
   assert.match(route,/WHERE p\.inventory_managed=1/);
   assert.match(route,/INVENTORY_NOT_MANAGED/);
-  assert.match(panel,/商品マスタ・実在庫を更新/);
-  assert.match(panel,/在庫を管理する/);
-  assert.match(panel,/在庫管理対象外/);
-  assert.match(panel,/inventory-product-name/);assert.match(styles,/Product and inventory management use one scannable list/);
+  assert.match(panel,/入荷対象・実在庫を更新/);
+  assert.match(master,/入荷・在庫・棚卸の対象にする/);
+  assert.doesNotMatch(panel,/inventory-product-name/);assert.match(styles,/Product and inventory management use one scannable list/);
   assert.match(migration,/inventory_product_settings/);
 });
 
@@ -1239,7 +1239,8 @@ test("統合会員管理から商品マスタを部門絞り込み・並び替�
     readFile(new URL("app/member-admin/AdminSidebar.tsx",root),"utf8"),
     readFile(new URL("app/menu-admin/ProductMasterWorkspace.tsx",root),"utf8"),
   ]);
-  assert.match(sidebar,/key:\s*"products"[\s\S]*?label:\s*"商品マスタ・期間売価"/);
+  assert.match(sidebar,/key:\s*"products"[\s\S]*?label:\s*"商品マスタ・販売設定"/);
+  assert.match(sidebar,/key:\s*"inventory"[\s\S]*?label:\s*"入荷・在庫・棚卸"/);
   assert.match(page,/tab==="products"/);
   assert.match(page,/<ProductMasterWorkspace allowCreate\/>/);
   assert.match(panel,/部門で絞り込み/);
@@ -1466,7 +1467,7 @@ test("精算管理へスマレジ店舗売上明細を表示し入荷登録を�
  assert.match(inventory,/inventory-suppliers/);assert.match(inventory,/使用日の新しい順/);
  assert.match(inventory,/期間限定価格・特売/);assert.match(inventory,/仕入れ価格ランキング/);
  assert.match(inventory,/supplierName: form\.supplierName/);assert.match(inventory,/isLimitedPrice: form\.isLimitedPrice/);
- assert.match(inventory,/かんたん入荷登録へ/);assert.match(inventory,/商品マスタを開く/);
+ assert.match(inventory,/かんたん入荷登録へ/);assert.match(inventory,/商品マスタ・販売設定へ/);
  assert.match(inventory,/id="quick-stock-receipt"/);
  assert.match(inventory,/`CW\$\{Date\.now\(\)\.toString\(36\)\.toUpperCase\(\)\}`/);
  assert.match(inventory,/スマレジへ商品を登録しました/);
@@ -1492,11 +1493,14 @@ test("入荷履歴から仕入れ先候補と商品別の安値ランキング�
  assert.match(migration,/inventory_purchase_prices_product_supplier_idx/);
 });
 
-test("入荷管理は簡単登録を上部、商品別設定を最下部に配置する",async()=>{
- const styles=await readFile(new URL("app/member-admin/member-admin.css",root),"utf8");
+test("商品管理の重複をなくし入荷画面を業務専用にする",async()=>{
+ const [styles,inventory,master]=await Promise.all([readFile(new URL("app/member-admin/member-admin.css",root),"utf8"),readFile(new URL("app/member-admin/InventoryPanel.tsx",root),"utf8"),readFile(new URL("app/menu-admin/MasterCatalogPanel.tsx",root),"utf8")]);
  assert.match(styles,/inventory-panel>\.inventory-layout\{order:3\}/);
- assert.match(styles,/inventory-panel>\.inventory-products\{order:7\}/);
  assert.match(styles,/inventory-primary-actions/);
+ assert.doesNotMatch(inventory,/className="inventory-products"/);
+ assert.match(inventory,/商品マスタ・販売設定へ/);
+ assert.match(master,/入荷・在庫・棚卸の対象にする/);
+ assert.match(master,/action:"SET_TRACKING"/);
 });
 
 test("商品管理はマスタ専用ページとしキッチン営業時間を操作対象から外す",async()=>{
@@ -1509,7 +1513,7 @@ test("商品管理はマスタ専用ページとしキッチン営業時間を�
  assert.match(page,/キッチンの営業時間はキッチンモニターで管理します/);
  assert.doesNotMatch(page,/onClick=\{\(\)=>setView\("HOURS"\)\}/);
  assert.match(page,/画像・掲載・並び順/);assert.match(route,/menu-admin\/page/);
- assert.match(inventory,/href="\/product-master"/);
+ assert.doesNotMatch(inventory,/href="\/product-master"/);
 });
 
 test("スタッフ管理はスマホ用分類メニューとカメラバーコード読取を備える",async()=>{

@@ -64,13 +64,13 @@ const items: Array<{
   { key: "finance", label: "取引・精算・売上", icon: WalletCards, ready: true },
   {
     key: "products",
-    label: "商品マスタ・期間売価",
+    label: "商品マスタ・販売設定",
     icon: Database,
     ready: true,
   },
   {
     key: "inventory",
-    label: "商品・在庫確認",
+    label: "入荷・在庫・棚卸",
     icon: PackageSearch,
     ready: true,
   },

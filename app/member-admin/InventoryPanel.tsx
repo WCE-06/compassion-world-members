@@ -60,12 +60,11 @@ const days = (date: string | null) =>
     ? Math.ceil((Date.parse(`${date}T00:00:00+09:00`) - Date.now()) / 86400000)
     : null;
 
-export function InventoryPanel() {
+export function InventoryPanel({ onOpenProducts }: { onOpenProducts: () => void }) {
   const [data, setData] = useState<Data | null>(null),
     [busy, setBusy] = useState(""),
     [message, setMessage] = useState(""),
     [categories, setCategories] = useState<[string, string][]>([]),
-    [q, setQ] = useState(""),
     [receiveQuery, setReceiveQuery] = useState(""),
     [cameraOpen, setCameraOpen] = useState(false),
     [showNewProduct, setShowNewProduct] = useState(false),
@@ -78,7 +77,6 @@ export function InventoryPanel() {
       taxRate: "10",
       category: "",
     }),
-    [filter, setFilter] = useState<"ALL" | "MANAGED" | "EXCLUDED">("ALL"),
     [form, setForm] = useState({
       productCode: "",
       quantity: "1",
@@ -151,17 +149,6 @@ export function InventoryPanel() {
   useEffect(() => {
     void loadCategories();
   }, [loadCategories]);
-  const products = useMemo(
-    () =>
-      data?.products.filter(
-        (p) =>
-          (filter === "ALL" ||
-            (filter === "MANAGED" && p.inventoryManaged) ||
-            (filter === "EXCLUDED" && !p.inventoryManaged)) &&
-          (!q || `${p.code} ${p.name}`.toLowerCase().includes(q.toLowerCase())),
-      ) ?? [],
-    [data, q, filter],
-  );
   const managedProducts = useMemo(
     () => data?.products.filter((p) => p.inventoryManaged) ?? [],
     [data],
@@ -186,10 +173,6 @@ export function InventoryPanel() {
       void load(true).then(() => loadCategories());
     }
   }, [data, load, loadCategories, smaregiCategories.length]);
-  const stockMap = useMemo(
-    () => new Map((data?.stocks ?? []).map((s) => [s.productCode, s])),
-    [data],
-  );
   const post = async (body: Record<string, unknown>) => {
     if (busy) return;
     setBusy(String(body.action));
@@ -432,14 +415,14 @@ export function InventoryPanel() {
     <section className="operations-panel inventory-panel">
       <header>
         <div>
-          <small>PRODUCTS & INVENTORY</small>
-          <h2>商品・在庫・販売期限</h2>
+          <small>STOCK OPERATIONS</small>
+          <h2>入荷・在庫・棚卸</h2>
           <p>
-            スマレジの商品マスタ全件を対象に、在庫管理する商品だけ期限・棚卸差異を管理します。
+            入荷、期限、実在庫、棚卸を扱います。商品情報と販売設定は商品マスタへ統合しました。
           </p>
         </div>
         <button disabled={Boolean(busy)} onClick={() => void load(true)}>
-          {busy === "SYNC" ? "商品・在庫を同期中…" : "商品マスタ・実在庫を更新"}
+          {busy === "SYNC" ? "入荷対象・在庫を同期中…" : "入荷対象・実在庫を更新"}
         </button>
       </header>
       {message && (
@@ -449,10 +432,10 @@ export function InventoryPanel() {
       )}
       <nav className="inventory-primary-actions" aria-label="入荷・商品管理">
         <a href="#quick-stock-receipt">かんたん入荷登録へ</a>
-        <a href="/product-master">商品マスタを開く</a>
+        <button type="button" onClick={onOpenProducts}>商品マスタ・販売設定へ</button>
       </nav>
       <div className="inventory-summary">
-        <Kpi label="商品マスタ" value={`${data?.products.length ?? 0}件`} />
+        <Kpi label="入荷対象商品" value={`${data?.products.length ?? 0}件`} />
         <Kpi label="在庫管理対象" value={`${managedProducts.length}件`} />
         <Kpi
           label="管理対象外"
@@ -480,87 +463,6 @@ export function InventoryPanel() {
             : "接続設定待ち。期限ロット台帳は先に利用できます。"}
         </span>
       </div>
-      <section className="inventory-products">
-        <header>
-          <div>
-            <small>INVENTORY POLICY</small>
-            <h3>商品別の在庫管理設定</h3>
-            <p>
-              通常はオンのまま使用します。無形サービスや都度調理品はオフにすると、入荷・棚卸し・差異補正の対象から外れます。
-            </p>
-          </div>
-          <div className="inventory-product-tools">
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as typeof filter)}
-            >
-              <option value="ALL">すべて</option>
-              <option value="MANAGED">在庫管理対象</option>
-              <option value="EXCLUDED">在庫管理対象外</option>
-            </select>
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="商品名・商品コードで検索"
-            />
-          </div>
-        </header>
-        <div className="inventory-product-grid">
-          {products.map((product) => {
-            const stock = stockMap.get(product.code);
-            return (
-              <article
-                key={product.code}
-                className={
-                  !product.inventoryManaged ? "inventory-excluded" : ""
-                }
-              >
-                <div className="inventory-product-name">
-                  <strong>{product.name}</strong>
-                  <small>
-                    {product.code}　{product.category}
-                  </small>
-                </div>
-                <b className="inventory-product-stock">
-                  {product.inventoryManaged
-                    ? stock
-                      ? `${stock.stockAmount - stock.layawayStockAmount}点`
-                      : "在庫未取得"
-                    : "在庫管理対象外"}
-                </b>
-                <label className="inventory-toggle">
-                  <input
-                    type="checkbox"
-                    checked={product.inventoryManaged}
-                    disabled={Boolean(busy)}
-                    onChange={(e) =>
-                      void post({
-                        action: "SET_TRACKING",
-                        productCode: product.code,
-                        productName: product.name,
-                        inventoryManaged: e.target.checked,
-                        managementNote: e.target.checked
-                          ? ""
-                          : "無形サービス・都度調理品等",
-                      })
-                    }
-                  />
-                  <span>在庫を管理する</span>
-                </label>
-                <span className="inventory-product-state">
-                  {product.inventoryManaged
-                    ? product.soldOut
-                      ? "売り切れ"
-                      : product.saleEndsAt
-                        ? `販売終了 ${new Date(product.saleEndsAt).toLocaleDateString("ja-JP")}`
-                        : "販売中"
-                    : "棚卸し・期限管理から除外"}
-                </span>
-              </article>
-            );
-          })}
-        </div>
-      </section>
       <div className="inventory-layout">
         <article className="inventory-receive" id="quick-stock-receipt">
           <small>STOCK RECEIPT</small>
