@@ -292,15 +292,30 @@ export function InventoryPanel() {
   };
   const createProductForReceipt = async () => {
     if (busy) return;
+    if (!newProduct.name.trim()) {
+      setMessage("商品名を入力してください");
+      return;
+    }
+    if (
+      newProduct.priceExcludingTax.trim() === "" ||
+      Number(newProduct.priceExcludingTax) < 0
+    ) {
+      setMessage("税抜価格を0円以上で入力してください");
+      return;
+    }
     setBusy("CREATE_PRODUCT");
     setMessage("商品マスタへ登録しています…");
     try {
+      const productCode =
+        newProduct.productCode.trim() ||
+        `CW${Date.now().toString(36).toUpperCase()}`;
       const response = await fetch("/api/v1/admin/product-master", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...newProduct,
-          janCode: newProduct.productCode,
+          productCode,
+          janCode: newProduct.productCode.trim() || null,
           priceExcludingTax: Number(newProduct.priceExcludingTax),
           costPrice: null,
           pointEligible: true,
@@ -312,27 +327,37 @@ export function InventoryPanel() {
         signal: AbortSignal.timeout(20000),
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok)
+      if (!response.ok && ![502, 503, 504].includes(response.status))
         throw new Error(result.message ?? result.error ?? "REGISTER_FAILED");
-      await fetch("/api/v1/admin/inventory", {
+      const masterPending = !response.ok;
+      const trackingResponse = await fetch("/api/v1/admin/inventory", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "SET_TRACKING",
-          productCode: newProduct.productCode,
+          productCode,
           productName: newProduct.name,
           inventoryManaged: true,
         }),
         signal: AbortSignal.timeout(15000),
       });
+      const trackingResult = await trackingResponse.json().catch(() => ({}));
+      if (!trackingResponse.ok)
+        throw new Error(
+          trackingResult.error ?? result.message ?? result.error ?? "REGISTER_FAILED",
+        );
       setForm((value) => ({
         ...value,
-        productCode: newProduct.productCode,
+        productCode,
       }));
-      setReceiveQuery(`${newProduct.name}（${newProduct.productCode}）`);
+      setReceiveQuery(`${newProduct.name}（${productCode}）`);
       setShowNewProduct(false);
-      setMessage("商品を登録しました。続けて入荷数と期限を入力してください");
-      await load(true);
+      setMessage(
+        masterPending
+          ? "入荷用の商品登録は完了しました。外部の商品マスタは現在接続待ちです。続けて入荷情報を入力できます"
+          : "商品を登録しました。続けて入荷数と期限を入力してください",
+      );
+      await load();
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -659,10 +684,7 @@ export function InventoryPanel() {
               <button
                 type="button"
                 disabled={
-                  busy === "CREATE_PRODUCT" ||
-                  !newProduct.productCode ||
-                  !newProduct.name ||
-                  newProduct.priceExcludingTax === ""
+                  busy === "CREATE_PRODUCT"
                 }
                 onClick={() => void createProductForReceipt()}
               >
@@ -670,6 +692,11 @@ export function InventoryPanel() {
                   ? "商品を登録中…"
                   : "商品マスタへ登録して入荷を続ける"}
               </button>
+              {!newProduct.productCode && (
+                <small>
+                  バーコードがない商品は、重複しない商品コードを自動で発行します。
+                </small>
+              )}
             </div>
           )}
           <label>
