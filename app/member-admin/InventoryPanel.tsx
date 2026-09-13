@@ -5,6 +5,8 @@ type Product = {
   code: string;
   name: string;
   category: string;
+  categoryId: string;
+  categoryName: string;
   soldOut: boolean;
   saleEndsAt: number | null;
   inventoryManaged: boolean;
@@ -70,8 +72,10 @@ export function InventoryPanel() {
       productCode: "",
       name: "",
       priceExcludingTax: "",
+      costIncludingTax: "",
+      costExcludingTax: "",
       taxRate: "10",
-      category: "RETAIL",
+      category: "",
     }),
     [filter, setFilter] = useState<"ALL" | "MANAGED" | "EXCLUDED">("ALL"),
     [form, setForm] = useState({
@@ -134,6 +138,17 @@ export function InventoryPanel() {
   );
   const managedProducts = useMemo(
     () => data?.products.filter((p) => p.inventoryManaged) ?? [],
+    [data],
+  );
+  const smaregiCategories = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          (data?.products ?? [])
+            .filter((product) => product.categoryId)
+            .map((product) => [product.categoryId, product.categoryName]),
+        ).entries(),
+      ).sort((a, b) => a[1].localeCompare(b[1], "ja")),
     [data],
   );
   const stockMap = useMemo(
@@ -303,6 +318,15 @@ export function InventoryPanel() {
       setMessage("税抜価格を0円以上で入力してください");
       return;
     }
+    if (!newProduct.category) {
+      setMessage("スマレジの商品ジャンルを選択してください");
+      return;
+    }
+    const costPrice = Number(newProduct.costExcludingTax);
+    if (!Number.isFinite(costPrice) || costPrice < 0) {
+      setMessage("仕入原価を税込または税抜で入力してください");
+      return;
+    }
     setBusy("CREATE_PRODUCT");
     setMessage("商品マスタへ登録しています…");
     try {
@@ -317,7 +341,7 @@ export function InventoryPanel() {
           productCode,
           janCode: newProduct.productCode.trim() || null,
           priceExcludingTax: Number(newProduct.priceExcludingTax),
-          costPrice: null,
+          costPrice,
           pointEligible: true,
           active: true,
           saleStartsAt: null,
@@ -327,9 +351,8 @@ export function InventoryPanel() {
         signal: AbortSignal.timeout(20000),
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok && ![502, 503, 504].includes(response.status))
+      if (!response.ok)
         throw new Error(result.message ?? result.error ?? "REGISTER_FAILED");
-      const masterPending = !response.ok;
       const trackingResponse = await fetch("/api/v1/admin/inventory", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -338,6 +361,12 @@ export function InventoryPanel() {
           productCode,
           productName: newProduct.name,
           inventoryManaged: true,
+          categoryId: newProduct.category,
+          categoryName:
+            smaregiCategories.find(([id]) => id === newProduct.category)?.[1] ??
+            newProduct.category,
+          price: Number(newProduct.priceExcludingTax),
+          cost: costPrice,
         }),
         signal: AbortSignal.timeout(15000),
       });
@@ -352,11 +381,7 @@ export function InventoryPanel() {
       }));
       setReceiveQuery(`${newProduct.name}（${productCode}）`);
       setShowNewProduct(false);
-      setMessage(
-        masterPending
-          ? "入荷用の商品登録は完了しました。外部の商品マスタは現在接続待ちです。続けて入荷情報を入力できます"
-          : "商品を登録しました。続けて入荷数と期限を入力してください",
-      );
+      setMessage("スマレジへ商品を登録しました。続けて入荷数と期限を入力してください");
       await load();
     } catch (error) {
       setMessage(
@@ -650,14 +675,69 @@ export function InventoryPanel() {
               </label>
               <div>
                 <label>
+                  仕入原価（税込）
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={newProduct.costIncludingTax}
+                    onChange={(event) => {
+                      const including = event.target.value;
+                      const rate = Number(newProduct.taxRate);
+                      setNewProduct((value) => ({
+                        ...value,
+                        costIncludingTax: including,
+                        costExcludingTax:
+                          including === ""
+                            ? ""
+                            : String(Math.round(Number(including) / (1 + rate / 100))),
+                      }));
+                    }}
+                  />
+                </label>
+                <label>
+                  仕入原価（税抜）
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={newProduct.costExcludingTax}
+                    onChange={(event) => {
+                      const excluding = event.target.value;
+                      const rate = Number(newProduct.taxRate);
+                      setNewProduct((value) => ({
+                        ...value,
+                        costExcludingTax: excluding,
+                        costIncludingTax:
+                          excluding === ""
+                            ? ""
+                            : String(Math.round(Number(excluding) * (1 + rate / 100))),
+                      }));
+                    }}
+                  />
+                </label>
+              </div>
+              <div>
+                <label>
                   税率
                   <select
                     value={newProduct.taxRate}
                     onChange={(event) =>
-                      setNewProduct((value) => ({
-                        ...value,
-                        taxRate: event.target.value,
-                      }))
+                      setNewProduct((value) => {
+                        const rate = Number(event.target.value);
+                        return {
+                          ...value,
+                          taxRate: event.target.value,
+                          costIncludingTax:
+                            value.costExcludingTax === ""
+                              ? value.costIncludingTax
+                              : String(
+                                  Math.round(
+                                    Number(value.costExcludingTax) * (1 + rate / 100),
+                                  ),
+                                ),
+                        };
+                      })
                     }
                   >
                     <option value="10">10%</option>
@@ -665,7 +745,7 @@ export function InventoryPanel() {
                   </select>
                 </label>
                 <label>
-                  分類
+                  商品ジャンル（スマレジ）
                   <select
                     value={newProduct.category}
                     onChange={(event) =>
@@ -675,9 +755,12 @@ export function InventoryPanel() {
                       }))
                     }
                   >
-                    <option value="RETAIL">物販</option>
-                    <option value="FOOD">フード</option>
-                    <option value="DRINK">ドリンク</option>
+                    <option value="">選択してください</option>
+                    {smaregiCategories.map(([id, name]) => (
+                      <option key={id} value={id}>
+                        {name}
+                      </option>
+                    ))}
                   </select>
                 </label>
               </div>

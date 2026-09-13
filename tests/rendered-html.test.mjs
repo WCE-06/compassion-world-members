@@ -1469,8 +1469,7 @@ test("精算管理へスマレジ店舗売上明細を表示し入荷登録を�
  assert.match(inventory,/かんたん入荷登録へ/);assert.match(inventory,/商品マスタを開く/);
  assert.match(inventory,/id="quick-stock-receipt"/);
  assert.match(inventory,/`CW\$\{Date\.now\(\)\.toString\(36\)\.toUpperCase\(\)\}`/);
- assert.match(inventory,/\[502, 503, 504\]\.includes\(response\.status\)/);
- assert.match(inventory,/外部の商品マスタは現在接続待ちです/);
+ assert.match(inventory,/スマレジへ商品を登録しました/);
  assert.match(inventory,/商品名を入力してください/);
  assert.match(inventory,/税抜価格を0円以上で入力してください/);
  assert.doesNotMatch(inventory,/!newProduct\.name \|\|/);
