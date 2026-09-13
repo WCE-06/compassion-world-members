@@ -1476,6 +1476,8 @@ test("精算管理へスマレジ店舗売上明細を表示し入荷登録を�
  assert.match(inventory,/categorySyncAttempted/);
  assert.match(inventory,/スマレジから取得中/);
  assert.match(inventory,/商品ジャンル（スマレジ）/);
+ assert.match(inventory,/view=categories/);
+ assert.match(inventory,/loadCategories/);
  assert.match(inventory,/await load\(\)/);
 });
 

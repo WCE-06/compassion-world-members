@@ -64,6 +64,7 @@ export function InventoryPanel() {
   const [data, setData] = useState<Data | null>(null),
     [busy, setBusy] = useState(""),
     [message, setMessage] = useState(""),
+    [categories, setCategories] = useState<[string, string][]>([]),
     [q, setQ] = useState(""),
     [receiveQuery, setReceiveQuery] = useState(""),
     [cameraOpen, setCameraOpen] = useState(false),
@@ -126,6 +127,30 @@ export function InventoryPanel() {
   useEffect(() => {
     void load();
   }, [load]);
+  const loadCategories = useCallback(async () => {
+    try {
+      const response = await fetch("/api/v1/admin/inventory?view=categories", {
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        location.replace("/member-admin/login");
+        return [] as [string, string][];
+      }
+      if (!response.ok) throw new Error(result.error);
+      const values = (result.categories ?? []).map(
+        (row: { id: string; name: string }) => [row.id, row.name] as [string, string],
+      );
+      setCategories(values);
+      return values;
+    } catch {
+      return [] as [string, string][];
+    }
+  }, []);
+  useEffect(() => {
+    void loadCategories();
+  }, [loadCategories]);
   const products = useMemo(
     () =>
       data?.products.filter(
@@ -141,17 +166,16 @@ export function InventoryPanel() {
     () => data?.products.filter((p) => p.inventoryManaged) ?? [],
     [data],
   );
-  const smaregiCategories = useMemo(
-    () =>
-      Array.from(
+  const smaregiCategories = useMemo(() => {
+    if (categories.length) return categories;
+    return Array.from(
         new Map(
           (data?.products ?? [])
             .filter((product) => product.categoryId)
             .map((product) => [product.categoryId, product.categoryName]),
         ).entries(),
-      ).sort((a, b) => a[1].localeCompare(b[1], "ja")),
-    [data],
-  );
+      ).sort((a, b) => a[1].localeCompare(b[1], "ja"));
+  }, [categories, data]);
   useEffect(() => {
     if (
       data &&
@@ -159,9 +183,9 @@ export function InventoryPanel() {
       !categorySyncAttempted.current
     ) {
       categorySyncAttempted.current = true;
-      void load(true);
+      void load(true).then(() => loadCategories());
     }
-  }, [data, load, smaregiCategories.length]);
+  }, [data, load, loadCategories, smaregiCategories.length]);
   const stockMap = useMemo(
     () => new Map((data?.stocks ?? []).map((s) => [s.productCode, s])),
     [data],
