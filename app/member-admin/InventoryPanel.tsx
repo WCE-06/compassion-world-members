@@ -91,6 +91,7 @@ export function InventoryPanel() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const cameraStream = useRef<MediaStream | null>(null);
   const scanFrame = useRef<number | null>(null);
+  const categorySyncAttempted = useRef(false);
   const load = useCallback(async (refresh = false) => {
     setBusy(refresh ? "SYNC" : "LOAD");
     setMessage(refresh ? "スマレジの商品マスタと実在庫を取得しています…" : "");
@@ -151,6 +152,16 @@ export function InventoryPanel() {
       ).sort((a, b) => a[1].localeCompare(b[1], "ja")),
     [data],
   );
+  useEffect(() => {
+    if (
+      data &&
+      smaregiCategories.length === 0 &&
+      !categorySyncAttempted.current
+    ) {
+      categorySyncAttempted.current = true;
+      void load(true);
+    }
+  }, [data, load, smaregiCategories.length]);
   const stockMap = useMemo(
     () => new Map((data?.stocks ?? []).map((s) => [s.productCode, s])),
     [data],
@@ -755,7 +766,13 @@ export function InventoryPanel() {
                       }))
                     }
                   >
-                    <option value="">選択してください</option>
+                    <option value="">
+                      {busy === "SYNC"
+                        ? "スマレジから取得中…"
+                        : smaregiCategories.length
+                          ? "選択してください"
+                          : "部門を取得できませんでした"}
+                    </option>
                     {smaregiCategories.map(([id, name]) => (
                       <option key={id} value={id}>
                         {name}

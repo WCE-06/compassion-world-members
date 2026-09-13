@@ -1473,6 +1473,9 @@ test("精算管理へスマレジ店舗売上明細を表示し入荷登録を�
  assert.match(inventory,/商品名を入力してください/);
  assert.match(inventory,/税抜価格を0円以上で入力してください/);
  assert.doesNotMatch(inventory,/!newProduct\.name \|\|/);
+ assert.match(inventory,/categorySyncAttempted/);
+ assert.match(inventory,/スマレジから取得中/);
+ assert.match(inventory,/商品ジャンル（スマレジ）/);
  assert.match(inventory,/await load\(\)/);
 });
 
