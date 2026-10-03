@@ -20,6 +20,25 @@ function jstDay(value: string) {
     ? Date.parse(`${value}T00:00:00+09:00`)
     : NaN;
 }
+function stringValue(row: Record<string, unknown>, keys: string[], fallback = "") {
+  for (const key of keys) {
+    const value = row[key];
+    if (value !== undefined && value !== null && String(value).trim())
+      return String(value);
+  }
+  return fallback;
+}
+function numberValue(row: Record<string, unknown>, keys: string[], fallback = 0) {
+  for (const key of keys) {
+    const value = Number(row[key]);
+    if (Number.isFinite(value)) return value;
+  }
+  return fallback;
+}
+function arrayValue(data: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) if (Array.isArray(data[key])) return data[key] as unknown[];
+  return [];
+}
 
 export async function GET(request: NextRequest) {
   if (!(admin(request) ?? (await requireAdminSession(request))))
@@ -83,36 +102,71 @@ export async function GET(request: NextRequest) {
             ? body.data
             : body
       ) as Record<string, unknown>,
-      rawStores = Array.isArray(data.stores) ? data.stores : [];
+      rawStores = arrayValue(data, ["stores", "storeSales", "storeSummaries"]);
     const stores = rawStores
       .map((value) => {
         const row = value as Record<string, unknown>;
         return {
-          storeId: String(row.storeId ?? ""),
-          name: String(row.storeName ?? row.name ?? row.storeId ?? "店舗"),
-          amount: Number(row.amount ?? row.sales ?? row.total ?? 0),
-          transactionCount: Number(row.transactionCount ?? 0),
+          storeId: stringValue(row, ["storeId", "storeCode", "id"]),
+          name: stringValue(row, ["storeName", "name", "storeId"], "店舗"),
+          amount: numberValue(row, ["amount", "sales", "total", "netSales"]),
+          transactionCount: numberValue(row, ["transactionCount", "count"]),
+          customerCount: numberValue(row, ["customerCount", "customers"]),
+          returnAmount: numberValue(row, ["returnAmount", "returns"]),
         };
       })
       .filter((row) => Number.isFinite(row.amount));
-    const rawTransactions = Array.isArray(data.transactions)
-      ? data.transactions
-      : [];
+    const rawTransactions = arrayValue(data, ["transactions", "receipts", "sales"]);
     const transactions = rawTransactions
       .map((value) => {
         const row = value as Record<string, unknown>;
         return {
-          id: String(row.id ?? ""),
-          receiptNo: String(row.receiptNo ?? ""),
-          storeId: String(row.storeId ?? ""),
-          storeName: String(row.storeName ?? row.storeId ?? "店舗"),
-          amount: Number(row.amount ?? 0),
-          occurredAt: String(row.occurredAt ?? ""),
-          memberCode: String(row.memberCode ?? ""),
-          division: String(row.division ?? "SALE"),
+          id: stringValue(row, ["id", "transactionId", "receiptId"]),
+          receiptNo: stringValue(row, ["receiptNo", "receiptNumber", "receipt_no"]),
+          storeId: stringValue(row, ["storeId", "storeCode"]),
+          storeName: stringValue(row, ["storeName", "storeId"], "店舗"),
+          amount: numberValue(row, ["amount", "total", "sales", "netSales"]),
+          tax: numberValue(row, ["tax", "taxAmount"]),
+          discount: numberValue(row, ["discount", "discountAmount"]),
+          occurredAt: stringValue(row, ["occurredAt", "soldAt", "transactionAt", "createdAt"]),
+          memberCode: stringValue(row, ["memberCode", "customerCode"]),
+          paymentMethod: stringValue(row, ["paymentMethod", "payment", "paymentName"]),
+          staffName: stringValue(row, ["staffName", "staff"]),
+          division: stringValue(row, ["division", "transactionDivision"], "SALE"),
         };
       })
       .filter((row) => row.id && Number.isFinite(row.amount));
+    const productRows = arrayValue(data, ["products", "items", "productSales"]).map(
+      (value) => {
+        const row = value as Record<string, unknown>;
+        return {
+          productId: stringValue(row, ["productId", "id", "code"]),
+          name: stringValue(row, ["name", "productName"], "商品"),
+          quantity: numberValue(row, ["quantity", "qty", "count"]),
+          amount: numberValue(row, ["amount", "sales", "total"]),
+        };
+      },
+    ).filter((row) => row.productId || row.name !== "商品");
+    const paymentRows = arrayValue(data, ["payments", "paymentMethods", "paymentSummary"]).map(
+      (value) => {
+        const row = value as Record<string, unknown>;
+        return {
+          method: stringValue(row, ["method", "paymentMethod", "name"], "未分類"),
+          amount: numberValue(row, ["amount", "sales", "total"]),
+          transactionCount: numberValue(row, ["transactionCount", "count"]),
+        };
+      },
+    ).filter((row) => Number.isFinite(row.amount));
+    const hourlyRows = arrayValue(data, ["hourly", "hourlySales", "timeBands"]).map(
+      (value) => {
+        const row = value as Record<string, unknown>;
+        return {
+          hour: stringValue(row, ["hour", "label", "time"], "時間帯"),
+          amount: numberValue(row, ["amount", "sales", "total"]),
+          transactionCount: numberValue(row, ["transactionCount", "count"]),
+        };
+      },
+    ).filter((row) => Number.isFinite(row.amount));
     const amount = Number(
       data.amount ??
         data.sales ??
@@ -127,7 +181,14 @@ export async function GET(request: NextRequest) {
         amount: Number.isFinite(amount) ? amount : 0,
         stores,
         transactions,
-        transactionCount: Number(data.transactionCount ?? 0),
+        products: productRows,
+        payments: paymentRows,
+        hourly: hourlyRows,
+        transactionCount: Number(data.transactionCount ?? transactions.length ?? 0),
+        customerCount: Number(data.customerCount ?? stores.reduce((sum, row) => sum + (row.customerCount || 0), 0)),
+        returnAmount: Number(data.returnAmount ?? stores.reduce((sum, row) => sum + (row.returnAmount || 0), 0)),
+        discountAmount: Number(data.discountAmount ?? transactions.reduce((sum, row) => sum + (row.discount || 0), 0)),
+        taxAmount: Number(data.taxAmount ?? transactions.reduce((sum, row) => sum + (row.tax || 0), 0)),
         syncedAt: String(data.syncedAt ?? new Date().toISOString()),
       },
       { headers: { "Cache-Control": "private, max-age=30" } },
